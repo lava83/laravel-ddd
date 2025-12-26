@@ -1,0 +1,34 @@
+<?php
+
+declare(strict_types=1);
+
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
+
+describe(
+    'Initialize equal filter',
+    function (): void {
+        it('creates an equal filter', function () {
+            $equal = new Equal('foo', 'bar');
+
+            expect($equal)->toBeInstanceOf(Equal::class);
+        });
+
+        it('has the correct target', function() {
+           expect((new Equal('foo', 'bar'))->value())->toBe('bar');
+        });
+
+        it('has the correct value', function() {
+            expect((new Equal('foo', 'bar'))->target())->toBe('foo');
+        });
+
+        it('has the correct array', function() {
+            expect((new Equal('foo', 'bar'))->toArray())->toBe([
+                'type' => '$eq',
+                'target' => 'foo',
+                'value' => 'bar',
+            ]);
+        });
+    }
+);
+
+
