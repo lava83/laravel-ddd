@@ -4,16 +4,24 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Domain\ValueObjects\Identity;
 
-use JsonSerializable;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
-use Stringable;
+use Ramsey\Uuid\UuidInterface;
 
-class MongoObjectId implements JsonSerializable, Stringable
+class MongoObjectId extends Id
 {
-    private function __construct(
-        private readonly string $value
-    ) {
-        $this->validate($value);
+    public static function fromString(string $value): static
+    {
+        return new static($value);
+    }
+
+    public function value(): int|string|UuidInterface
+    {
+        return $this->value;
+    }
+
+    public function toString(): string
+    {
+        return (string) $this->value();
     }
 
     public function __toString(): string
@@ -21,27 +29,9 @@ class MongoObjectId implements JsonSerializable, Stringable
         return $this->toString();
     }
 
-    public static function fromString(string $value): static
-    {
-        return new static($value);
-    }
-
-    public function value(): string
-    {
-        return $this->value;
-    }
-
-    public function toString(): string
-    {
-        return $this->value;
-    }
-
-    /**
-     * @return array{value: string}
-     */
     public function jsonSerialize(): string
     {
-        return $this->value;
+        return $this->toString();
     }
 
     public function equals(mixed $other): bool
@@ -49,13 +39,15 @@ class MongoObjectId implements JsonSerializable, Stringable
         return $other instanceof self && $this->value === $other->value;
     }
 
-    private function validate(string $value): void
+    /**
+     * @throws ValidationException
+     */
+    protected function validate(string $value): void
     {
         // ObjectId must be exactly 24 hexadecimal characters
-        if (! preg_match('/^[a-f0-9]{24}$/i', $value)) {
-            throw new ValidationException(
-                'Invalid ObjectId format. Expected 24 hexadecimal characters, got: ' . $value
-            );
+        if (!preg_match('/^[a-f0-9]{24}$/i', $value)) {
+            throw new ValidationException('Invalid ObjectId format. Expected 24 hexadecimal characters, got: '
+            . $value);
         }
     }
 }

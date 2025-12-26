@@ -13,13 +13,13 @@ class Money implements JsonSerializable, \Stringable
 
     private readonly string $currency;
 
-    public function __construct(float $amount, string $currency)
+    final public function __construct(float $amount, string $currency)
     {
         if ($amount < 0) {
             throw new InvalidArgumentException('Amount cannot be negative');
         }
 
-        if (! in_array($currency, ['USD', 'EUR', 'GBP'])) {
+        if (!in_array($currency, ['USD', 'EUR', 'GBP'], true)) {
             throw new InvalidArgumentException('Unsupported currency');
         }
 

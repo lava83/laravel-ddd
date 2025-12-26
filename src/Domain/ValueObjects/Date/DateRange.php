@@ -17,7 +17,10 @@ class DateRange implements JsonSerializable, Stringable
 
     private readonly CarbonImmutable $endDate;
 
-    public function __construct(CarbonInterface $startDate, CarbonInterface $endDate)
+    /**
+     * @throws ValidationException
+     */
+    final public function __construct(CarbonInterface $startDate, CarbonInterface $endDate)
     {
         $this->startDate = CarbonImmutable::instance($startDate)->startOfDay();
         $this->endDate = CarbonImmutable::instance($endDate)->endOfDay();
@@ -31,28 +34,26 @@ class DateRange implements JsonSerializable, Stringable
             '%s to %s (%d days)',
             $this->startDate->toDateString(),
             $this->endDate->toDateString(),
-            $this->durationInDays()
+            $this->durationInDays(),
         );
     }
 
     public static function fromString(string $startDate, string $endDate): static
     {
         try {
-            return new self(
-                CarbonImmutable::parse($startDate),
-                CarbonImmutable::parse($endDate)
-            );
+            return new self(CarbonImmutable::parse($startDate), CarbonImmutable::parse($endDate));
         } catch (Exception) {
             throw new ValidationException('Invalid date format provided');
         }
     }
 
     /**
-     * @param  array<string, string>  $dateRange
+     * @param array<string, string> $dateRange
+     * @throws ValidationException
      */
     public static function fromArray(array $dateRange): static
     {
-        if (! isset($dateRange['start_date']) || ! isset($dateRange['end_date'])) {
+        if (!isset($dateRange['start_date']) || !isset($dateRange['end_date'])) {
             throw new ValidationException('Date range must contain start_date and end_date');
         }
 
@@ -68,30 +69,21 @@ class DateRange implements JsonSerializable, Stringable
     {
         $now = CarbonImmutable::now();
 
-        return new static(
-            $now->startOfWeek(CarbonInterface::MONDAY),
-            $now->endOfWeek(CarbonInterface::SUNDAY)
-        );
+        return new static($now->startOfWeek(CarbonInterface::MONDAY), $now->endOfWeek(CarbonInterface::SUNDAY));
     }
 
     public static function currentMonth(): static
     {
         $now = CarbonImmutable::now();
 
-        return new static(
-            $now->startOfMonth(),
-            $now->endOfMonth()
-        );
+        return new static($now->startOfMonth(), $now->endOfMonth());
     }
 
     public static function currentYear(): static
     {
         $now = CarbonImmutable::now();
 
-        return new static(
-            $now->startOfYear(),
-            $now->endOfYear()
-        );
+        return new static($now->startOfYear(), $now->endOfYear());
     }
 
     public static function previousWeek(): static
@@ -100,7 +92,7 @@ class DateRange implements JsonSerializable, Stringable
 
         return new static(
             $now->subWeek()->startOfWeek(CarbonInterface::MONDAY),
-            $now->subWeek()->endOfWeek(CarbonInterface::SUNDAY)
+            $now->subWeek()->endOfWeek(CarbonInterface::SUNDAY),
         );
     }
 
@@ -108,40 +100,28 @@ class DateRange implements JsonSerializable, Stringable
     {
         $now = CarbonImmutable::now();
 
-        return new static(
-            $now->subMonth()->startOfMonth(),
-            $now->subMonth()->endOfMonth()
-        );
+        return new static($now->subMonth()->startOfMonth(), $now->subMonth()->endOfMonth());
     }
 
     public static function previousYear(): static
     {
         $now = CarbonImmutable::now();
 
-        return new static(
-            $now->subYear()->startOfYear(),
-            $now->subYear()->endOfYear()
-        );
+        return new static($now->subYear()->startOfYear(), $now->subYear()->endOfYear());
     }
 
     public static function lastNDays(int $days): static
     {
         $now = CarbonImmutable::now();
 
-        return new static(
-            $now->subDays($days - 1),
-            $now
-        );
+        return new static($now->subDays($days - 1), $now);
     }
 
     public static function previousPeriodOf(DateRange $dateRange): static
     {
         $durationDays = $dateRange->durationInDays();
 
-        return new static(
-            $dateRange->startDate()->subDays((int) $durationDays + 1),
-            $dateRange->startDate()->subDay()
-        );
+        return new static($dateRange->startDate()->subDays((int) $durationDays + 1), $dateRange->startDate()->subDay());
     }
 
     public function startDate(): CarbonImmutable
@@ -213,26 +193,20 @@ class DateRange implements JsonSerializable, Stringable
 
     public function merge(DateRange $other): DateRange
     {
-        if (! $this->overlaps($other) && ! $this->touches($other)) {
+        if (!$this->overlaps($other) && !$this->touches($other)) {
             throw new ValidationException('Cannot merge non-overlapping and non-touching date ranges');
         }
 
-        return new static(
-            $this->startDate->min($other->startDate),
-            $this->endDate->max($other->endDate)
-        );
+        return new static($this->startDate->min($other->startDate), $this->endDate->max($other->endDate));
     }
 
     public function intersect(DateRange $other): ?DateRange
     {
-        if (! $this->overlaps($other)) {
+        if (!$this->overlaps($other)) {
             return null;
         }
 
-        return new static(
-            $this->startDate->max($other->startDate),
-            $this->endDate->min($other->endDate)
-        );
+        return new static($this->startDate->max($other->startDate), $this->endDate->min($other->endDate));
     }
 
     /**
@@ -242,7 +216,7 @@ class DateRange implements JsonSerializable, Stringable
     {
         $split = CarbonImmutable::instance($splitDate);
 
-        if (! $this->contains($split)) {
+        if (!$this->contains($split)) {
             throw new ValidationException('Split date must be within the date range');
         }
 
@@ -258,10 +232,7 @@ class DateRange implements JsonSerializable, Stringable
 
     public function extend(int $daysBefore = 0, int $daysAfter = 0): DateRange
     {
-        return new static(
-            $this->startDate->subDays($daysBefore),
-            $this->endDate->addDays($daysAfter)
-        );
+        return new static($this->startDate->subDays($daysBefore), $this->endDate->addDays($daysAfter));
     }
 
     public function isCurrentWeek(): bool
@@ -310,11 +281,7 @@ class DateRange implements JsonSerializable, Stringable
 
     public function format(string $format = 'Y-m-d'): string
     {
-        return sprintf(
-            '%s - %s',
-            $this->startDate->format($format),
-            $this->endDate->format($format)
-        );
+        return sprintf('%s - %s', $this->startDate->format($format), $this->endDate->format($format));
     }
 
     /**

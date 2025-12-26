@@ -5,22 +5,25 @@ declare(strict_types=1);
 namespace Lava83\LaravelDdd\Domain\Entities;
 
 use Carbon\CarbonImmutable;
-use DateTimeImmutable;
-use Illuminate\Database\Eloquent\Model;
+use DateTimeInterface;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\MongoObjectId;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Uuid;
+use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
+use Lava83\LaravelDdd\Infrastructure\Models\Model;
 use LogicException;
 use ReflectionClass;
+use ReflectionException;
 use Stringable;
 
 /**
  * Base class for all entities (both aggregate roots and child entities)
  * Contains common entity functionality without domain event handling
+ * @todo fix: error[kan-defect]: Class has a high kan defect score (1.61).
  */
 abstract class Entity implements Stringable
 {
-    /** @var Collection<string, mixed> */
+    /** @var Collection<string, null|string|int|array|Collection|ValueObject> */
     protected Collection $dirty;
 
     public function __construct(
@@ -32,25 +35,11 @@ abstract class Entity implements Stringable
     }
 
     /**
-     * Clone protection - entities should not be cloned carelessly
-     */
-    protected function __clone()
-    {
-        // Keep the same timestamps and version on clone
-        // Child classes can override this behavior
-    }
-
-    /**
      * String representation for debugging
      */
     public function __toString(): string
     {
-        return sprintf(
-            '%s[id=%s, version=%d]',
-            static::class,
-            $this->id()->value(),
-            $this->version
-        );
+        return sprintf('%s[id=%s, version=%d]', static::class, $this->id()->value(), $this->version);
     }
 
     /**
@@ -96,9 +85,8 @@ abstract class Entity implements Stringable
         return $this->version;
     }
 
-    public function hydrate(
-        Model $model,
-    ): void {
+    public function hydrate(Model $model): void
+    {
         $this->createdAt = CarbonImmutable::parse($model->created_at);
         $this->updatedAt = $model->updated_at ? CarbonImmutable::parse($model->updated_at) : null;
         $this->version = $model->version;
@@ -107,12 +95,12 @@ abstract class Entity implements Stringable
     /**
      * Convert entity to array for persistence
      *
-     * @return array<string, int|string|null>
+     * @return array{id: string, created_at: string, updated_at: null|string, version: int}
      */
     public function toArray(): array
     {
         return [
-            'id' => $this->id()->value(),
+            'id' => $this->id()->toString(),
             'created_at' => $this->createdAt->format('Y-m-d H:i:s'),
             'updated_at' => $this->updatedAt?->format('Y-m-d H:i:s'),
             'version' => $this->version,
@@ -197,8 +185,8 @@ abstract class Entity implements Stringable
             'entity_type' => static::class,
             'entity_id' => $this->id()->value(),
             'version' => $this->version,
-            'created_at' => $this->createdAt()->format(DateTimeImmutable::ATOM),
-            'updated_at' => $this->updatedAt()->format(DateTimeImmutable::ATOM),
+            'created_at' => $this->createdAt()->format(DateTimeInterface::ATOM),
+            'updated_at' => $this->updatedAt()->format(DateTimeInterface::ATOM),
             'age_seconds' => $this->ageInSeconds(),
         ];
     }
@@ -223,7 +211,8 @@ abstract class Entity implements Stringable
     /**
      * Helper method for child entities to update themselves
      *
-     * @param  array<string, mixed>  $changes  Key-value pairs of changes made to the aggregate
+     * @param array<string, null|string|int|array|Collection|ValueObject> $changes Key-value pairs of changes made to the aggregate
+     * @throws ReflectionException
      */
     protected function updateEntity(array $changes): Collection
     {
@@ -239,12 +228,19 @@ abstract class Entity implements Stringable
         return $changes;
     }
 
+    /**
+     * Collects changes between current entity state and new values
+     *
+     * @param array<string, null|string|int|array|Collection|ValueObject> $newValues Key-value pairs of new values to compare
+     * @return Collection<string, null|string|int|array|Collection|ValueObject> Collection of changes with 'old_' and 'new_' prefixes
+     * @throws ReflectionException
+     */
     protected function collectChanges(array $newValues): Collection
     {
         $this->resetDirty();
 
         foreach ($newValues as $property => $newValue) {
-            $currentValue = $this->$property;
+            $currentValue = $this->getPropertyValue($property);
 
             if ($this->hasChanged($currentValue, $newValue)) {
                 $this->dirty->put('old_' . $property, $currentValue);
@@ -257,20 +253,11 @@ abstract class Entity implements Stringable
 
     protected function hasChanged(mixed $current, mixed $new): bool
     {
-        if (is_object($current) && method_exists($current, '__toString')) {
+        if ($current instanceof Stringable) {
             return (string) $current !== (string) $new;
         }
 
         return $current !== $new;
-    }
-
-    protected function applyChangesByPropertyMap(array $propertyMap, Collection $changes): void
-    {
-        foreach ($propertyMap as $property => $setter) {
-            if ($changes->has('new_' . $property)) {
-                $setter($changes->get('new_' . $property));
-            }
-        }
     }
 
     protected function updateDirtyEntity(): void
@@ -282,23 +269,25 @@ abstract class Entity implements Stringable
      * Applies changes from a collection to the aggregate's properties using reflection
      * Automatically maps properties based on naming convention
      *
-     * @param  Collection  $changes  Collection with keys like 'new_{propertyName}'
-     * @param  array<string, callable>  $customSetters  Optional custom setters for specific properties
+     * @param Collection<string, null|string|int|array|Collection|ValueObject> $changes Collection with keys like 'new_{propertyName}'
+     * @param array<string, callable> $customSetters Optional custom setters for specific properties
+     * @throws ReflectionException
      */
     protected function applyChanges(Collection $changes, array $customSetters = []): void
     {
         $excludedProperties = ['id', 'version', 'createdAt', 'updatedAt', 'domainEvents'];
 
-        $reflectionClass = new ReflectionClass($this);
+        $reflectionClass = $this->reflectionClass();
+
         $constructor = $reflectionClass->getConstructor();
 
-        if (! $constructor) {
+        if (!$constructor) {
             return;
         }
 
         foreach ($constructor->getParameters() as $parameter) {
             // Only process promoted properties
-            if (! $parameter->isPromoted()) {
+            if (!$parameter->isPromoted()) {
                 continue;
             }
 
@@ -311,7 +300,7 @@ abstract class Entity implements Stringable
 
             $changeKey = 'new_' . $propertyName;
 
-            if (! $changes->has($changeKey)) {
+            if (!$changes->has($changeKey)) {
                 continue;
             }
 
@@ -324,13 +313,63 @@ abstract class Entity implements Stringable
                 continue;
             }
 
-            // Apply value directly
-            $reflectionClass->getProperty($propertyName)->setValue($this, $value);
+            $this->setPropertyValue($propertyName, $value);
         }
     }
 
     private function resetDirty(): void
     {
         $this->dirty = collect();
+    }
+
+    /**
+     * @throws ReflectionException
+     */
+    protected function setPropertyValue(string $property, null|string|int|array|Collection|ValueObject $value): void
+    {
+        $reflectionClass = $this->reflectionClass();
+
+        $this->ensurePropertyExists($property);
+
+        $reflectionProperty = $reflectionClass->getProperty($property);
+        $reflectionProperty->setValue($this, $value);
+    }
+
+    /**
+     * @throws ReflectionException
+     */
+    protected function getPropertyValue(string $property): null|string|int|array|Collection|ValueObject
+    {
+        $reflectionClass = $this->reflectionClass();
+
+        $this->ensurePropertyExists($property);
+
+        $reflectionProperty = $reflectionClass->getProperty($property);
+
+        /** @var null|string|int|array|Collection|ValueObject $value */
+        $value = $reflectionProperty->getValue($this);
+
+        return $value;
+    }
+
+    /**
+     * @throws ReflectionException
+     */
+    private function ensurePropertyExists(string $property): void
+    {
+        $reflectionClass = $this->reflectionClass();
+
+        if (!$reflectionClass->hasProperty($property)) {
+            throw new LogicException("Property {$property} does not exist on " . static::class);
+        }
+    }
+
+    /**
+     * @return ReflectionClass
+     * @throws ReflectionException
+     */
+    private function reflectionClass(): ReflectionClass
+    {
+        return once(fn(): ReflectionClass => new ReflectionClass($this));
     }
 }

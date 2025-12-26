@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder;
-use Tests\TestCase;
 
 it('initializes the builder', function () {
     $builder = new Builder();
@@ -23,14 +22,22 @@ describe('Builder equal', function () {
 
         $builder->eq('foo', 'bar');
 
-        expect($builder)->toHaveCount(1)
-            ->and($builder->toArray())->toBeArray()
-            ->and($builder->toArray())->toMatchArray([
-                [
-                    'type' => '$eq',
-                    'target' => 'foo',
-                    'value' => 'bar',
-                ]
-            ]);
+        expect($builder)->toHaveCount(1);
+    });
+
+    it('can convert to array', function () {
+        $builder = new Builder();
+
+        $builder->eq('foo', 'bar');
+
+        $expectedArray = [
+            [
+                'type' => '$eq',
+                'target' => 'foo',
+                'value' => 'bar',
+            ],
+        ];
+
+        expect($builder->toArray())->toBe($expectedArray);
     });
 });

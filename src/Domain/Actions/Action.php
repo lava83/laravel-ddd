@@ -24,7 +24,7 @@ abstract class Action
             return $instance;
         }
 
-        return tap(Mockery::getContainer()->mock(static::class), fn () => app()->instance(static::class, $instance));
+        return tap(Mockery::getContainer()->mock(static::class), fn() => app()->instance(static::class, $instance));
     }
 
     public static function shouldExecute(): ExpectationInterface|HigherOrderMessage

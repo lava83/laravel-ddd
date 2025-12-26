@@ -1,10 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Lava83\LaravelDdd;
 
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use Lava83\LaravelDdd\Commands\LaravelDddCommand;
 
 class LaravelDddServiceProvider extends PackageServiceProvider
 {

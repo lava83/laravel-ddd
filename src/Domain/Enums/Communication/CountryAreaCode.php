@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Domain\Enums\Communication;
 
-use InvalidArgumentException;
-
 enum CountryAreaCode: string
 {
     case US = '+1';
@@ -33,6 +31,6 @@ enum CountryAreaCode: string
      */
     public static function values(): array
     {
-        return array_map(fn (self $code) => $code->value, self::cases());
+        return array_map(fn(self $code) => $code->value, self::cases());
     }
 }

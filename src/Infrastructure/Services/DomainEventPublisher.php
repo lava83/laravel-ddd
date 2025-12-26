@@ -12,15 +12,14 @@ final readonly class DomainEventPublisher
 {
     public function __construct(
         private Dispatcher $dispatcher,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  Collection<int, DomainEvent>  $events
      */
     public function publishEvents(Collection $events): void
     {
-        $events->each(fn (DomainEvent $event) => $this->publishEvent($event));
+        $events->each(fn(DomainEvent $event) => $this->publishEvent($event));
     }
 
     public function publishEvent(DomainEvent $event): void

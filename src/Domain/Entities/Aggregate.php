@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Lava83\LaravelDdd\Domain\Entities;
 
 use DateTimeImmutable;
+use DateTimeInterface;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Contracts\AggregateRoot;
 use Lava83\LaravelDdd\Domain\Contracts\DomainEvent;
+use Lava83\LaravelDdd\Domain\Events\DomainEvent as DomainEventClass;
+use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 use LogicException;
 
 /**
@@ -30,7 +33,7 @@ abstract class Aggregate extends Entity implements AggregateRoot
      */
     public function __clone()
     {
-        parent::__clone();
+        // parent::__clone();
         // Reset events on clone to prevent event duplication
         // @todo make method resetEvents()
         // or similar to reset events in a more generic way
@@ -69,7 +72,7 @@ abstract class Aggregate extends Entity implements AggregateRoot
     public function uncommittedEvents(): Collection
     {
         // Return a copy of the events to prevent external modification
-        return $this->domainEvents->map(fn (DomainEvent $event): DomainEvent => clone $event);
+        return $this->domainEvents->map(fn(DomainEvent $event): DomainEvent => clone $event);
     }
 
     public function markEventsAsCommitted(): void
@@ -79,7 +82,7 @@ abstract class Aggregate extends Entity implements AggregateRoot
 
     public function hasUncommittedEvents(): bool
     {
-        return ! $this->domainEvents->isEmpty();
+        return !$this->domainEvents->isEmpty();
     }
 
     /**
@@ -101,20 +104,20 @@ abstract class Aggregate extends Entity implements AggregateRoot
     /**
      * Get summary of uncommitted events for debugging
      *
-     * @return Collection<int, array<string, string>>
+     * @return Collection<int, array{event_name:string,aggregate_id:string,occurred_on:string}>
      */
     public function eventSummary(): Collection
     {
         return $this->domainEvents->map(fn(DomainEvent $event): array => [
             'event_name' => $event->eventName(),
-            'aggregate_id' => $event->aggregateId()->value(),
-            'occurred_on' => $event->occurredOn()->format(DateTimeImmutable::ATOM),
+            'aggregate_id' => $event->aggregateId()->toString(),
+            'occurred_on' => $event->occurredOn()->format(DateTimeInterface::ATOM),
         ]);
     }
 
     public function eventByType(string $eventName): ?DomainEvent
     {
-        return $this->domainEvents->first(fn (DomainEvent $event): bool => $event->eventName() === $eventName) ?? null;
+        return $this->domainEvents->first(fn(DomainEvent $event): bool => $event->eventName() === $eventName) ?? null;
     }
 
     /**
@@ -122,7 +125,14 @@ abstract class Aggregate extends Entity implements AggregateRoot
      */
     public function clearEventsOfType(string $eventName): void
     {
-        $this->domainEvents = $this->domainEvents->filter(fn (DomainEvent $event): bool => $event->eventName() !== $eventName);
+        /**
+         * @var Collection<int, DomainEvent> $filteredDomainEvents
+         */
+        $filteredDomainEvents = $this->domainEvents->filter(
+            fn(DomainEvent $event): bool => $event->eventName() !== $eventName,
+        );
+
+        $this->domainEvents = $filteredDomainEvents;
     }
 
     /**
@@ -130,19 +140,22 @@ abstract class Aggregate extends Entity implements AggregateRoot
      */
     public function countEventsOfType(string $eventName): int
     {
-        return $this->domainEvents->filter(fn (DomainEvent $event): bool => $event->eventName() === $eventName)->count();
+        return $this->domainEvents->filter(fn(DomainEvent $event): bool => $event->eventName() === $eventName)->count();
     }
 
     /**
      * Helper method for aggregate roots to update and record change event
      *
-     * @param  array<string, mixed>  $changes  Key-value pairs of changes made to the aggregate
+     * @param array<string, null|string|int|array|Collection|ValueObject> $changes Key-value pairs of changes made to the aggregate
+     * @param class-string<DomainEventClass>|null $eventClass Optional event class to instantiate
+     * @param DomainEvent|null $event Optional pre-created event instance
+     * @throws \ReflectionException
      */
-    protected function updateAggregateRoot(
-        array $changes,
-        ?string $eventClass = null,
-        ?DomainEvent $event = null
-    ): void {
+    protected function updateAggregateRoot(array $changes, ?string $eventClass = null, ?DomainEvent $event = null): void
+    {
+        /**
+         * @var Collection<string, mixed> $changesCollection
+         */
         $changesCollection = $this->updateEntity($changes);
 
         if ($changesCollection->isEmpty()) {
@@ -150,7 +163,7 @@ abstract class Aggregate extends Entity implements AggregateRoot
         }
 
         if ($eventClass !== null) {
-            if (! is_a($eventClass, DomainEvent::class, true)) {
+            if (!is_a($eventClass, DomainEvent::class, true)) {
                 throw new LogicException(sprintf('Event class %s must implement DomainEvent interface', $eventClass));
             }
 

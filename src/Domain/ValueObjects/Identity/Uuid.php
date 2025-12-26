@@ -4,33 +4,19 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Domain\ValueObjects\Identity;
 
-use DateTimeInterface;
-use JsonSerializable;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Ramsey\Uuid\Uuid as RamseyUuid;
 use Ramsey\Uuid\UuidInterface;
-use Stringable;
+use Throwable;
 
 // @todo this is only a base class without specification of UUID or whatever.
 
-class Uuid implements JsonSerializable, Stringable
+/**
+ * @property-read UuidInterface $value
+ */
+class Uuid extends Id
 {
     protected string $prefix = '';
-
-    private readonly UuidInterface $value;
-
-    /**
-     * @throws ValidationException
-     */
-    final public function __construct(string $value)
-    {
-        if (blank($this->prefix)) {
-            throw new ValidationException('Prefix must be set in the child class');
-        }
-
-        $this->validate($value);
-        $this->value = RamseyUuid::fromString($value);
-    }
 
     public function __toString(): string
     {
@@ -42,21 +28,29 @@ class Uuid implements JsonSerializable, Stringable
         return new static(RamseyUuid::uuid7(now())->toString());
     }
 
+    /**
+     * @throws ValidationException
+     */
     public static function fromString(string $value): static
     {
-        return new static($value);
+        self::validate($value);
+
+        return new static(RamseyUuid::fromString($value));
     }
 
-    public static function fromUuid(UuidInterface $uuid): static
+    public static function fromUuid(Uuid $uuid): static
     {
-        return new static($uuid->toString());
+        return new static(RamseyUuid::fromString((string) $uuid));
     }
 
     public static function fromBytes(string $bytes): static
     {
-        return new static(RamseyUuid::fromBytes($bytes)->toString());
+        return new static(RamseyUuid::fromBytes($bytes));
     }
 
+    /**
+     * @throws ValidationException
+     */
     public static function fromPrefixed(string $prefixedId): static
     {
         $value = str($prefixedId);
@@ -66,12 +60,15 @@ class Uuid implements JsonSerializable, Stringable
         }
 
         try {
-            return new static($value->afterLast('_')->toString());
-        } catch (ValidationException) {
+            return new static(RamseyUuid::fromString((string) $value->afterLast('_')));
+        } catch (Throwable) {
             throw new ValidationException('Invalid prefixed ID format');
         }
     }
 
+    /**
+     * @throws ValidationException
+     */
     public static function extractPrefix(string $prefixedId): string
     {
         $value = str($prefixedId);
@@ -112,7 +109,7 @@ class Uuid implements JsonSerializable, Stringable
      */
     public static function fromArray(array $values): array
     {
-        return array_map(fn (string $value): static => new static($value), $values);
+        return array_map(fn(string $value): static => new static(RamseyUuid::fromString($value)), $values);
     }
 
     /**
@@ -122,7 +119,7 @@ class Uuid implements JsonSerializable, Stringable
      */
     public static function toStringArray(array $ids): array
     {
-        return array_map(fn (Uuid $id): string => $id->value(), $ids);
+        return array_map(fn(Uuid $id): string => $id->value(), $ids);
     }
 
     public function value(): string
@@ -142,12 +139,7 @@ class Uuid implements JsonSerializable, Stringable
 
     public function hex(): string
     {
-        return $this->value->getHex()->toString();
-    }
-
-    public function equals(Uuid $other): bool
-    {
-        return $this->value->equals($other->value);
+        return (string) $this->value->getHex();
     }
 
     public function toString(): string
@@ -196,23 +188,6 @@ class Uuid implements JsonSerializable, Stringable
     }
 
     /**
-     * Get the timestamp component from UUID v1 (if applicable)
-     * Returns null for UUID v4 and higher
-     */
-    public function timestamp(): ?DateTimeInterface
-    {
-        return $this->value->getDateTime();
-    }
-
-    /**
-     * Get UUID version
-     */
-    public function version(): ?int
-    {
-        return $this->value->getVersion();
-    }
-
-    /**
      * Check if this is a nil/empty UUID
      */
     public function isNil(): bool
@@ -258,40 +233,25 @@ class Uuid implements JsonSerializable, Stringable
 
     public function logId(): string
     {
-        return str($this->shortId())
-            ->substr(0, 4)
-            ->append('****')
-            ->toString();
+        return str($this->shortId())->substr(0, 4)->append('****')->toString();
     }
 
     public function displayId(): string
     {
-        return str($this->withPrefix())
-            ->upper()
-            ->replace('_', '-')
-            ->toString();
+        return str($this->withPrefix())->upper()->replace('_', '-')->toString();
     }
 
     /**
      * @throws ValidationException
      */
-    private function validate(string $value): void
+    private static function validate(string $value): void
     {
         if (blank($value)) {
             throw new ValidationException('Id cannot be empty');
         }
 
-        if (! RamseyUuid::isValid($value)) {
-            throw new ValidationException('Invalid UUID format: '.$value);
-        }
-
-        $uuid = RamseyUuid::fromString($value);
-
-        if (
-            $value !== RamseyUuid::NIL
-            && $uuid->getVersion() < 4
-        ) {
-            throw new ValidationException('Only UUID version 4 or higher are allowed, got version: '.$uuid->getVersion());
+        if (!RamseyUuid::isValid($value)) {
+            throw new ValidationException('Invalid UUID format: ' . $value);
         }
     }
 }

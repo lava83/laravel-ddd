@@ -7,10 +7,10 @@ namespace Lava83\LaravelDdd\Domain\ValueObjects\Communication;
 use Closure;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Stringable;
-use JsonSerializable;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
+use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
-class Email implements JsonSerializable, \Stringable
+class Email extends ValueObject
 {
     private readonly Stringable $value;
 
@@ -18,7 +18,10 @@ class Email implements JsonSerializable, \Stringable
 
     private Stringable $domain;
 
-    public function __construct(string $email)
+    /**
+     * @throws ValidationException
+     */
+    final public function __construct(string $email)
     {
         $email = str($email);
 
@@ -32,14 +35,20 @@ class Email implements JsonSerializable, \Stringable
         return $this->toString();
     }
 
+    /**
+     * @throws ValidationException
+     */
     public static function fromString(string $email): static
     {
         return new static($email);
     }
 
+    /**
+     * @throws ValidationException
+     */
     public static function fromParts(string $localPart, string $domain): static
     {
-        return new static($localPart.'@'.$domain);
+        return new static($localPart . '@' . $domain);
     }
 
     public function value(): Stringable
@@ -104,7 +113,7 @@ class Email implements JsonSerializable, \Stringable
             'mac.com',
         ];
 
-        return ! in_array($this->domainWithoutSubdomain(), $personalProviders);
+        return in_array($this->domainWithoutSubdomain(), $personalProviders, true) === false;
     }
 
     public function isGermanProvider(): bool
@@ -121,26 +130,30 @@ class Email implements JsonSerializable, \Stringable
             'mailbox.org',
         ];
 
-        return in_array($this->domainWithoutSubdomain(), $germanProviders);
+        return in_array($this->domainWithoutSubdomain(), $germanProviders, true);
     }
 
     public function obfuscate(): Stringable
     {
         $localLength = $this->localPart->length();
 
-        if ($localLength <= 2) {
-            $obfuscatedLocal = str('*')->repeat($localLength);
-        } else {
-            $obfuscatedLocal = str($this->localPart[0])->append((string) str('*')->repeat($localLength - 2))->append($this->localPart[-1]);
+        /** @var Stringable $obfuscatedLocal */
+        $obfuscatedLocal = str('*')->repeat($localLength);
+
+        if ($localLength > 2) {
+            /** @var string $localPart */
+            $localPart = $this->localPart[0];
+            $obfuscatedLocal = str($localPart);
+            $obfuscatedLocal = $obfuscatedLocal->append(str('*')->repeat($localLength - 2)->toString());
+            $obfuscatedLocal = $obfuscatedLocal->append((string) $this->localPart[$localLength - 1]);
         }
 
-        return str($obfuscatedLocal.'@'.$this->domain);
+        return str($obfuscatedLocal->toString() . '@' . $this->domain->toString());
     }
 
     public function displayName(): Stringable
     {
-        return $this->localPart->replace(['.', '_', '-', '+'], ' ')
-            ->title();
+        return $this->localPart->replace(['.', '_', '-', '+'], ' ')->title();
     }
 
     public function encrypt(): Stringable
@@ -150,15 +163,14 @@ class Email implements JsonSerializable, \Stringable
 
     public function generateUsername(): Stringable
     {
-        return $this->localPart->replaceMatches('/[^a-zA-Z0-9]/', '')
-            ->lower();
+        return $this->localPart->replaceMatches('/[^a-zA-Z0-9]/', '')->lower();
     }
 
     public function isValidForNotifications(): bool
     {
         $blockedPrefixes = ['noreply', 'no-reply', 'donotreply', 'bounce'];
 
-        return ! $this->localPart->startsWith($blockedPrefixes);
+        return !$this->localPart->startsWith($blockedPrefixes);
     }
 
     public function domainAge(): ?int
@@ -192,26 +204,6 @@ class Email implements JsonSerializable, \Stringable
     public function toString(): string
     {
         return (string) $this->value;
-    }
-
-    /**
-     * Create a mailto link
-     */
-    public function toMailtoLink(string $subject = '', string $body = ''): string
-    {
-        $params = [];
-
-        if (filled($subject)) {
-            $params[] = 'subject='.urlencode($subject);
-        }
-
-        if (filled($body)) {
-            $params[] = 'body='.urlencode($body);
-        }
-
-        $queryString = filled($params) ? '?'.implode('&', $params) : '';
-
-        return 'mailto:'.$this->value.$queryString;
     }
 
     /**
@@ -276,7 +268,7 @@ class Email implements JsonSerializable, \Stringable
         $score = 100;
 
         // Deduct points for personal email providers
-        if (! $this->isCompanyEmail()) {
+        if (!$this->isCompanyEmail()) {
             $score -= 20;
         }
 
@@ -286,7 +278,7 @@ class Email implements JsonSerializable, \Stringable
         }
 
         // Deduct points if not valid for notifications
-        if (! $this->isValidForNotifications()) {
+        if (!$this->isValidForNotifications()) {
             $score -= 50;
         }
 
@@ -302,16 +294,13 @@ class Email implements JsonSerializable, \Stringable
     {
         $email = $email->trim();
 
-        $validator = Validator::make(
-            ['email' => $email],
-            [
-                'email' => [
-                    'required',
-                    'email:rfc',
-                    fn (string $attribute, string $value, Closure $fail) => $this->validateBusiness(str($value), $fail),
-                ],
-            ]
-        );
+        $validator = Validator::make(['email' => $email], [
+            'email' => [
+                'required',
+                'email:rfc',
+                fn(string $attribute, string $value, Closure $fail) => $this->validateBusiness(str($value), $fail),
+            ],
+        ]);
 
         if ($validator->fails()) {
             throw new ValidationException('Invalid email format provided');
@@ -323,6 +312,8 @@ class Email implements JsonSerializable, \Stringable
         $localPart = $email->before('@');
         $domain = $email->after('@');
 
+        //@todo implement here trash email detection logic
+
         // Block obviously fake/temporary email services (extend as needed)
         $blockedDomains = [
             '10minutemail.com',
@@ -333,9 +324,8 @@ class Email implements JsonSerializable, \Stringable
             'throwaway.email',
         ];
 
-        if (in_array($domain, $blockedDomains)) {
+        if (in_array($domain, $blockedDomains, true)) {
             $fail('Temporary email addresses are not allowed');
-            // throw new ValidationException('Temporary email addresses are not allowed');
         }
 
         // Block emails with suspicious patterns
@@ -348,9 +338,9 @@ class Email implements JsonSerializable, \Stringable
         ];
 
         foreach ($suspiciousPatterns as $pattern) {
-            if (preg_match($pattern, (string) $localPart)) {
-                $fail('Email address appears to be invalid or test address');
-            }
+            when(preg_match($pattern, (string) $localPart), fn() => $fail(
+                'Email address appears to be invalid or test address',
+            ));
         }
     }
 

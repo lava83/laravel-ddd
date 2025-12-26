@@ -14,13 +14,18 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class ErrorResource extends JsonResource
 {
     /**
-     * @return array{error:string,code:int}
+     * @return array{error:string,code:int|string}
      */
     public function toArray(Request $request): array
     {
+        /**
+         * @var Exception $exception
+         */
+        $exception = $this->resource;
+
         return [
-            'error' => $this->getMessage(),
-            'code' => $this->getCode(),
+            'error' => $exception->getMessage(),
+            'code' => $exception->getCode(),
         ];
     }
 }

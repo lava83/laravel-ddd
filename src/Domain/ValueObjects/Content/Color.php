@@ -6,14 +6,14 @@ namespace Lava83\LaravelDdd\Domain\ValueObjects\Content;
 
 use Illuminate\Support\Stringable;
 use Illuminate\Validation\Rule;
-use JsonSerializable;
 use Lava83\LaravelDdd\Domain\ValueObjects\Content\Enums\ColorEnum;
+use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
-class Color implements JsonSerializable, \Stringable
+class Color extends ValueObject
 {
     private readonly Stringable $value;
 
-    public function __construct(string $color)
+    final public function __construct(string $color)
     {
         $color = str($color)->lower()->trim();
         $this->validate($color);
@@ -42,14 +42,13 @@ class Color implements JsonSerializable, \Stringable
 
     private function validate(Stringable $color): void
     {
-        validator()->make(
-            ['color' => $color],
-            [
+        validator()
+            ->make(['color' => $color], [
                 'color' => [
                     'required',
                     Rule::enum(ColorEnum::class),
                 ],
-            ]
-        )->validate();
+            ])
+            ->validate();
     }
 }

@@ -14,11 +14,20 @@ class Json implements JsonSerializable, Stringable
 {
     private readonly Fluent $data;
 
+    /**
+     * @throws ValidationException
+     */
     private function __construct(
         private readonly string $value,
     ) {
         $this->validate($value);
-        $this->data = fluent(json_decode($value, true));
+
+        /**
+         * @var array<string, mixed> $jsonDecodedValue
+         */
+        $jsonDecodedValue = json_decode($value, true);
+
+        $this->data = fluent($jsonDecodedValue);
     }
 
     public function __toString(): string
@@ -116,7 +125,7 @@ class Json implements JsonSerializable, Stringable
 
     public function keys(): Collection
     {
-        return $this->data->keys();
+        return $this->data->collect()->keys();
     }
 
     public function values(): Collection
@@ -139,15 +148,21 @@ class Json implements JsonSerializable, Stringable
         $keys = str($key)->explode('.');
         $current = &$array;
 
+        /**
+         * @var string $nestedKey
+         */
         foreach ($keys->take(-1) as $nestedKey) {
-            if (! isset($current[$nestedKey]) || ! is_array($current[$nestedKey])) {
+            if (!isset($current[$nestedKey]) || !is_array($current[$nestedKey])) {
                 return;
             }
 
             $current = &$current[$nestedKey];
         }
 
-        unset($current[$keys->last()]);
+        if (is_string($keys->last())) {
+            // @mago-expect analyzer:possibly-null-array-index
+            unset($current[$keys->last()]);
+        }
     }
 
     private function validate(string $value): void
@@ -159,9 +174,7 @@ class Json implements JsonSerializable, Stringable
         json_decode($value, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new ValidationException(
-                'Invalid JSON: '.json_last_error_msg()
-            );
+            throw new ValidationException('Invalid JSON: ' . json_last_error_msg());
         }
     }
 }

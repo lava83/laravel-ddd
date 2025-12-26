@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Lava83\LaravelDdd\Domain\ValueObjects\Communication;
 
 use Illuminate\Support\Stringable;
-use JsonSerializable;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
-use Stringable as StringableContract;
+use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
-class Link implements JsonSerializable, StringableContract
+class Link extends ValueObject
 {
     private Stringable $value;
 
@@ -21,7 +20,10 @@ class Link implements JsonSerializable, StringableContract
 
     private Stringable $query;
 
-    public function __construct(string $link)
+    /**
+     * @throws ValidationException
+     */
+    final public function __construct(string $link)
     {
         $this->validate($link);
         $this->extractParts($link);
@@ -67,24 +69,27 @@ class Link implements JsonSerializable, StringableContract
         return (string) $this->value;
     }
 
+    /**
+     * @throws ValidationException
+     */
     private function extractParts(string $link): void
     {
         $parts = parse_url($link);
 
-        if (! isset($parts['scheme'], $parts['host'])) {
+        if (!isset($parts['scheme'], $parts['host'])) {
             throw new ValidationException('Invalid URL format provided');
         }
 
         $this->scheme = str($parts['scheme']);
         $this->host = str($parts['host']);
-        $this->path = str($parts['path'] ?? '');
+        $this->path = str($parts['path']);
         $this->query = str($parts['query'] ?? '');
 
         $this->value = $this->scheme
             ->append('://')
             ->append((string) $this->host)
             ->append((string) $this->path)
-            ->when(filled($this->query), fn (Stringable $s) => $s->append('?')->append((string) $this->query));
+            ->when($this->query->length() > 0, fn(Stringable $s) => $s->append('?')->append((string) $this->query));
     }
 
     private function validate(string $url): void

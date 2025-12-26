@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Infrastructure\Models;
 
+use Closure;
 use Illuminate\Database\Eloquent\Model as EloquentModel;
 use Illuminate\Support\Carbon;
 use IndexZer0\EloquentFiltering\Filter\Contracts\AllowedFilterList;
@@ -15,6 +16,7 @@ use Lava83\LaravelDdd\Infrastructure\Models\Concerns\HasUuids;
  * @property-read Carbon $created_at
  * @property-read ?Carbon $updated_at
  *
+ * @method Model findOr($id, $columns = ['*'], Closure $callback = null)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Model newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Model newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Model query()

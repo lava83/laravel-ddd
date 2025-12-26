@@ -24,9 +24,8 @@ class Phonenumber implements JsonSerializable, StringableContract
 
     private Stringable $subscriberNumber;
 
-    public function __construct(
-        string $number,
-    ) {
+    public function __construct(string $number)
+    {
         $number = str($number);
 
         $this->validate($number);
@@ -84,15 +83,14 @@ class Phonenumber implements JsonSerializable, StringableContract
     {
         $number = $this->numberProto((string) $rawNumber);
 
-        $this->countryAreaCode = CountryAreaCode::from(
-            (string) str('+')->append((string) $number->getCountryCode())
-        );
+        $this->countryAreaCode = CountryAreaCode::from((string) str('+')->append((string) $number->getCountryCode()));
 
         $this->localAreaCode = str($this->phoneNumberUtil()->formatNationalNumberWithCarrierCode($number, null))
             ->before(' ');
 
         $this->subscriberNumber = str($this->phoneNumberUtil()->formatNationalNumberWithCarrierCode($number, null))
-            ->after(' ')->replace(' ', '');
+            ->after(' ')
+            ->replace(' ', '');
 
         $this->value = $this->buildNormalizedNumber();
     }
@@ -100,9 +98,8 @@ class Phonenumber implements JsonSerializable, StringableContract
     private function buildNormalizedNumber(): Stringable
     {
         return str(
-            $this->countryAreaCode->value.
-            $this->localAreaCode->substr(1).
-            $this->subscriberNumber
+            $this->countryAreaCode->value . $this->localAreaCode->substr(1)->toString()
+                . $this->subscriberNumber->toString(),
         );
     }
 
@@ -113,7 +110,7 @@ class Phonenumber implements JsonSerializable, StringableContract
         $validator = validator(['number' => $number], [
             'number' => [
                 'required',
-                fn (string $attribute, string $value, Closure $fail) => $this->validatePhoneNumber($value, $fail),
+                fn(string $attribute, string $value, Closure $fail) => $this->validatePhoneNumber($value, $fail),
             ],
         ]);
 
@@ -122,10 +119,8 @@ class Phonenumber implements JsonSerializable, StringableContract
         }
     }
 
-    private function validatePhoneNumber(
-        string $value,
-        Closure $fail
-    ): void {
+    private function validatePhoneNumber(string $value, Closure $fail): void
+    {
         try {
             $this->numberProto($value);
         } catch (NumberParseException $numberParseException) {
