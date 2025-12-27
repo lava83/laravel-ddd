@@ -10,6 +10,7 @@ use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Between;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\BetweenColumns;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Filter;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThan;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThanEqualTo;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotBetween;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotBetweenColumns;
@@ -74,6 +75,13 @@ final readonly class Builder implements Countable
     public function notBetweenColumns(string $target, array $value): self
     {
         $this->filters->add(new NotBetweenColumns($target, $value));
+
+        return $this;
+    }
+
+    public function gt(string $target, int|float $value): self
+    {
+        $this->filters->add(new GreaterThan($target, $value));
 
         return $this;
     }
