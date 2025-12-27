@@ -26,7 +26,8 @@ cyclomatic-complexity = { threshold=25 }
 prefer-first-class-callable = { enabled = false }
 no-boolean-flag-parameter = { enabled = false }
 #todo: enable when fixed: src/Domain/Entities/Entity.php:22:1
-kan-defect= { enabled = false }
+kan-defect = { enabled = false }
+inline-variable-return = { enabled = false }
 
 [analyzer]
 find-unused-definitions = true

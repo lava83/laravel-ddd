@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterValueNotValid;
 
 describe(
     'Initialize equal filter',
@@ -28,6 +29,11 @@ describe(
                 'value' => 'bar',
             ]);
         });
+
+        it('validate of having string or integer or float value', function() {
+            $equalNotAllowedValue = new Equal('foo', '');
+            $equalNotAllowedValue->toArray();
+        })->throws(FilterValueNotValid::class, 'The filter value "" is not valid.');
     }
 );
 
