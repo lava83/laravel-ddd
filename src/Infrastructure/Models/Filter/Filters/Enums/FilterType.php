@@ -17,4 +17,6 @@ enum FilterType: string
     case BetweenColumns = '$betweenColumns';
 
     case NotBetweenColumns = '$notBetweenColumns';
+
+    case GreaterThanEqualTo = '$gte';
 }

@@ -10,6 +10,9 @@ use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Between;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\BetweenColumns;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Filter;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThanEqualTo;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotBetween;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotBetweenColumns;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotEqual;
 
 final readonly class Builder implements Countable
@@ -46,11 +49,38 @@ final readonly class Builder implements Countable
     }
 
     /**
+     * @param array<int, string|int|float> $value
+     */
+    public function notBetween(string $target, array $value): self
+    {
+        $this->filters->add(new NotBetween($target, $value));
+
+        return $this;
+    }
+
+    /**
      * @param string[] $value
      */
     public function betweenColumns(string $target, array $value): self
     {
         $this->filters->add(new BetweenColumns($target, $value));
+
+        return $this;
+    }
+
+    /**
+     * @param string[] $value
+     */
+    public function notBetweenColumns(string $target, array $value): self
+    {
+        $this->filters->add(new NotBetweenColumns($target, $value));
+
+        return $this;
+    }
+
+    public function gte(string $target, int|float $value): self
+    {
+        $this->filters->add(new GreaterThanEqualTo($target, $value));
 
         return $this;
     }
