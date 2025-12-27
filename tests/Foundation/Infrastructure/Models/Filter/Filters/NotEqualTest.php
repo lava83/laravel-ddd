@@ -4,34 +4,35 @@ declare(strict_types=1);
 
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterValueNotValid;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotEqual;
 
 describe(
     'Initialize equal filter',
     function (): void {
-        it('creates an equal filter', function () {
-            $equal = new Equal('foo', 'bar');
+        it('creates a not equal filter', function () {
+            $equal = new NotEqual('foo', 'bar');
 
-            expect($equal)->toBeInstanceOf(Equal::class);
+            expect($equal)->toBeInstanceOf(NotEqual::class);
         });
 
         it('has the correct value', function() {
-           expect((new Equal('foo', 'bar'))->value())->toBe('bar');
+           expect((new NotEqual('foo', 'bar'))->value())->toBe('bar');
         });
 
         it('has the correct target', function() {
-            expect((new Equal('foo', 'bar'))->target())->toBe('foo');
+            expect((new NotEqual('foo', 'bar'))->target())->toBe('foo');
         });
 
         it('has the correct array', function() {
-            expect((new Equal('foo', 'bar'))->toArray())->toBe([
-                'type' => '$eq',
+            expect((new NotEqual('foo', 'bar'))->toArray())->toBe([
+                'type' => '$notEq',
                 'target' => 'foo',
                 'value' => 'bar',
             ]);
         });
 
         it('validate of having string or integer or float value', function() {
-            $equalNotAllowedValue = new Equal('foo', '');
+            $equalNotAllowedValue = new NotEqual('foo', '');
             $equalNotAllowedValue->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "" is not valid.');
     }

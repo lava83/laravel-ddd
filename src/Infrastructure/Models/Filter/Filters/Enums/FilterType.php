@@ -7,4 +7,6 @@ namespace Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Enums;
 enum FilterType: string
 {
     case Equal = '$eq';
+
+    case NotEqual = '$notEq';
 }

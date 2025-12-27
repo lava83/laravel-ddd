@@ -7,7 +7,7 @@ namespace Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters;
 use Closure;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Enums\FilterType;
 
-final class Equal extends Filter
+class Equal extends Filter
 {
     protected FilterType $type = FilterType::Equal;
 
