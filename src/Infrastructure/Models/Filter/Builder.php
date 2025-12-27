@@ -7,8 +7,8 @@ namespace Lava83\LaravelDdd\Infrastructure\Models\Filter;
 use Countable;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterValueNotValid;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Filter;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotEqual;
 
 final readonly class Builder implements Countable
 {
@@ -19,12 +19,16 @@ final readonly class Builder implements Countable
         private Collection $filters = new Collection(),
     ) {}
 
-    /**
-     * @throws FilterValueNotValid
-     */
     public function eq(string $target, string $value): self
     {
         $this->filters->add(new Equal($target, $value));
+
+        return $this;
+    }
+
+    public function neq(string $target, string $value): self
+    {
+        $this->filters->add(new NotEqual($target, $value));
 
         return $this;
     }

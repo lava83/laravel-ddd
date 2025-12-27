@@ -41,3 +41,29 @@ describe('Builder equal', function () {
         expect($builder->toArray())->toBe($expectedArray);
     });
 });
+
+describe('Builder not equal', function () {
+    it('can build an builder with not equal filter', function () {
+        $builder = new Builder();
+
+        $builder->neq('foo', 'bar');
+
+        expect($builder)->toHaveCount(1);
+    });
+
+    it('can convert to array', function () {
+        $builder = new Builder();
+
+        $builder->neq('foo', 'bar');
+
+        $expectedArray = [
+            [
+                'type' => '$notEq',
+                'target' => 'foo',
+                'value' => 'bar',
+            ],
+        ];
+
+        expect($builder->toArray())->toBe($expectedArray);
+    });
+});
