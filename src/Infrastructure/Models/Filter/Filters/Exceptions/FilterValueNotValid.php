@@ -10,6 +10,10 @@ class FilterValueNotValid extends Exception
 {
     public static function make(mixed $value): self
     {
+        if (is_array($value)) {
+            $value = json_encode($value);
+        }
+
         return new self("The filter value \"{$value}\" is not valid.");
     }
 }

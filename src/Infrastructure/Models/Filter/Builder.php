@@ -6,6 +6,7 @@ namespace Lava83\LaravelDdd\Infrastructure\Models\Filter;
 
 use Countable;
 use Illuminate\Support\Collection;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Between;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Filter;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotEqual;
@@ -29,6 +30,13 @@ final readonly class Builder implements Countable
     public function neq(string $target, string $value): self
     {
         $this->filters->add(new NotEqual($target, $value));
+
+        return $this;
+    }
+
+    public function between(string $target, array $values): self
+    {
+        $this->filters->add(new Between($target, $values));
 
         return $this;
     }

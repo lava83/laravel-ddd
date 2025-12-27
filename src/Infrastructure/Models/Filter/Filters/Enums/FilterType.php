@@ -9,4 +9,6 @@ enum FilterType: string
     case Equal = '$eq';
 
     case NotEqual = '$notEq';
+
+    case Between = '$between';
 }
