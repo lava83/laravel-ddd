@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters;
 
-use Closure;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Enums\FilterType;
 
-class Between extends Filter
+class BetweenColumns extends Filter
 {
-    protected FilterType $type = FilterType::Between;
+    protected FilterType $type = FilterType::BetweenColumns;
 
     /**
-     * @param array<int, string|int|float> $value
+     * @param string[] $value
      */
     public function __construct(
         protected readonly string $target,
@@ -40,11 +39,7 @@ class Between extends Filter
             ],
             'value.*' => [
                 'required',
-                function (string $attribute, mixed $value, Closure $fail) {
-                    if (!is_string($value) && !is_int($value) && !is_float($value)) {
-                        $fail("The {$attribute} must be a string, integer, or float.");
-                    }
-                },
+                'string',
             ],
         ]);
 

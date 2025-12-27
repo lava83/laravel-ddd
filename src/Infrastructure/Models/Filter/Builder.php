@@ -7,6 +7,7 @@ namespace Lava83\LaravelDdd\Infrastructure\Models\Filter;
 use Countable;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Between;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\BetweenColumns;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Filter;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotEqual;
@@ -34,9 +35,22 @@ final readonly class Builder implements Countable
         return $this;
     }
 
-    public function between(string $target, array $values): self
+    /**
+     * @param array<int, string|int|float> $value
+     */
+    public function between(string $target, array $value): self
     {
-        $this->filters->add(new Between($target, $values));
+        $this->filters->add(new Between($target, $value));
+
+        return $this;
+    }
+
+    /**
+     * @param string[] $value
+     */
+    public function betweenColumns(string $target, array $value): self
+    {
+        $this->filters->add(new BetweenColumns($target, $value));
 
         return $this;
     }

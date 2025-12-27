@@ -11,4 +11,6 @@ enum FilterType: string
     case NotEqual = '$notEq';
 
     case Between = '$between';
+
+    case BetweenColumns = '$betweenColumns';
 }
