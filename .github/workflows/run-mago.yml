@@ -1,7 +1,17 @@
 name: run-mago.yml
 on:
   push:
+    paths:
+      - '**.php'
+      - '.github/workflows/run-mago.yml'
+      - 'composer.json'
+      - 'composer.lock'
   pull_request:
+    paths:
+      - '**.php'
+      - '.github/workflows/run-mago.yml'
+      - 'composer.json'
+      - 'composer.lock'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
