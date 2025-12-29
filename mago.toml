@@ -42,3 +42,55 @@ strict-list-index-checks = false
 no-boolean-literal-comparison = false
 check-missing-type-hints = false
 register-super-globals = true
+
+[guard.perimeter]
+# Defines the architectural layers from core to infrastructure.
+layering = [
+    "Lava83\\LaravelDdd\\Domain",
+    "Lava83\\LaravelDdd\\Application",
+    "Lava83\\LaravelDdd\\Facades",
+    "Lava83\\LaravelDdd\\Infrastructure",
+]
+
+# Creates reusable aliases for groups of namespaces.
+[guard.perimeter.layers]
+core = ["@native", "Psl\\**", "Ramsey\\**", "Illuminate\\**", "Illuminate\\**", "Carbon\\**", "libphonenumber\\**", "Lava83\\LaravelDdd\\Infrastructure\\Models\\Model"]
+psr = ["Psr\\**"]
+framework = ["Symfony\\**", "GuzzleHttp\\**", "Monolog\\**", "Doctrine\\**", "Spatie\\**"]
+
+[[guard.perimeter.rules]]
+namespace = "Lava83\\LaravelDdd\\Domain"
+permit = ["@layer:core"]
+
+[[guard.perimeter.rules]]
+namespace = "Lava83\\LaravelDdd\\Application"
+permit = ["@layer:core", "@layer:psr"]
+
+[[guard.perimeter.rules]]
+namespace = "Lava83\\LaravelDdd\\Infrastructure"
+permit = ["@layer:core", "@layer:psr", "@layer:framework"]
+
+[[guard.perimeter.rules]]
+namespace = "Lava83\\LaravelDdd\\Tests"
+permit = ["@all"]
+
+[[guard.structural.rules]]
+on               = "Lava83\\LaravelDdd\\Application\\**\\Controller\\**"
+target           = "class"
+must-be-named    = "*Controller"
+must-be-final    = true
+must-be-readonly = true
+reason           = "Controllers must be final and follow naming conventions."
+
+[[guard.structural.rules]]
+on               = "Lava83\\LaravelDdd\\Application\\**\\Resources\\**"
+target           = "class"
+must-be-named    = "*Resource"
+must-be-final    = true
+must-extend      = "Illuminate\\Http\\Resources\\Json\\JsonResource"
+reason           = "Resources must be final and follow naming conventions."
+
+[[guard.structural.rules]]
+on          = "Lava83\\LaravelDdd\\Domain\\**\\Enum\\**"
+must-be     = ["enum"]
+reason      = "This namespace is designated for enums only."

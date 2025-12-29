@@ -59,3 +59,4 @@ jobs:
           mago format --dry-run
           mago lint --reporting-format=github
           mago analyze --reporting-format=github
+          mago guard --reporting-format=github
