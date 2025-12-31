@@ -177,11 +177,11 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @return array<int, array{type: string, target: string, value: array<int, string|int|float>|string|int|float}>
+     * @return array<int, array{type: string, target: string, value: array<int, string|int|float>|string|int|float|bool}>
      */
     public function toArray(): array
     {
-        /** @var array<int, array{type: string, target: string, value: array<int, string|int|float>|string|int|float}> $result */
+        /** @var array<int, array{type: string, target: string, value: array<int, string|int|float>|string|int|float|bool}> $result */
         $result = $this->filters->map(fn(Filter $filter): array => $filter->toArray())->toArray();
 
         return $result;
