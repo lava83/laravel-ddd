@@ -13,10 +13,14 @@ use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Filter;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThan;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThanEqualTo;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\In;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\LessThan;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\LessThanEqualTo;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Like;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotBetween;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotBetweenColumns;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotEqual;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotIn;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotLike;
 
 final readonly class Builder implements Countable
 {
@@ -111,6 +115,34 @@ final readonly class Builder implements Countable
     public function notIn(string $target, array $value): self
     {
         $this->filters->add(new NotIn($target, $value));
+
+        return $this;
+    }
+
+    public function like(string $target, string|int|float $value): self
+    {
+        $this->filters->add(new Like($target, $value));
+
+        return $this;
+    }
+
+    public function notLike(string $target, string|int|float $value): self
+    {
+        $this->filters->add(new NotLike($target, $value));
+
+        return $this;
+    }
+
+    public function lt(string $target, int|float $value): self
+    {
+        $this->filters->add(new LessThan($target, $value));
+
+        return $this;
+    }
+
+    public function lte(string $target, int|float $value): self
+    {
+        $this->filters->add(new LessThanEqualTo($target, $value));
 
         return $this;
     }

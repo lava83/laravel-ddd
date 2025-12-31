@@ -28,5 +28,9 @@ enum FilterType: string
 
     case LessThan = '$lt';
 
-    case LessThanOrEqualTo = '$lte';
+    case LessThanEqualTo = '$lte';
+
+    case Like = '$like';
+
+    case NotLike = '$notLike';
 }

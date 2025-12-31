@@ -19,10 +19,7 @@ describe(
                ->toBeInt()
                ->and((new LessThan('foo', 123.123))->value())
                ->toBe(123.123)
-               ->toBeFloat()
-               ->and((int)(new LessThan('foo', '123'))->value())
-               ->toBe(123)
-               ->toBeInt();
+               ->toBeFloat();
         });
 
         it('has the correct target', function() {

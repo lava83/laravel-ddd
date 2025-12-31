@@ -119,3 +119,167 @@ describe('Builder not in', function () {
         expect($builder->toArray())->toBe($expectedArray);
     });
 });
+
+describe('Builder like', function () {
+    it('can build a builder with like filter', function () {
+        $builder = new Builder();
+
+        $builder->like('foo', 'bar')
+            ->like('foo', 123)
+            ->like('foo', 45.67);
+
+        expect($builder)->toHaveCount(3);
+    });
+
+    it('can convert to array', function () {
+        $builder = new Builder();
+
+        $builder->like('foo', 'bar');
+
+        $expectedArray = [
+            [
+                'type' => '$like',
+                'target' => 'foo',
+                'value' => 'bar',
+            ],
+        ];
+
+        expect($builder->toArray())->toBe($expectedArray);
+    });
+});
+
+describe('Builder not like', function () {
+    it('can build a builder with not like filter', function () {
+        $builder = new Builder();
+
+        $builder->notLike('foo', 'bar')
+            ->notLike('foo', 123)
+            ->notLike('foo', 45.67);
+
+        expect($builder)->toHaveCount(3);
+    });
+
+    it('can convert to array', function () {
+        $builder = new Builder();
+
+        $builder->notLike('foo', 'bar');
+
+        $expectedArray = [
+            [
+                'type' => '$notLike',
+                'target' => 'foo',
+                'value' => 'bar',
+            ],
+        ];
+
+        expect($builder->toArray())->toBe($expectedArray);
+    });
+});
+
+describe('Builder greater than', function () {
+    it('can build a builder with greater than filter', function () {
+        $builder = new Builder();
+
+        $builder->gt('foo', 123)
+            ->gt('foo', 45.67);
+
+        expect($builder)->toHaveCount(2);
+    });
+
+    it('can convert to array', function () {
+        $builder = new Builder();
+
+        $builder->gt('foo', 123);
+
+        $expectedArray = [
+            [
+                'type' => '$gt',
+                'target' => 'foo',
+                'value' => 123,
+            ],
+        ];
+
+        expect($builder->toArray())->toBe($expectedArray);
+    });
+});
+
+describe('Builder greater than equal to', function () {
+    it('can build a builder with greater than equal to filter', function () {
+        $builder = new Builder();
+
+        $builder->gte('foo', 123)
+            ->gte('foo', 45.67);
+
+        expect($builder)->toHaveCount(2);
+    });
+
+    it('can convert to array', function () {
+        $builder = new Builder();
+
+        $builder->gte('foo', 123);
+
+        $expectedArray = [
+            [
+                'type' => '$gte',
+                'target' => 'foo',
+                'value' => 123,
+            ],
+        ];
+
+        expect($builder->toArray())->toBe($expectedArray);
+    });
+});
+
+describe('Builder less than', function () {
+    it('can build a builder with less than filter', function () {
+        $builder = new Builder();
+
+        $builder->lt('foo', 123)
+            ->lt('foo', 45.67);
+
+        expect($builder)->toHaveCount(2);
+    });
+
+    it('can convert to array', function () {
+        $builder = new Builder();
+
+        $builder->lt('foo', 123);
+
+        $expectedArray = [
+            [
+                'type' => '$lt',
+                'target' => 'foo',
+                'value' => 123,
+            ],
+        ];
+
+        expect($builder->toArray())->toBe($expectedArray);
+    });
+});
+
+describe('Builder less than equal to', function () {
+    it('can build a builder with less than equal to filter', function () {
+        $builder = new Builder();
+
+        $builder->lte('foo', 123)
+            ->lte('foo', 45.67);
+
+        expect($builder)->toHaveCount(2);
+    });
+
+    it('can convert to array', function () {
+        $builder = new Builder();
+
+        $builder->lte('foo', 123);
+
+        $expectedArray = [
+            [
+                'type' => '$lte',
+                'target' => 'foo',
+                'value' => 123,
+            ],
+        ];
+
+        expect($builder->toArray())->toBe($expectedArray);
+    });
+});
