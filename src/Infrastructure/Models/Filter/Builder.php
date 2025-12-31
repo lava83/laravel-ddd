@@ -48,7 +48,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string|int|float|bool> $value
+     * @param array<int, string|int|float> $value
      */
     public function between(string $target, array $value): self
     {
@@ -58,7 +58,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string|int|float|bool> $value
+     * @param array<int, string|int|float> $value
      */
     public function notBetween(string $target, array $value): self
     {
@@ -102,7 +102,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string|int|float|bool> $value
+     * @param array<int, string|int|float> $value
      */
     public function in(string $target, array $value): self
     {
@@ -112,7 +112,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string|int|float|bool> $value
+     * @param array<int, string|int|float> $value
      */
     public function notIn(string $target, array $value): self
     {

@@ -11,7 +11,7 @@ class BetweenColumns extends Filter
     protected FilterType $type = FilterType::BetweenColumns;
 
     /**
-     * @param array<int, string|int|float|bool> $value
+     * @param array<int, string> $value
      */
     public function __construct(
         protected readonly string $target,
