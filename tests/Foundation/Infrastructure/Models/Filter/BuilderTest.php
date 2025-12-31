@@ -93,3 +93,29 @@ describe('Builder in', function () {
         expect($builder->toArray())->toBe($expectedArray);
     });
 });
+
+describe('Builder not in', function () {
+    it('can build a builder with not in filter', function () {
+        $builder = new Builder();
+
+        $builder->notIn('foo', ['bar', 'baz']);
+
+        expect($builder)->toHaveCount(1);
+    });
+
+    it('can convert to array', function () {
+        $builder = new Builder();
+
+        $builder->notIn('foo', ['bar', 'baz']);
+
+        $expectedArray = [
+            [
+                'type' => '$notIn',
+                'target' => 'foo',
+                'value' => ['bar', 'baz'],
+            ],
+        ];
+
+        expect($builder->toArray())->toBe($expectedArray);
+    });
+});

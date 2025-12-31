@@ -16,6 +16,7 @@ use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\In;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotBetween;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotBetweenColumns;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotEqual;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotIn;
 
 final readonly class Builder implements Countable
 {
@@ -97,6 +98,13 @@ final readonly class Builder implements Countable
     public function in(string $target, array $value): self
     {
         $this->filters->add(new In($target, $value));
+
+        return $this;
+    }
+
+    public function notIn(string $target, array $value): self
+    {
+        $this->filters->add(new NotIn($target, $value));
 
         return $this;
     }
