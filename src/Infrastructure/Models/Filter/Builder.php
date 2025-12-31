@@ -25,14 +25,14 @@ final readonly class Builder implements Countable
         private Collection $filters = new Collection(),
     ) {}
 
-    public function eq(string $target, string $value): self
+    public function eq(string $target, string|int|float $value): self
     {
         $this->filters->add(new Equal($target, $value));
 
         return $this;
     }
 
-    public function neq(string $target, string $value): self
+    public function neq(string $target, string|int|float $value): self
     {
         $this->filters->add(new NotEqual($target, $value));
 

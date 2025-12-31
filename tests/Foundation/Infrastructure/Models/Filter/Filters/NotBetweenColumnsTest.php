@@ -9,9 +9,9 @@ describe(
     'Initialize not between columns filter',
     function (): void {
         it('creates a not between columns filter', function () {
-            $equal = new NotBetweenColumns('foo', ['bar', 'baz']);
+            $notBetweenColumns = new NotBetweenColumns('foo', ['bar', 'baz']);
 
-            expect($equal)->toBeInstanceOf(NotBetweenColumns::class);
+            expect($notBetweenColumns)->toBeInstanceOf(NotBetweenColumns::class);
         });
 
         it('has the correct value', function() {

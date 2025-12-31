@@ -54,7 +54,7 @@ layering = [
 
 # Creates reusable aliases for groups of namespaces.
 [guard.perimeter.layers]
-core = ["@native", "Psl\\**", "Ramsey\\**", "Illuminate\\**", "Illuminate\\**", "Carbon\\**", "libphonenumber\\**", "Lava83\\LaravelDdd\\Infrastructure\\Models\\Model"]
+core = ["@native", "Psl\\**", "Ramsey\\**", "Illuminate\\**", "Carbon\\**", "libphonenumber\\**", "Lava83\\LaravelDdd\\Infrastructure\\Models\\Model"]
 psr = ["Psr\\**"]
 framework = ["Symfony\\**", "GuzzleHttp\\**", "Monolog\\**", "Doctrine\\**", "Spatie\\**"]
 

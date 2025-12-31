@@ -9,9 +9,9 @@ describe(
     'Initialize not between filter',
     function (): void {
         it('creates an not between filter', function () {
-            $equal = new NotBetween('foo', ['bar', 'baz']);
+            $notBetween = new NotBetween('foo', ['bar', 'baz']);
 
-            expect($equal)->toBeInstanceOf(NotBetween::class);
+            expect($notBetween)->toBeInstanceOf(NotBetween::class);
         });
 
         it('has the correct value', function() {

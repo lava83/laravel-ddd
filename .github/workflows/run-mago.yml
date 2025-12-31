@@ -32,7 +32,7 @@ jobs:
     name: Mago Lint - P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
 
     steps:
-      - name: Checkoud code
+      - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Setup PHP

@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterValueNotValid;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotEqual;
 
 describe(
-    'Initialize equal filter',
+    'Initialize not equal filter',
     function (): void {
         it('creates a not equal filter', function () {
             $equal = new NotEqual('foo', 'bar');

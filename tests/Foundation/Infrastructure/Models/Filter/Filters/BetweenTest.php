@@ -8,7 +8,7 @@ use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterValu
 describe(
     'Initialize between filter',
     function (): void {
-        it('creates an between filter', function () {
+        it('creates a between filter', function () {
             $equal = new Between('foo', ['bar', 'baz']);
 
             expect($equal)->toBeInstanceOf(Between::class);
@@ -30,22 +30,22 @@ describe(
             ]);
         });
 
-        it('validate of having array with not only one value', function() {
+        it('throws exception when array has only one value', function() {
             $equalNotAllowedValue = new Between('foo', ['bar']);
             $equalNotAllowedValue->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar"]" is not valid.');
 
-        it('validate of having array with more than two values', function() {
+        it('throws exception when array has more than two values', function() {
             $equalNotAllowedValue = new Between('foo', ['bar', 'baz', 'qux']);
             $equalNotAllowedValue->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar","baz","qux"]" is not valid.');
 
-        it('validate of having required values', function() {
+        it('throws exception when both values are empty', function() {
             $equalNotAllowedValue = new Between('foo', ['', '']);
             $equalNotAllowedValue->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["",""]" is not valid.');
 
-        it('validate of having both values are required', function() {
+        it('throws exception when one value is empty', function() {
             $equalNotAllowedValue = new Between('foo', ['bar', '']);
             $equalNotAllowedValue->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar",""]" is not valid.');

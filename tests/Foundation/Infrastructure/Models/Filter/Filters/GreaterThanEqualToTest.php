@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Between;
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterValueNotValid;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThanEqualTo;
 
 describe(

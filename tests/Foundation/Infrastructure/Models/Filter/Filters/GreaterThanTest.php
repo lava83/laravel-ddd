@@ -2,10 +2,7 @@
 
 declare(strict_types=1);
 
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Between;
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterValueNotValid;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThan;
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThanEqualTo;
 
 describe(
     'Initialize gt filter',
@@ -20,7 +17,7 @@ describe(
            expect((new GreaterThan('foo', 123))->value())
                ->toBe(123)
                ->toBeInt()
-               ->and((new GreaterThanEqualTo('foo', 123.123))->value())
+               ->and((new GreaterThan('foo', 123.123))->value())
                ->toBe(123.123)
                ->toBeFloat();
         });
