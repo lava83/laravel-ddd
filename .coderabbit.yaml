@@ -7,21 +7,21 @@ language: en-US
 early_access: false
 
 reviews:
-  # Run reviews on draft PRs as well
-  request_changes_workflow: true
-  high_level_summary: true
-  high_level_summary_placeholder: "@coderabbit-summary"
-  
   # Only critical issues, no nitpicks or style suggestions
   profile: chill
-  
-  # Review configuration
-  review_status: true
+
+  # Approve once comments resolved
+  request_changes_workflow: true
+
+  # Summary & walkthrough settings
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
   collapse_walkthrough: false
-  sequence_diagrams: false
   changed_files_summary: true
+  sequence_diagrams: false
   poem: false
-  
+  review_status: true
+
   # Auto-review settings
   auto_review:
     enabled: true
@@ -30,14 +30,25 @@ reviews:
       - main
       - develop
 
-  # Path-based review configuration
+  # File patterns to exclude from review
+  path_filters:
+    - "!vendor/**"
+    - "!node_modules/**"
+    - "!*.lock"
+    - "!build/**"
+    - "!coverage/**"
+    - "!.phpunit.cache/**"
+    - "!_ide_helper*.php"
+    - "!.phpstorm.meta.php"
+
+  # Path-based review instructions
   path_instructions:
     - path: "src/Domain/**"
       instructions: |
         This is the Domain Layer. Review for:
-        - Pure PHP without framework dependencies (Laravel helpers like collect(), str() are acceptable. Also we allow "Lava83\LaravelDdd\Infrastructure\Models\Model" on Entity base class to use it on fromState method.)
+        - Pure PHP without framework dependencies (Laravel helpers like collect(), str() are acceptable)
         - No direct database or infrastructure concerns
-        
+
         IMMUTABILITY IS CRITICAL - Flag violations as blocking:
         - All Value Objects MUST use `readonly` properties
         - Value Objects MUST NOT have setter methods
@@ -46,7 +57,7 @@ reviews:
         - Entities MUST use `CarbonImmutable` instead of `Carbon` for timestamps
         - Collections in Entities should be replaced via new instance, not mutated
         - Domain Events MUST be `readonly class`
-        
+
         Valid immutable pattern:
         ```php
         public function withName(string $name): self
@@ -54,7 +65,7 @@ reviews:
             return new self($this->id, $name, $this->other);
         }
         ```
-        
+
         Invalid mutable pattern (flag this):
         ```php
         public function setName(string $name): void
@@ -62,108 +73,68 @@ reviews:
             $this->name = $name; // ❌ Mutation!
         }
         ```
-        
+
     - path: "src/Application/**"
       instructions: |
         This is the Application Layer. Review for:
         - Orchestration logic only, no business rules
         - Proper use of domain services and repositories
         - No direct database access (use repositories)
-        
+
     - path: "src/Infrastructure/**"
       instructions: |
         This is the Infrastructure Layer. Review for:
         - Proper implementation of domain contracts/interfaces
-        - Eloquent models should extend the base Model: `Lava83\LaravelDdd\Infrastructure\Models\Model` class
+        - Eloquent models should extend the base Model class
         - Mappers must correctly translate between Entity and Model
         - Repository implementations must handle transactions and events
-        - Also note that using a caching layer (e.g., Redis) is acceptable here for read-heavy operations.
-        
+
     - path: "tests/**"
       instructions: |
         Review tests for:
         - Using Pest PHP testing framework
         - Proper test isolation
         - Meaningful test descriptions
-        - Coverage of edge cases
 
-  # Global review instructions
-  instructions: |
-    This is a DDD Foundation package for Laravel. Key architectural principles:
-    
-    1. IMMUTABILITY: Everything in the Domain layer must be immutable.
-       - Flag any non-readonly properties in Value Objects as critical
-       - Flag any setter methods in Value Objects/Entities as critical
-       - Flag use of `Carbon` instead of `CarbonImmutable` as critical
-       - Mutation methods must return new instances, never modify $this
-    
-    2. LAYER SEPARATION: Respect DDD boundaries.
-       - Domain layer: Pure PHP + Laravel helpers (collect, str, etc.)
-       - Application layer: Orchestration, no business logic
-       - Infrastructure layer: Laravel/Eloquent implementations
-    
-    3. Static analysis via Mago is configured - don't flag issues Mago already catches.
+  # Auto-labeling configuration
+  labeling_instructions:
+    - label: "domain"
+      instructions: "Apply when PR contains changes to src/Domain/**"
+    - label: "infrastructure"
+      instructions: "Apply when PR contains changes to src/Infrastructure/**"
+    - label: "application"
+      instructions: "Apply when PR contains changes to src/Application/**"
+    - label: "tests"
+      instructions: "Apply when PR contains changes to tests/**"
+    - label: "documentation"
+      instructions: "Apply when PR contains changes to *.md files or docs/**"
+    - label: "dependencies"
+      instructions: "Apply when PR contains changes to composer.json"
+    - label: "ci"
+      instructions: "Apply when PR contains changes to .github/**"
+    - label: "breaking-change"
+      instructions: "Apply when PR introduces breaking changes to public APIs, method signatures, or contracts"
+
+  auto_apply_labels: true
+  suggested_labels: true
+
+  # Pre-merge checks for title validation
+  pre_merge_checks:
+    title:
+      mode: warning
+      requirements: |
+        PR title must follow Conventional Commits format: type(scope)?: description
+        Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+        Example: feat(value-objects): add Money value object
 
 chat:
   auto_reply: true
 
-# Pull Request settings
-pull_request:
-  # Validate PR titles follow Conventional Commits
-  title_validation:
-    enabled: true
-    pattern: "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\([a-z-]+\\))?!?: .+"
-    message: |
-      PR title must follow Conventional Commits format:
-      `type(scope)?: description`
-      
-      Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
-      Example: `feat(value-objects): add Money value object`
-
-  # Auto-labeling based on changed files
-  auto_label:
-    enabled: true
-    labels:
-      domain:
-        - "src/Domain/**"
-      infrastructure:
-        - "src/Infrastructure/**"
-      application:
-        - "src/Application/**"
-      tests:
-        - "tests/**"
-      documentation:
-        - "*.md"
-        - "docs/**"
-      dependencies:
-        - "composer.json"
-        - "composer.lock"
-      ci:
-        - ".github/**"
-
-# Files and paths to ignore
-path_filters:
-  # Exclude vendor and generated files
-  excluded_paths:
-    - "vendor/**"
-    - "node_modules/**"
-    - "*.lock"
-    - "build/**"
-    - "coverage/**"
-    - ".phpunit.cache/**"
-    - "_ide_helper*.php"
-    - ".phpstorm.meta.php"
-
-# Knowledge base for context
 knowledge_base:
   opt_out: false
   learnings:
     scope: auto
   issues:
     scope: auto
-  jira:
-    project_keys: []
-  linear:
-    team_keys: []
   pull_requests:
     scope: auto
