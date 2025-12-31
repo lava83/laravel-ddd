@@ -12,7 +12,7 @@ class Like extends Filter
 
     public function __construct(
         protected readonly string $target,
-        protected readonly string|int|float $value,
+        protected readonly string|int|float|bool $value,
     ) {}
 
     public function target(): string
@@ -20,7 +20,7 @@ class Like extends Filter
         return $this->target;
     }
 
-    public function value(): string|int|float
+    public function value(): string|int|float|bool
     {
         return $this->value;
     }

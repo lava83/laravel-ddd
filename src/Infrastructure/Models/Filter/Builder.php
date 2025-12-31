@@ -33,14 +33,14 @@ final readonly class Builder implements Countable
         private Collection $filters = new Collection(),
     ) {}
 
-    public function eq(string $target, string|int|float $value): self
+    public function eq(string $target, string|int|float|bool $value): self
     {
         $this->filters->add(new Equal($target, $value));
 
         return $this;
     }
 
-    public function neq(string $target, string|int|float $value): self
+    public function neq(string $target, string|int|float|bool $value): self
     {
         $this->filters->add(new NotEqual($target, $value));
 
@@ -48,7 +48,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string|int|float> $value
+     * @param array<int, string|int|float|bool> $value
      */
     public function between(string $target, array $value): self
     {
@@ -58,7 +58,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string|int|float> $value
+     * @param array<int, string|int|float|bool> $value
      */
     public function notBetween(string $target, array $value): self
     {
@@ -102,7 +102,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string|int|float> $value
+     * @param array<int, string|int|float|bool> $value
      */
     public function in(string $target, array $value): self
     {
@@ -112,7 +112,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string|int|float> $value
+     * @param array<int, string|int|float|bool> $value
      */
     public function notIn(string $target, array $value): self
     {
@@ -121,14 +121,14 @@ final readonly class Builder implements Countable
         return $this;
     }
 
-    public function like(string $target, string|int|float $value): self
+    public function like(string $target, string|int|float|bool $value): self
     {
         $this->filters->add(new Like($target, $value));
 
         return $this;
     }
 
-    public function notLike(string $target, string|int|float $value): self
+    public function notLike(string $target, string|int|float|bool $value): self
     {
         $this->filters->add(new NotLike($target, $value));
 
@@ -168,7 +168,7 @@ final readonly class Builder implements Countable
      */
     public function filters(): Collection
     {
-        return $this->filters;
+        return $this->filters->collect();
     }
 
     public function count(): int
