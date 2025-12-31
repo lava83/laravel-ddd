@@ -30,23 +30,23 @@ describe(
             ]);
         });
 
-        it('validate of having array with not only one value', function() {
+        it('throws exception if value array has only one value', function() {
             (new NotBetweenColumns('foo', ['bar']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar"]" is not valid.');
 
-        it('validate of having array with more than two values', function() {
+        it('throws exception if value array has more than two values', function() {
             (new NotBetweenColumns('foo', ['bar', 'baz', 'qux']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar","baz","qux"]" is not valid.');
 
-        it('validate of having required values', function() {
+        it('throws exception if both values are empty', function() {
             (new NotBetweenColumns('foo', ['', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["",""]" is not valid.');
 
-        it('validate of having both values are required', function() {
+        it('throws exception if one of the two values are empty', function() {
             (new NotBetweenColumns('foo', ['bar', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar",""]" is not valid.');
 
-        it('validate of only strings are allowed', function() {
+        it('throws exception if the values are not from type string', function() {
             (new NotBetweenColumns('foo', ['bar', 123]))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar",123]" is not valid.');
     }

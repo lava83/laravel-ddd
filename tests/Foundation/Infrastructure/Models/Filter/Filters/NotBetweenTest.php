@@ -8,7 +8,7 @@ use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotBetween;
 describe(
     'Initialize not between filter',
     function (): void {
-        it('creates an not between filter', function () {
+        it('creates a not between filter', function () {
             $notBetween = new NotBetween('foo', ['bar', 'baz']);
 
             expect($notBetween)->toBeInstanceOf(NotBetween::class);
@@ -30,19 +30,19 @@ describe(
             ]);
         });
 
-        it('validate of having array with not only one value', function() {
+        it('throws exception if value array has only one value', function() {
             (new NotBetween('foo', ['bar']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar"]" is not valid.');
 
-        it('validate of having array with more than two values', function() {
+        it('throws exception if value array has more than two values', function() {
             (new NotBetween('foo', ['bar', 'baz', 'qux']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar","baz","qux"]" is not valid.');
 
-        it('validate of having required values', function() {
+        it('throws exception if the both values in array are empty', function() {
             (new NotBetween('foo', ['', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["",""]" is not valid.');
 
-        it('validate of having both values are required', function() {
+        it('throws exception if one of the values are empty', function() {
             (new NotBetween('foo', ['bar', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar",""]" is not valid.');
     }

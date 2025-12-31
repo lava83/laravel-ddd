@@ -30,7 +30,7 @@ describe(
             ]);
         });
 
-        it('validate of having string or integer or float value', function() {
+        it('throws exception if the filter value is empty', function() {
             (new Equal('foo', ''))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "" is not valid.');
     }

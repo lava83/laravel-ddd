@@ -37,7 +37,7 @@ class In extends Filter
         ], [
             'value' => [
                 'array',
-                'size:2',
+                'min:1',
             ],
             'value.*' => [
                 'required',

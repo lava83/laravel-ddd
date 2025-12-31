@@ -71,6 +71,10 @@ namespace = "Lava83\\LaravelDdd\\Infrastructure"
 permit = ["@layer:core", "@layer:psr", "@layer:framework"]
 
 [[guard.perimeter.rules]]
+namespace = "Lava83\\LaravelDdd\\Facades"
+permit = ["@layer:core", "@layer:psr"]
+
+[[guard.perimeter.rules]]
 namespace = "Lava83\\LaravelDdd\\Tests"
 permit = ["@all"]
 

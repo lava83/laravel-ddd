@@ -30,7 +30,7 @@ describe(
             ]);
         });
 
-        it('validate of having string or integer or float value', function() {
+        it('throws exception if value is not of type string or number', function() {
             (new NotEqual('foo', ''))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "" is not valid.');
     }

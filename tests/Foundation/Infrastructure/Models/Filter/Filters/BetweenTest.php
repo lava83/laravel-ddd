@@ -9,9 +9,9 @@ describe(
     'Initialize between filter',
     function (): void {
         it('creates a between filter', function () {
-            $equal = new Between('foo', ['bar', 'baz']);
+            $between = new Between('foo', ['bar', 'baz']);
 
-            expect($equal)->toBeInstanceOf(Between::class);
+            expect($between)->toBeInstanceOf(Between::class);
         });
 
         it('has the correct value', function() {

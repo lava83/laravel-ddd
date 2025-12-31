@@ -62,7 +62,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param string[] $value
+     * @param array<int, string|int|float> $value
      */
     public function betweenColumns(string $target, array $value): self
     {
@@ -72,7 +72,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param string[] $value
+     * @param array<int, string|int|float> $value
      */
     public function notBetweenColumns(string $target, array $value): self
     {
@@ -95,6 +95,9 @@ final readonly class Builder implements Countable
         return $this;
     }
 
+    /**
+     * @param array<int, string|int|float> $value
+     */
     public function in(string $target, array $value): self
     {
         $this->filters->add(new In($target, $value));

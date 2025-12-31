@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Between;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterValueNotValid;
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\In;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotIn;
 
 describe(
@@ -32,16 +30,11 @@ describe(
             ]);
         });
 
-        it('throws exception when array has only one value', function() {
-            (new NotIn('foo', ['bar']))->toArray();
+        it('throws exception when value array is empty', function() {
+            (new NotIn('foo', []))->toArray();
+        })->throws(FilterValueNotValid::class, 'The filter value "[]" is not valid.');
 
-        })->throws(FilterValueNotValid::class, 'The filter value "["bar"]" is not valid.');
-
-        it('throws exception when array has more than two values', function() {
-            (new NotIn('foo', ['bar', 'baz', 'qux']))->toArray();
-        })->throws(FilterValueNotValid::class, 'The filter value "["bar","baz","qux"]" is not valid.');
-
-        it('throws exception when both values are empty', function() {
+        it('throws exception when values are empty', function() {
             (new NotIn('foo', ['', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["",""]" is not valid.');
 
