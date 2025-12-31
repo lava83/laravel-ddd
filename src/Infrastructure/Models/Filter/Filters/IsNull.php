@@ -7,13 +7,13 @@ namespace Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters;
 use Closure;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Enums\FilterType;
 
-class In extends Filter
+class IsNull extends Filter
 {
-    protected FilterType $type = FilterType::In;
+    protected FilterType $type = FilterType::IsNull;
 
     public function __construct(
         protected readonly string $target,
-        protected readonly array $value,
+        protected readonly bool $value = true,
     ) {}
 
     public function target(): string
@@ -21,7 +21,7 @@ class In extends Filter
         return $this->target;
     }
 
-    public function value(): array
+    public function value(): bool
     {
         return $this->value;
     }
@@ -32,14 +32,10 @@ class In extends Filter
             'value' => $this->value,
         ], [
             'value' => [
-                'array',
-                'min:1',
-            ],
-            'value.*' => [
                 'required',
                 function (string $attribute, mixed $value, Closure $fail) {
-                    if (!is_string($value) && !is_int($value) && !is_float($value)) {
-                        $fail("The {$attribute} must be a string, integer, or float.");
+                    if ($value !== true) {
+                        $fail("The {$attribute} must be true.");
                     }
                 },
             ],

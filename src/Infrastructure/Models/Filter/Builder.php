@@ -13,6 +13,8 @@ use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Filter;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThan;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThanEqualTo;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\In;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\IsNotNull;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\IsNull;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\LessThan;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\LessThanEqualTo;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Like;
@@ -145,6 +147,28 @@ final readonly class Builder implements Countable
         $this->filters->add(new LessThanEqualTo($target, $value));
 
         return $this;
+    }
+
+    public function isNull(string $target): self
+    {
+        $this->filters->add(new IsNull($target));
+
+        return $this;
+    }
+
+    public function isNotNull(string $target): self
+    {
+        $this->filters->add(new IsNotNull($target));
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Filter>
+     */
+    public function filters(): Collection
+    {
+        return $this->filters;
     }
 
     public function count(): int

@@ -33,4 +33,6 @@ enum FilterType: string
     case Like = '$like';
 
     case NotLike = '$notLike';
+
+    case IsNull = '$null';
 }
