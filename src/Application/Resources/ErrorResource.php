@@ -11,7 +11,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * @mixin Exception
  */
-class ErrorResource extends JsonResource
+final class ErrorResource extends JsonResource
 {
     /**
      * @return array{error:string,code:int|string}

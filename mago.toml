@@ -56,7 +56,15 @@ layering = [
 [guard.perimeter.layers]
 core = ["@native", "Psl\\**", "Ramsey\\**", "Illuminate\\**", "Carbon\\**", "libphonenumber\\**", "Lava83\\LaravelDdd\\Infrastructure\\Models\\Model"]
 psr = ["Psr\\**"]
-framework = ["Symfony\\**", "GuzzleHttp\\**", "Monolog\\**", "Doctrine\\**", "Spatie\\**"]
+framework = [
+    "Symfony\\**",
+    "GuzzleHttp\\**",
+    "Monolog\\**",
+    "Doctrine\\**",
+    "Spatie\\**",
+    "IndexZer0\\**",
+]
+root = ["Lava83\\LaravelDdd\\LaravelDdd"]
 
 [[guard.perimeter.rules]]
 namespace = "Lava83\\LaravelDdd\\Domain"
@@ -72,7 +80,11 @@ permit = ["@layer:core", "@layer:psr", "@layer:framework"]
 
 [[guard.perimeter.rules]]
 namespace = "Lava83\\LaravelDdd\\Facades"
-permit = ["@layer:core", "@layer:psr"]
+permit = ["@layer:core", "@layer:psr", "@layer:root"]
+
+[[guard.perimeter.rules]]
+namespace = "Lava83\\LaravelDdd"
+permit = ["@layer:core", "@layer:psr", "@layer:framework"]
 
 [[guard.perimeter.rules]]
 namespace = "Lava83\\LaravelDdd\\Tests"

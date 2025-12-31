@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterValueNotValid;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\IsNotNull;
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\IsNull;
 
 describe(
     'Initialize is not null filter',
@@ -32,7 +30,7 @@ describe(
             ]);
         });
 
-        it('throws exception if the filter value is false', function() {
+        it('throws exception if the filter value is true', function() {
             (new IsNotNull('foo', true))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "1" is not valid.');
     }
