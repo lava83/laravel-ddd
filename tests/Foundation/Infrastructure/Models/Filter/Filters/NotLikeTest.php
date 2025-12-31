@@ -10,9 +10,9 @@ describe(
     'Initialize not like filter',
     function (): void {
         it('creates a not like filter', function () {
-            $like = new NotLike('foo', 'bar');
+            $notLike = new NotLike('foo', 'bar');
 
-            expect($like)->toBeInstanceOf(NotLike::class);
+            expect($notLike)->toBeInstanceOf(NotLike::class);
         });
 
         it('has the correct value', function() {
