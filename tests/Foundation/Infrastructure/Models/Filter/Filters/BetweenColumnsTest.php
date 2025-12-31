@@ -31,28 +31,23 @@ describe(
         });
 
         it('throws exception when array has only one value', function() {
-            $equalNotAllowedValue = new BetweenColumns('foo', ['bar']);
-            $equalNotAllowedValue->toArray();
+            (new BetweenColumns('foo', ['bar']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar"]" is not valid.');
 
         it('throws exception when array has more than two values', function() {
-            $equalNotAllowedValue = new BetweenColumns('foo', ['bar', 'baz', 'qux']);
-            $equalNotAllowedValue->toArray();
+            (new BetweenColumns('foo', ['bar', 'baz', 'qux']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar","baz","qux"]" is not valid.');
 
         it('throws exception when both values are empty', function() {
-            $equalNotAllowedValue = new BetweenColumns('foo', ['', '']);
-            $equalNotAllowedValue->toArray();
+            (new BetweenColumns('foo', ['', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["",""]" is not valid.');
 
         it('throws exception when one value is empty', function() {
-            $equalNotAllowedValue = new BetweenColumns('foo', ['bar', '']);
-            $equalNotAllowedValue->toArray();
+            (new BetweenColumns('foo', ['bar', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar",""]" is not valid.');
 
         it('throws exception when non-string values are provided', function() {
-            $equalNotAllowedValue = new BetweenColumns('foo', ['bar', 123]);
-            $equalNotAllowedValue->toArray();
+            (new BetweenColumns('foo', ['bar', 123]))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar",123]" is not valid.');
     }
 );

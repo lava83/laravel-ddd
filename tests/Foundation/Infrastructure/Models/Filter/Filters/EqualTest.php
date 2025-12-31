@@ -31,8 +31,7 @@ describe(
         });
 
         it('validate of having string or integer or float value', function() {
-            $equalNotAllowedValue = new Equal('foo', '');
-            $equalNotAllowedValue->toArray();
+            (new Equal('foo', ''))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "" is not valid.');
     }
 );

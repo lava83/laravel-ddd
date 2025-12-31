@@ -31,28 +31,23 @@ describe(
         });
 
         it('validate of having array with not only one value', function() {
-            $equalNotAllowedValue = new NotBetweenColumns('foo', ['bar']);
-            $equalNotAllowedValue->toArray();
+            (new NotBetweenColumns('foo', ['bar']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar"]" is not valid.');
 
         it('validate of having array with more than two values', function() {
-            $equalNotAllowedValue = new NotBetweenColumns('foo', ['bar', 'baz', 'qux']);
-            $equalNotAllowedValue->toArray();
+            (new NotBetweenColumns('foo', ['bar', 'baz', 'qux']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar","baz","qux"]" is not valid.');
 
         it('validate of having required values', function() {
-            $equalNotAllowedValue = new NotBetweenColumns('foo', ['', '']);
-            $equalNotAllowedValue->toArray();
+            (new NotBetweenColumns('foo', ['', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["",""]" is not valid.');
 
         it('validate of having both values are required', function() {
-            $equalNotAllowedValue = new NotBetweenColumns('foo', ['bar', '']);
-            $equalNotAllowedValue->toArray();
+            (new NotBetweenColumns('foo', ['bar', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar",""]" is not valid.');
 
         it('validate of only strings are allowed', function() {
-            $equalNotAllowedValue = new NotBetweenColumns('foo', ['bar', 123]);
-            $equalNotAllowedValue->toArray();
+            (new NotBetweenColumns('foo', ['bar', 123]))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar",123]" is not valid.');
     }
 );

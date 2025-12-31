@@ -9,9 +9,9 @@ describe(
     'Initialize not equal filter',
     function (): void {
         it('creates a not equal filter', function () {
-            $equal = new NotEqual('foo', 'bar');
+            $notEqual = new NotEqual('foo', 'bar');
 
-            expect($equal)->toBeInstanceOf(NotEqual::class);
+            expect($notEqual)->toBeInstanceOf(NotEqual::class);
         });
 
         it('has the correct value', function() {
@@ -31,8 +31,7 @@ describe(
         });
 
         it('validate of having string or integer or float value', function() {
-            $equalNotAllowedValue = new NotEqual('foo', '');
-            $equalNotAllowedValue->toArray();
+            (new NotEqual('foo', ''))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "" is not valid.');
     }
 );

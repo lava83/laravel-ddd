@@ -33,23 +33,20 @@ describe(
         });
 
         it('throws exception when array has only one value', function() {
-            $equalNotAllowedValue = new NotIn('foo', ['bar']);
-            $equalNotAllowedValue->toArray();
+            (new NotIn('foo', ['bar']))->toArray();
+
         })->throws(FilterValueNotValid::class, 'The filter value "["bar"]" is not valid.');
 
         it('throws exception when array has more than two values', function() {
-            $equalNotAllowedValue = new NotIn('foo', ['bar', 'baz', 'qux']);
-            $equalNotAllowedValue->toArray();
+            (new NotIn('foo', ['bar', 'baz', 'qux']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar","baz","qux"]" is not valid.');
 
         it('throws exception when both values are empty', function() {
-            $equalNotAllowedValue = new NotIn('foo', ['', '']);
-            $equalNotAllowedValue->toArray();
+            (new NotIn('foo', ['', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["",""]" is not valid.');
 
         it('throws exception when one value is empty', function() {
-            $equalNotAllowedValue = new NotIn('foo', ['bar', '']);
-            $equalNotAllowedValue->toArray();
+            (new NotIn('foo', ['bar', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar",""]" is not valid.');
     }
 );
