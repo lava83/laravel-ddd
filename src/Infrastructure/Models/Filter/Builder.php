@@ -12,6 +12,7 @@ use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Filter;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThan;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThanEqualTo;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\In;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotBetween;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotBetweenColumns;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotEqual;
@@ -89,6 +90,13 @@ final readonly class Builder implements Countable
     public function gte(string $target, int|float $value): self
     {
         $this->filters->add(new GreaterThanEqualTo($target, $value));
+
+        return $this;
+    }
+
+    public function in(string $target, array $value): self
+    {
+        $this->filters->add(new In($target, $value));
 
         return $this;
     }

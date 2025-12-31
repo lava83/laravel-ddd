@@ -21,4 +21,6 @@ enum FilterType: string
     case GreaterThanEqualTo = '$gte';
 
     case GreaterThan = '$gt';
+
+    case In = '$in';
 }

@@ -11,7 +11,9 @@ class FilterValueNotValid extends Exception
     public static function make(mixed $value): self
     {
         if (is_array($value)) {
-            $value = json_encode($value) ?: 'array';
+            $encodedValue = json_encode($value);
+
+            $value = $encodedValue ? $encodedValue : 'array';
         }
 
         return new self("The filter value \"{$value}\" is not valid.");

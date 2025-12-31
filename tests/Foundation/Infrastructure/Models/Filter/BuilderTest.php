@@ -67,3 +67,29 @@ describe('Builder not equal', function () {
         expect($builder->toArray())->toBe($expectedArray);
     });
 });
+
+describe('Builder in', function () {
+    it('can build a builder with in filter', function () {
+        $builder = new Builder();
+
+        $builder->in('foo', ['bar', 'baz']);
+
+        expect($builder)->toHaveCount(1);
+    });
+
+    it('can convert to array', function () {
+        $builder = new Builder();
+
+        $builder->in('foo', ['bar', 'baz']);
+
+        $expectedArray = [
+            [
+                'type' => '$in',
+                'target' => 'foo',
+                'value' => ['bar', 'baz'],
+            ],
+        ];
+
+        expect($builder->toArray())->toBe($expectedArray);
+    });
+});
