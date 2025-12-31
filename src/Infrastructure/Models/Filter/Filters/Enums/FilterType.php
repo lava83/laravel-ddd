@@ -25,4 +25,8 @@ enum FilterType: string
     case In = '$in';
 
     case NotIn = '$notIn';
+
+    case LessThan = '$lt';
+
+    case LessThanOrEqualTo = '$lte';
 }

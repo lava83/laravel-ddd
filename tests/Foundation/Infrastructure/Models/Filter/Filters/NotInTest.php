@@ -9,9 +9,9 @@ describe(
     'Initialize not in filter',
     function (): void {
         it('creates a not in filter', function () {
-            $equal = new NotIn('foo', ['bar', 'baz']);
+            $notIn = new NotIn('foo', ['bar', 'baz']);
 
-            expect($equal)->toBeInstanceOf(NotIn::class);
+            expect($notIn)->toBeInstanceOf(NotIn::class);
         });
 
         it('has the correct value', function() {

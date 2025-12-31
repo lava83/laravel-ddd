@@ -8,9 +8,9 @@ describe(
     'Initialize gt filter',
     function (): void {
         it('creates an gt filter', function () {
-            $equal = new GreaterThan('foo', 123);
+            $gt = new GreaterThan('foo', 123);
 
-            expect($equal)->toBeInstanceOf(GreaterThan::class);
+            expect($gt)->toBeInstanceOf(GreaterThan::class);
         });
 
         it('has the correct number value', function() {

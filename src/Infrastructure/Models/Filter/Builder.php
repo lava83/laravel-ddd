@@ -105,6 +105,9 @@ final readonly class Builder implements Countable
         return $this;
     }
 
+    /**
+     * @param array<int, string|int|float> $value
+     */
     public function notIn(string $target, array $value): self
     {
         $this->filters->add(new NotIn($target, $value));

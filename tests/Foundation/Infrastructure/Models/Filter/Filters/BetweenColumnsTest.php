@@ -9,9 +9,9 @@ describe(
     'Initialize between columns filter',
     function (): void {
         it('creates a between columns filter', function () {
-            $equal = new BetweenColumns('foo', ['bar', 'baz']);
+            $betweenColumns = new BetweenColumns('foo', ['bar', 'baz']);
 
-            expect($equal)->toBeInstanceOf(BetweenColumns::class);
+            expect($betweenColumns)->toBeInstanceOf(BetweenColumns::class);
         });
 
         it('has the correct value', function() {

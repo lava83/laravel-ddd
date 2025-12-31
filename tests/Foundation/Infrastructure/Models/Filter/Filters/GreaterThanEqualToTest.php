@@ -8,9 +8,9 @@ describe(
     'Initialize gte filter',
     function (): void {
         it('creates an gte filter', function () {
-            $equal = new GreaterThanEqualTo('foo', 123);
+            $gte = new GreaterThanEqualTo('foo', 123);
 
-            expect($equal)->toBeInstanceOf(GreaterThanEqualTo::class);
+            expect($gte)->toBeInstanceOf(GreaterThanEqualTo::class);
         });
 
         it('has the correct number value', function() {
