@@ -11,7 +11,7 @@ interface FilterContract
 {
     public function target(): string;
 
-    public function value(): Collection|array|string;
+    public function value(): Collection|array|string|int|float|bool;
 
     public function type(): FilterType;
 

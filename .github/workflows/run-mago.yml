@@ -32,7 +32,7 @@ jobs:
     name: Mago Lint - P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
 
     steps:
-      - name: Checkoud code
+      - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Setup PHP
@@ -59,3 +59,4 @@ jobs:
           mago format --dry-run
           mago lint --reporting-format=github
           mago analyze --reporting-format=github
+          mago guard --reporting-format=github

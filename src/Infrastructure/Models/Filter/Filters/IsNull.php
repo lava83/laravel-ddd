@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters;
 
+use Closure;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Enums\FilterType;
 
-class Equal extends Filter
+class IsNull extends Filter
 {
-    protected FilterType $type = FilterType::Equal;
+    protected FilterType $type = FilterType::IsNull;
 
     public function __construct(
         protected readonly string $target,
-        protected readonly string|int|float|bool $value,
+        protected readonly bool $value = true,
     ) {}
 
     public function target(): string
@@ -20,7 +21,7 @@ class Equal extends Filter
         return $this->target;
     }
 
-    public function value(): string|int|float|bool
+    public function value(): bool
     {
         return $this->value;
     }
@@ -32,6 +33,11 @@ class Equal extends Filter
         ], [
             'value' => [
                 'required',
+                function (string $attribute, mixed $value, Closure $fail) {
+                    if ($value !== true) {
+                        $fail("The {$attribute} must be true.");
+                    }
+                },
             ],
         ]);
 

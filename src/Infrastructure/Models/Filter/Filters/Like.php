@@ -6,9 +6,9 @@ namespace Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters;
 
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Enums\FilterType;
 
-class Equal extends Filter
+class Like extends Filter
 {
-    protected FilterType $type = FilterType::Equal;
+    protected FilterType $type = FilterType::Like;
 
     public function __construct(
         protected readonly string $target,
