@@ -107,7 +107,7 @@ reviews:
     - label: "tests"
       instructions: "Apply when PR contains changes to tests/**"
     - label: "documentation"
-      instructions: "Apply when PR contains changes to *.md files or docs/**"
+      instructions: "Apply when PR contains changes to *.md instructions or docs/**"
     - label: "dependencies"
       instructions: "Apply when PR contains changes to composer.json"
     - label: "ci"
