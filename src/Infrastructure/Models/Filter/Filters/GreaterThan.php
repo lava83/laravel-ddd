@@ -6,13 +6,13 @@ namespace Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters;
 
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Enums\FilterType;
 
-class Equal extends Filter
+class GreaterThan extends Filter
 {
-    protected FilterType $type = FilterType::Equal;
+    protected FilterType $type = FilterType::GreaterThan;
 
     public function __construct(
         protected readonly string $target,
-        protected readonly string|int|float|bool $value,
+        protected readonly int|float $value,
     ) {}
 
     public function target(): string
@@ -20,7 +20,7 @@ class Equal extends Filter
         return $this->target;
     }
 
-    public function value(): string|int|float|bool
+    public function value(): int|float
     {
         return $this->value;
     }
@@ -32,6 +32,7 @@ class Equal extends Filter
         ], [
             'value' => [
                 'required',
+                'numeric',
             ],
         ]);
 
