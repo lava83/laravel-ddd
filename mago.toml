@@ -20,7 +20,7 @@ integrations = ["laravel"]
 ambiguous-function-call = { enabled = false }
 literal-named-argument = { enabled = false }
 prefer-static-closure = { enabled = false }
-halstead = { effort-threshold = 7000 }
+halstead = { effort-threshold = 7000, difficulty-threshold = 15 }
 too-many-methods = { threshold=40 }
 cyclomatic-complexity = { threshold=25 }
 prefer-first-class-callable = { enabled = false }

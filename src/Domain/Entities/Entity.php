@@ -254,6 +254,18 @@ abstract class Entity implements Stringable
 
     protected function hasChanged(mixed $current, mixed $new): bool
     {
+        if ($current instanceof CarbonImmutable && $new instanceof CarbonImmutable) {
+            return $this->carbonHasChanged($current, $new);
+        }
+
+        if ($current instanceof Entity && $new instanceof Entity) {
+            return !$current->equals($new);
+        }
+
+        if ($current instanceof BackedEnum && $new instanceof BackedEnum) {
+            return $current->value !== $new->value;
+        }
+
         if ($current instanceof Stringable) {
             return (string) $current !== (string) $new;
         }
@@ -374,5 +386,20 @@ abstract class Entity implements Stringable
     private function reflectionClass(): ReflectionClass
     {
         return once(fn(): ReflectionClass => new ReflectionClass($this));
+    }
+
+    private function carbonHasChanged(CarbonImmutable $current, CarbonImmutable $new): bool
+    {
+        return $this->carbonTimestampDiffers($current, $new) || $this->carbonTimezoneDiffers($current, $new);
+    }
+
+    private function carbonTimestampDiffers(CarbonImmutable $current, CarbonImmutable $new): bool
+    {
+        return $current->getTimestamp() !== $new->getTimestamp();
+    }
+
+    private function carbonTimezoneDiffers(CarbonImmutable $current, CarbonImmutable $new): bool
+    {
+        return $current->getTimezone()->getName() !== $new->getTimezone()->getName();
     }
 }
