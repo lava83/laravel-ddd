@@ -7,6 +7,8 @@ namespace Lava83\LaravelDdd\Domain\Entities;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
+use Illuminate\Database\Eloquent\Model as EloquentModel;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\MongoObjectId;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Uuid;
@@ -86,11 +88,17 @@ abstract class Entity implements Stringable
         return $this->version;
     }
 
-    public function hydrate(Model $model): void
+    public function hydrate(Model|EloquentModel $model): void
     {
-        $this->createdAt = CarbonImmutable::parse($model->created_at);
-        $this->updatedAt = $model->updated_at ? CarbonImmutable::parse($model->updated_at) : null;
-        $this->version = $model->version;
+        /** @var Carbon $createdAt */
+        $createdAt = $model->created_at;
+        $this->createdAt = $createdAt->toImmutable();
+
+        /** @var Carbon|null $updatedAt */
+        $updatedAt = $model->updated_at;
+        $this->updatedAt = $updatedAt?->toImmutable();
+
+        $this->version = (int) $model->version;
     }
 
     /**

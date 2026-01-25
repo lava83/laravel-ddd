@@ -105,7 +105,7 @@ abstract class Repository
     protected function handleOptimisticLocking(Model|Authenticatable|PersonalAccessToken $model, Entity $entity): void
     {
         $expectedDatabaseVersion = $entity->version();
-        $modelVersion = $model instanceof Model ? $model->version : (int) ($model->getAttribute('version') ?? 0);
+        $modelVersion = $model instanceof Model ? (int) $model->version : (int) ($model->getAttribute('version') ?? 0);
 
         if ($modelVersion !== $expectedDatabaseVersion) {
             throw new ConcurrencyException(sprintf(
@@ -119,7 +119,6 @@ abstract class Repository
 
     protected function syncEntityFromModel(Entity $entity, Model|Authenticatable|PersonalAccessToken $model): void
     {
-        // @mago-expect analyzer:possibly-invalid-argument
         $entity->hydrate($model);
     }
 
