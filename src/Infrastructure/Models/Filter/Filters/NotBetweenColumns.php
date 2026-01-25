@@ -8,5 +8,6 @@ use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Enums\FilterType;
 
 final class NotBetweenColumns extends BetweenColumns
 {
+    // @mago-expect analyzer:unused-property
     protected FilterType $type = FilterType::NotBetweenColumns;
 }

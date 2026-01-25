@@ -88,8 +88,11 @@ class Link extends ValueObject
         $this->value = $this->scheme
             ->append('://')
             ->append((string) $this->host)
-            ->append((string) $this->path)
-            ->when($this->query->length() > 0, fn(Stringable $s) => $s->append('?')->append((string) $this->query));
+            ->append((string) $this->path);
+
+        if ($this->query->isNotEmpty()) {
+            $this->value = $this->value->append('?')->append((string) $this->query);
+        }
     }
 
     private function validate(string $url): void

@@ -7,7 +7,9 @@ namespace Lava83\LaravelDdd\Domain\Entities;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Collection;
+use Laravel\Sanctum\PersonalAccessToken;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\MongoObjectId;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Uuid;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
@@ -24,7 +26,7 @@ use Stringable;
  */
 abstract class Entity implements Stringable
 {
-    /** @var Collection<string, null|string|int|array|Collection|ValueObject> */
+    /** @var Collection<string, null|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable> */
     protected Collection $dirty;
 
     public function __construct(
@@ -212,7 +214,7 @@ abstract class Entity implements Stringable
     /**
      * Helper method for child entities to update themselves
      *
-     * @param array<string, null|string|int|array|Collection|ValueObject> $changes Key-value pairs of changes made to the aggregate
+     * @param array<string, null|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable> $changes Key-value pairs of changes made to the aggregate
      * @throws ReflectionException
      */
     protected function updateEntity(array $changes): Collection
@@ -232,8 +234,8 @@ abstract class Entity implements Stringable
     /**
      * Collects changes between current entity state and new values
      *
-     * @param array<string, null|string|int|array|Collection|ValueObject> $newValues Key-value pairs of new values to compare
-     * @return Collection<string, null|string|int|array|Collection|ValueObject> Collection of changes with 'old_' and 'new_' prefixes
+     * @param array<string, null|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable> $newValues Key-value pairs of new values to compare
+     * @return Collection<string, null|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable> Collection of changes with 'old_' and 'new_' prefixes
      * @throws ReflectionException
      */
     protected function collectChanges(array $newValues): Collection
@@ -270,7 +272,7 @@ abstract class Entity implements Stringable
      * Applies changes from a collection to the aggregate's properties using reflection
      * Automatically maps properties based on naming convention
      *
-     * @param Collection<string, null|string|int|array|Collection|ValueObject> $changes Collection with keys like 'new_{propertyName}'
+     * @param Collection<string, null|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable> $changes Collection with keys like 'new_{propertyName}'
      * @param array<string, callable> $customSetters Optional custom setters for specific properties
      * @throws ReflectionException
      */
