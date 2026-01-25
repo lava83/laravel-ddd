@@ -25,7 +25,7 @@ class Uuid extends Id
 
     public static function generate(): static
     {
-        return new static(RamseyUuid::uuid7(now())->toString());
+        return new static(RamseyUuid::uuid7(now()));
     }
 
     /**

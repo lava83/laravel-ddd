@@ -63,12 +63,13 @@ framework = [
     "Doctrine\\**",
     "Spatie\\**",
     "IndexZer0\\**",
+    "Laravel\\Sanctum\\**",
 ]
 root = ["Lava83\\LaravelDdd\\LaravelDdd"]
 
 [[guard.perimeter.rules]]
 namespace = "Lava83\\LaravelDdd\\Domain"
-permit = ["@layer:core"]
+permit = ["@layer:core", "@layer:framework"]  # TEMP: Remove after refactoring #4
 
 [[guard.perimeter.rules]]
 namespace = "Lava83\\LaravelDdd\\Application"

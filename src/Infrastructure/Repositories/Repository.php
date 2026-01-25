@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Infrastructure\Repositories;
 
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Collection;
+use Laravel\Sanctum\PersonalAccessToken;
 use Lava83\LaravelDdd\Domain\Entities\Aggregate;
 use Lava83\LaravelDdd\Domain\Entities\Entity;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper;
@@ -34,7 +36,7 @@ abstract class Repository
         return $this->mapperResolver->resolve($this->aggregateClass);
     }
 
-    protected function saveEntity(Entity|Aggregate $entity): Model
+    protected function saveEntity(Entity|Aggregate $entity): Model|Authenticatable|PersonalAccessToken
     {
         $model = $this->mapperResolver->resolve($entity::class)->toModel($entity);
 
@@ -61,7 +63,7 @@ abstract class Repository
     }
 
     /**
-     * @param Collection<Entity|Aggregate> $entities
+     * @param Collection<int, Entity|Aggregate> $entities
      */
     protected function deleteEntities(Collection $entities): void
     {
@@ -75,7 +77,11 @@ abstract class Repository
         // @mago-expect analyzer:mixed-assignment,mixed-method-access,string-member-selector
         $related = $model->$relation()->find($relatedId);
 
-        if ($related instanceof Model === false) {
+        if (
+            $related instanceof Model === false
+            && $related instanceof Authenticatable === false
+            && $related instanceof PersonalAccessToken === false
+        ) {
             throw new CantDeleteRelatedModel(sprintf('Relation %s is not a valid Eloquent relation', $relation));
         }
 
@@ -96,28 +102,31 @@ abstract class Repository
         }
     }
 
-    protected function handleOptimisticLocking(Model $model, Entity $entity): void
+    protected function handleOptimisticLocking(Model|Authenticatable|PersonalAccessToken $model, Entity $entity): void
     {
         $expectedDatabaseVersion = $entity->version();
+        $modelVersion = $model instanceof Model ? $model->version : (int) ($model->getAttribute('version') ?? 0);
 
-        if ($model->version !== $expectedDatabaseVersion) {
+        if ($modelVersion !== $expectedDatabaseVersion) {
             throw new ConcurrencyException(sprintf(
                 'Entity %s was modified by another process. Expected version: %d, Actual version: %d',
                 $entity->id()->value(),
                 $expectedDatabaseVersion,
-                $model->version,
+                $modelVersion,
             ));
         }
     }
 
-    protected function syncEntityFromModel(Entity $entity, Model $model): void
+    protected function syncEntityFromModel(Entity $entity, Model|Authenticatable|PersonalAccessToken $model): void
     {
-        // Update entity with final database values
+        // @mago-expect analyzer:possibly-invalid-argument
         $entity->hydrate($model);
     }
 
-    private function persistDirtyEntity(Entity|Aggregate $entity, Model $model): void
-    {
+    private function persistDirtyEntity(
+        Entity|Aggregate $entity,
+        Model|Authenticatable|PersonalAccessToken $model,
+    ): void {
         if ($model->exists) {
             $this->handleOptimisticLocking($model, $entity);
         }
