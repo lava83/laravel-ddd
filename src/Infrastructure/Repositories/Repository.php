@@ -105,10 +105,7 @@ abstract class Repository
     protected function handleOptimisticLocking(Model|Authenticatable|PersonalAccessToken $model, Entity $entity): void
     {
         $expectedDatabaseVersion = $entity->version();
-        $modelVersion = $model instanceof Model
-            ? $model->version
-            : (int) ($model->getAttribute('version') ?? 0);
-
+        $modelVersion = $model instanceof Model ? $model->version : (int) ($model->getAttribute('version') ?? 0);
 
         if ($modelVersion !== $expectedDatabaseVersion) {
             throw new ConcurrencyException(sprintf(
@@ -126,8 +123,10 @@ abstract class Repository
         $entity->hydrate($model);
     }
 
-    private function persistDirtyEntity(Entity|Aggregate $entity, Model|Authenticatable|PersonalAccessToken $model): void
-    {
+    private function persistDirtyEntity(
+        Entity|Aggregate $entity,
+        Model|Authenticatable|PersonalAccessToken $model,
+    ): void {
         if ($model->exists) {
             $this->handleOptimisticLocking($model, $entity);
         }
