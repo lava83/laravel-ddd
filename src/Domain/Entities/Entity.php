@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Domain\Entities;
 
+use BackedEnum;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
@@ -325,7 +326,7 @@ abstract class Entity implements Stringable
     /**
      * @throws ReflectionException
      */
-    protected function setPropertyValue(string $property, null|string|int|array|Collection|ValueObject $value): void
+    protected function setPropertyValue(string $property, null|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable $value): void
     {
         $reflectionClass = $this->reflectionClass();
 
@@ -338,7 +339,7 @@ abstract class Entity implements Stringable
     /**
      * @throws ReflectionException
      */
-    protected function getPropertyValue(string $property): null|string|int|array|Collection|ValueObject
+    protected function getPropertyValue(string $property): null|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable
     {
         $reflectionClass = $this->reflectionClass();
 

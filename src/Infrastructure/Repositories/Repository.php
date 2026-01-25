@@ -100,7 +100,7 @@ abstract class Repository
     {
         $expectedDatabaseVersion = $entity->version();
 
-        if ($model->version !== $expectedDatabaseVersion) {
+        if ((int)$model->version !== $expectedDatabaseVersion) {
             throw new ConcurrencyException(sprintf(
                 'Entity %s was modified by another process. Expected version: %d, Actual version: %d',
                 $entity->id()->value(),

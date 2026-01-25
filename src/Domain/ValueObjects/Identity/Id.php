@@ -20,6 +20,6 @@ abstract class Id extends ValueObject
 
     public function equals(Id $other): bool
     {
-        return $this->value === $other->value;
+        return $this->value->toString() === $other->value->toString();
     }
 }
