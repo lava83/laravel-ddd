@@ -20,7 +20,7 @@ abstract class DomainEvent implements DomainEventContract
      */
     final public function __construct(
         /** @todo here we expect only an Id not the types of it */
-        private readonly Uuid|MongoObjectId  $aggregateId,
+        private readonly Uuid|MongoObjectId $aggregateId,
         private readonly Collection $eventData = new Collection(),
         private readonly int $eventVersion = 1,
     ) {

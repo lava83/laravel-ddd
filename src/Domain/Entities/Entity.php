@@ -326,8 +326,10 @@ abstract class Entity implements Stringable
     /**
      * @throws ReflectionException
      */
-    protected function setPropertyValue(string $property, null|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable $value): void
-    {
+    protected function setPropertyValue(
+        string $property,
+        null|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable $value,
+    ): void {
         $reflectionClass = $this->reflectionClass();
 
         $this->ensurePropertyExists($property);
