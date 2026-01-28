@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.1.4.3 - 2026-01-28
+
+### What's Changed
+
+* Makes value objects extend ValueObject by @lava83 in https://github.com/lava83/laravel-ddd/pull/8
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.1.4.2...v0.1.4.3
+
 ## v0.1.4.2 - 2026-01-28
 
 ### What's Changed
