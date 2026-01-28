@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Lava83\LaravelDdd\Tests\TestCase;
-use Illuminate\Support\Facades\Http;
 
 pest()
     ->extend(TestCase::class)

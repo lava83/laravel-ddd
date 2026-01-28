@@ -12,6 +12,7 @@ use Lava83\LaravelDdd\Domain\Contracts\DomainEvent;
 use Lava83\LaravelDdd\Domain\Events\DomainEvent as DomainEventClass;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 use LogicException;
+use ReflectionException;
 
 /**
  * Base class for Aggregate Root entities
@@ -146,10 +147,11 @@ abstract class Aggregate extends Entity implements AggregateRoot
     /**
      * Helper method for aggregate roots to update and record change event
      *
-     * @param array<string, null|string|int|array|Collection|ValueObject> $changes Key-value pairs of changes made to the aggregate
-     * @param class-string<DomainEventClass>|null $eventClass Optional event class to instantiate
-     * @param DomainEvent|null $event Optional pre-created event instance
-     * @throws \ReflectionException
+     * @param  array<string, null|bool|string|int|array|Collection|ValueObject>  $changes  Key-value pairs of changes made to the aggregate
+     * @param  class-string<DomainEventClass>|null  $eventClass  Optional event class to instantiate
+     * @param  DomainEvent|null  $event  Optional pre-created event instance
+     *
+     * @throws ReflectionException
      */
     protected function updateAggregateRoot(array $changes, ?string $eventClass = null, ?DomainEvent $event = null): void
     {

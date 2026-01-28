@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Lava83\LaravelDdd\Tests;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Orchestra\Testbench\TestCase as Orchestra;
 use Lava83\LaravelDdd\LaravelDddServiceProvider;
+use Orchestra\Testbench\TestCase as Orchestra;
 
 class TestCase extends Orchestra
 {

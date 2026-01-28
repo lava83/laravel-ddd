@@ -14,15 +14,15 @@ describe(
             expect($like)->toBeInstanceOf(Like::class);
         });
 
-        it('has the correct value', function() {
-           expect((new Like('foo', 'bar'))->value())->toBe('bar');
+        it('has the correct value', function () {
+            expect((new Like('foo', 'bar'))->value())->toBe('bar');
         });
 
-        it('has the correct target', function() {
+        it('has the correct target', function () {
             expect((new Like('foo', 'bar'))->target())->toBe('foo');
         });
 
-        it('has the correct array', function() {
+        it('has the correct array', function () {
             expect((new Like('foo', 'bar'))->toArray())->toBe([
                 'type' => '$like',
                 'target' => 'foo',
@@ -30,10 +30,8 @@ describe(
             ]);
         });
 
-        it('throws exception if the filter value is empty', function() {
+        it('throws exception if the filter value is empty', function () {
             (new Like('foo', ''))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "" is not valid.');
     }
 );
-
-

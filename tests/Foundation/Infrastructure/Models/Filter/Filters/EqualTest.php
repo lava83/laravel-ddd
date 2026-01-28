@@ -14,15 +14,15 @@ describe(
             expect($equal)->toBeInstanceOf(Equal::class);
         });
 
-        it('has the correct value', function() {
-           expect((new Equal('foo', 'bar'))->value())->toBe('bar');
+        it('has the correct value', function () {
+            expect((new Equal('foo', 'bar'))->value())->toBe('bar');
         });
 
-        it('has the correct target', function() {
+        it('has the correct target', function () {
             expect((new Equal('foo', 'bar'))->target())->toBe('foo');
         });
 
-        it('has the correct array', function() {
+        it('has the correct array', function () {
             expect((new Equal('foo', 'bar'))->toArray())->toBe([
                 'type' => '$eq',
                 'target' => 'foo',
@@ -30,10 +30,8 @@ describe(
             ]);
         });
 
-        it('throws exception if the filter value is empty', function() {
+        it('throws exception if the filter value is empty', function () {
             (new Equal('foo', ''))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "" is not valid.');
     }
 );
-
-

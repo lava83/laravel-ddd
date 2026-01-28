@@ -104,7 +104,6 @@ class Uuid extends Id
 
     /**
      * @param  array<string>  $values
-     *
      * @return array<static>
      */
     public static function fromArray(array $values): array
@@ -114,7 +113,6 @@ class Uuid extends Id
 
     /**
      * @param  array<Uuid>  $ids
-     *
      * @return array<string>
      */
     public static function toStringArray(array $ids): array

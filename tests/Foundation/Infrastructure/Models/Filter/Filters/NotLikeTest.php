@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterValueNotValid;
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Like;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotLike;
 
 describe(
@@ -15,15 +14,15 @@ describe(
             expect($notLike)->toBeInstanceOf(NotLike::class);
         });
 
-        it('has the correct value', function() {
-           expect((new NotLike('foo', 'bar'))->value())->toBe('bar');
+        it('has the correct value', function () {
+            expect((new NotLike('foo', 'bar'))->value())->toBe('bar');
         });
 
-        it('has the correct target', function() {
+        it('has the correct target', function () {
             expect((new NotLike('foo', 'bar'))->target())->toBe('foo');
         });
 
-        it('has the correct array', function() {
+        it('has the correct array', function () {
             expect((new NotLike('foo', 'bar'))->toArray())->toBe([
                 'type' => '$notLike',
                 'target' => 'foo',
@@ -31,10 +30,8 @@ describe(
             ]);
         });
 
-        it('throws exception if the filter value is empty', function() {
+        it('throws exception if the filter value is empty', function () {
             (new NotLike('foo', ''))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "" is not valid.');
     }
 );
-
-

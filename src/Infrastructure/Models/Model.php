@@ -23,8 +23,8 @@ use Lava83\LaravelDdd\Infrastructure\Models\Concerns\HasUuids;
  */
 abstract class Model extends EloquentModel
 {
-    use HasUuids;
     use Filterable;
+    use HasUuids;
 
     public function allowedFilters(): ?AllowedFilterList
     {

@@ -6,8 +6,9 @@ namespace Lava83\LaravelDdd\Domain\ValueObjects\Business;
 
 use InvalidArgumentException;
 use JsonSerializable;
+use Stringable;
 
-class Money implements JsonSerializable, \Stringable
+class Money implements Stringable, JsonSerializable
 {
     private readonly float $amount;
 

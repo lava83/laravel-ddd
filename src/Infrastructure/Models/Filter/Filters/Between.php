@@ -12,7 +12,7 @@ class Between extends Filter
     protected FilterType $type = FilterType::Between;
 
     /**
-     * @param array<int, string|int|float|bool> $value
+     * @param  array<int, string|int|float|bool>  $value
      */
     public function __construct(
         protected readonly string $target,

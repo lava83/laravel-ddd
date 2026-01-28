@@ -21,20 +21,20 @@ use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotIn;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotLike;
 
 it('initializes the builder', function () {
-    $builder = new Builder();
+    $builder = new Builder;
 
     expect($builder)->toBeInstanceOf(Builder::class);
 });
 
 it('has no initial filters', function () {
-    $builder = new Builder();
+    $builder = new Builder;
 
     expect($builder)->toHaveCount(0);
 });
 
 describe('Builder equal', function () {
     it('can build an builder with equal filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->eq('foo', 'bar');
 
@@ -43,7 +43,7 @@ describe('Builder equal', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->eq('foo', 'bar');
 
@@ -61,7 +61,7 @@ describe('Builder equal', function () {
 
 describe('Builder not equal', function () {
     it('can build an builder with not equal filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->neq('foo', 'bar');
 
@@ -70,7 +70,7 @@ describe('Builder not equal', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->neq('foo', 'bar');
 
@@ -88,7 +88,7 @@ describe('Builder not equal', function () {
 
 describe('Builder in', function () {
     it('can build a builder with in filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->in('foo', ['bar', 'baz']);
 
@@ -97,7 +97,7 @@ describe('Builder in', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->in('foo', ['bar', 'baz']);
 
@@ -115,7 +115,7 @@ describe('Builder in', function () {
 
 describe('Builder not in', function () {
     it('can build a builder with not in filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->notIn('foo', ['bar', 'baz']);
 
@@ -124,7 +124,7 @@ describe('Builder not in', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->notIn('foo', ['bar', 'baz']);
 
@@ -142,7 +142,7 @@ describe('Builder not in', function () {
 
 describe('Builder like', function () {
     it('can build a builder with like filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->like('foo', 'bar')
             ->like('foo', 123)
@@ -153,7 +153,7 @@ describe('Builder like', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->like('foo', 'bar');
 
@@ -171,7 +171,7 @@ describe('Builder like', function () {
 
 describe('Builder not like', function () {
     it('can build a builder with not like filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->notLike('foo', 'bar')
             ->notLike('foo', 123)
@@ -182,7 +182,7 @@ describe('Builder not like', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->notLike('foo', 'bar');
 
@@ -200,7 +200,7 @@ describe('Builder not like', function () {
 
 describe('Builder greater than', function () {
     it('can build a builder with greater than filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->gt('foo', 123)
             ->gt('foo', 45.67);
@@ -210,7 +210,7 @@ describe('Builder greater than', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->gt('foo', 123);
 
@@ -228,7 +228,7 @@ describe('Builder greater than', function () {
 
 describe('Builder greater than equal to', function () {
     it('can build a builder with greater than equal to filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->gte('foo', 123)
             ->gte('foo', 45.67);
@@ -238,7 +238,7 @@ describe('Builder greater than equal to', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->gte('foo', 123);
 
@@ -256,7 +256,7 @@ describe('Builder greater than equal to', function () {
 
 describe('Builder less than', function () {
     it('can build a builder with less than filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->lt('foo', 123)
             ->lt('foo', 45.67);
@@ -266,7 +266,7 @@ describe('Builder less than', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->lt('foo', 123);
 
@@ -284,7 +284,7 @@ describe('Builder less than', function () {
 
 describe('Builder less than equal to', function () {
     it('can build a builder with less than equal to filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->lte('foo', 123)
             ->lte('foo', 45.67);
@@ -294,7 +294,7 @@ describe('Builder less than equal to', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->lte('foo', 123);
 
@@ -312,7 +312,7 @@ describe('Builder less than equal to', function () {
 
 describe('Builder is null', function () {
     it('can build a builder with is null filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->isNull('foo');
 
@@ -321,7 +321,7 @@ describe('Builder is null', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->isNull('foo');
 
@@ -339,7 +339,7 @@ describe('Builder is null', function () {
 
 describe('Builder is not null', function () {
     it('can build a builder with is not null filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->isNotNull('foo');
 
@@ -348,7 +348,7 @@ describe('Builder is not null', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->isNotNull('foo');
 
@@ -366,7 +366,7 @@ describe('Builder is not null', function () {
 
 describe('Builder between', function () {
     it('can build a builder with between filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->between('foo', [10, 20]);
 
@@ -375,7 +375,7 @@ describe('Builder between', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->between('foo', [10, 20]);
 
@@ -383,7 +383,7 @@ describe('Builder between', function () {
             [
                 'type' => '$between',
                 'target' => 'foo',
-                'value' => [10,20],
+                'value' => [10, 20],
             ],
         ];
 
@@ -393,7 +393,7 @@ describe('Builder between', function () {
 
 describe('Builder not between', function () {
     it('can build a builder with not between filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->notBetween('foo', [10, 20]);
 
@@ -402,7 +402,7 @@ describe('Builder not between', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->notBetween('foo', [10, 20]);
 
@@ -410,7 +410,7 @@ describe('Builder not between', function () {
             [
                 'type' => '$notBetween',
                 'target' => 'foo',
-                'value' => [10,20],
+                'value' => [10, 20],
             ],
         ];
 
@@ -420,7 +420,7 @@ describe('Builder not between', function () {
 
 describe('Builder between columns', function () {
     it('can build a builder with between columns filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->betweenColumns('foo', ['foo', 'bar']);
 
@@ -429,7 +429,7 @@ describe('Builder between columns', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->betweenColumns('foo', ['bar', 'baz']);
 
@@ -437,7 +437,7 @@ describe('Builder between columns', function () {
             [
                 'type' => '$betweenColumns',
                 'target' => 'foo',
-                'value' => ['bar','baz'],
+                'value' => ['bar', 'baz'],
             ],
         ];
 
@@ -447,7 +447,7 @@ describe('Builder between columns', function () {
 
 describe('Builder not between columns', function () {
     it('can build a builder with not between columns filter', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->notBetweenColumns('foo', ['bar', 'baz']);
 
@@ -456,7 +456,7 @@ describe('Builder not between columns', function () {
     });
 
     it('can convert to array', function () {
-        $builder = new Builder();
+        $builder = new Builder;
 
         $builder->notBetweenColumns('foo', ['bar', 'baz']);
 
@@ -464,7 +464,7 @@ describe('Builder not between columns', function () {
             [
                 'type' => '$notBetweenColumns',
                 'target' => 'foo',
-                'value' => ['bar','baz'],
+                'value' => ['bar', 'baz'],
             ],
         ];
 
