@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.1.4.2 - 2026-01-28
+
+### What's Changed
+
+* Extends allowed types for entity values by @lava83 in https://github.com/lava83/laravel-ddd/pull/7
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.1.4.1...v0.1.4.2
+
 ## v0.1.4.1 - 2026-01-25
 
 ### What's Changed
