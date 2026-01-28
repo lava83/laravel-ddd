@@ -63,7 +63,7 @@ abstract class Repository
     }
 
     /**
-     * @param Collection<int, Entity|Aggregate> $entities
+     * @param  Collection<int, Entity|Aggregate>  $entities
      */
     protected function deleteEntities(Collection $entities): void
     {

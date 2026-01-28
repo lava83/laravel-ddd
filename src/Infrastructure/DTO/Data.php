@@ -10,7 +10,7 @@ use Spatie\LaravelData\Data as SpatieData;
 abstract class Data extends SpatieData
 {
     /**
-     * @return array<string, Data|Collection<int, Data>|array|string|float|integer|bool|null>
+     * @return array<string, Data|Collection<int, Data>|array|string|float|int|bool|null>
      */
     abstract public function mapToPersistenceLayerArray(): array;
 }

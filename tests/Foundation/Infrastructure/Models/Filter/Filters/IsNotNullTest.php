@@ -14,15 +14,15 @@ describe(
             expect($equal)->toBeInstanceOf(IsNotNull::class);
         });
 
-        it('has the correct value', function() {
-           expect((new IsNotNull('foo'))->value())->toBeFalse();
+        it('has the correct value', function () {
+            expect((new IsNotNull('foo'))->value())->toBeFalse();
         });
 
-        it('has the correct target', function() {
+        it('has the correct target', function () {
             expect((new IsNotNull('foo'))->target())->toBe('foo');
         });
 
-        it('has the correct array', function() {
+        it('has the correct array', function () {
             expect((new IsNotNull('foo'))->toArray())->toBe([
                 'type' => '$null',
                 'target' => 'foo',
@@ -30,10 +30,8 @@ describe(
             ]);
         });
 
-        it('throws exception if the filter value is true', function() {
+        it('throws exception if the filter value is true', function () {
             (new IsNotNull('foo', true))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "1" is not valid.');
     }
 );
-
-

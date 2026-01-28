@@ -27,7 +27,7 @@ use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotLike;
 final readonly class Builder implements Countable
 {
     /**
-     * @param Collection<int, Filter> $filters
+     * @param  Collection<int, Filter>  $filters
      */
     public function __construct(
         private Collection $filters = new Collection(),
@@ -48,7 +48,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string|int|float> $value
+     * @param  array<int, string|int|float>  $value
      */
     public function between(string $target, array $value): self
     {
@@ -58,7 +58,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string|int|float> $value
+     * @param  array<int, string|int|float>  $value
      */
     public function notBetween(string $target, array $value): self
     {
@@ -68,7 +68,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string> $value
+     * @param  array<int, string>  $value
      */
     public function betweenColumns(string $target, array $value): self
     {
@@ -78,7 +78,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string> $value
+     * @param  array<int, string>  $value
      */
     public function notBetweenColumns(string $target, array $value): self
     {
@@ -102,7 +102,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string|int|float> $value
+     * @param  array<int, string|int|float>  $value
      */
     public function in(string $target, array $value): self
     {
@@ -112,7 +112,7 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @param array<int, string|int|float> $value
+     * @param  array<int, string|int|float>  $value
      */
     public function notIn(string $target, array $value): self
     {

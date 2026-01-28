@@ -13,20 +13,20 @@ describe(
             expect($lt)->toBeInstanceOf(LessThan::class);
         });
 
-        it('has the correct number value', function() {
-           expect((new LessThan('foo', 123))->value())
-               ->toBe(123)
-               ->toBeInt()
-               ->and((new LessThan('foo', 123.123))->value())
-               ->toBe(123.123)
-               ->toBeFloat();
+        it('has the correct number value', function () {
+            expect((new LessThan('foo', 123))->value())
+                ->toBe(123)
+                ->toBeInt()
+                ->and((new LessThan('foo', 123.123))->value())
+                ->toBe(123.123)
+                ->toBeFloat();
         });
 
-        it('has the correct target', function() {
+        it('has the correct target', function () {
             expect((new LessThan('foo', 1234))->target())->toBe('foo');
         });
 
-        it('has the correct array', function() {
+        it('has the correct array', function () {
             expect((new LessThan('foo', 123))->toArray())->toBe([
                 'type' => '$lt',
                 'target' => 'foo',
@@ -35,5 +35,3 @@ describe(
         });
     }
 );
-
-

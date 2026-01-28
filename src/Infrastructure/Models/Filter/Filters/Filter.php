@@ -24,6 +24,7 @@ abstract class Filter implements FilterContract
      *     target: string,
      *     value: array|string|int|float|bool
      * }
+     *
      * @throws FilterValueNotValid
      */
     public function toArray(): array

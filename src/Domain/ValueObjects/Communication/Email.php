@@ -312,7 +312,7 @@ class Email extends ValueObject
         $localPart = $email->before('@');
         $domain = $email->after('@');
 
-        //@todo implement here trash email detection logic
+        // @todo implement here trash email detection logic
 
         // Block obviously fake/temporary email services (extend as needed)
         $blockedDomains = [

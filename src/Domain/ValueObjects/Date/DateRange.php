@@ -48,7 +48,8 @@ class DateRange implements JsonSerializable, Stringable
     }
 
     /**
-     * @param array<string, string> $dateRange
+     * @param  array<string, string>  $dateRange
+     *
      * @throws ValidationException
      */
     public static function fromArray(array $dateRange): static

@@ -14,15 +14,15 @@ describe(
             expect($notIn)->toBeInstanceOf(NotIn::class);
         });
 
-        it('has the correct value', function() {
-           expect((new NotIn('foo', ['bar', 'baz']))->value())->toBe(['bar', 'baz']);
+        it('has the correct value', function () {
+            expect((new NotIn('foo', ['bar', 'baz']))->value())->toBe(['bar', 'baz']);
         });
 
-        it('has the correct target', function() {
+        it('has the correct target', function () {
             expect((new NotIn('foo', ['bar', 'baz']))->target())->toBe('foo');
         });
 
-        it('has the correct array', function() {
+        it('has the correct array', function () {
             expect((new NotIn('foo', ['bar', 'baz']))->toArray())->toBe([
                 'type' => '$notIn',
                 'target' => 'foo',
@@ -30,18 +30,16 @@ describe(
             ]);
         });
 
-        it('throws exception when value array is empty', function() {
+        it('throws exception when value array is empty', function () {
             (new NotIn('foo', []))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "[]" is not valid.');
 
-        it('throws exception when values are empty', function() {
+        it('throws exception when values are empty', function () {
             (new NotIn('foo', ['', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["",""]" is not valid.');
 
-        it('throws exception when one value is empty', function() {
+        it('throws exception when one value is empty', function () {
             (new NotIn('foo', ['bar', '']))->toArray();
         })->throws(FilterValueNotValid::class, 'The filter value "["bar",""]" is not valid.');
     }
 );
-
-
