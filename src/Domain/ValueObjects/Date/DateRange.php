@@ -7,11 +7,10 @@ namespace Lava83\LaravelDdd\Domain\ValueObjects\Date;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Exception;
-use JsonSerializable;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
-use Stringable;
+use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
-class DateRange implements JsonSerializable, Stringable
+class DateRange extends ValueObject
 {
     private readonly CarbonImmutable $startDate;
 

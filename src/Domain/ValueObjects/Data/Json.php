@@ -6,11 +6,10 @@ namespace Lava83\LaravelDdd\Domain\ValueObjects\Data;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Fluent;
-use JsonSerializable;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
-use Stringable;
+use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
-class Json implements JsonSerializable, Stringable
+class Json extends ValueObject
 {
     private readonly Fluent $data;
 

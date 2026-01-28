@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Lava83\LaravelDdd\Domain\ValueObjects\Business;
 
 use InvalidArgumentException;
-use JsonSerializable;
-use Stringable;
+use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
-class Money implements Stringable, JsonSerializable
+class Money extends ValueObject
 {
     private readonly float $amount;
 

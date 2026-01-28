@@ -6,15 +6,14 @@ namespace Lava83\LaravelDdd\Domain\ValueObjects\Communication;
 
 use Closure;
 use Illuminate\Support\Stringable;
-use JsonSerializable;
 use Lava83\LaravelDdd\Domain\Enums\Communication\CountryAreaCode;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
+use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 use libphonenumber\NumberParseException;
 use libphonenumber\PhoneNumber as LibphonenumberPhoneNumber;
 use libphonenumber\PhoneNumberUtil;
-use Stringable as StringableContract;
 
-class Phonenumber implements JsonSerializable, StringableContract
+class Phonenumber extends ValueObject
 {
     private Stringable $value;
 
