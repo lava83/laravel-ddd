@@ -21,8 +21,8 @@ class DateRange extends ValueObject
      */
     final public function __construct(CarbonInterface $startDate, CarbonInterface $endDate)
     {
-        $this->startDate = CarbonImmutable::instance($startDate)->startOfDay();
-        $this->endDate = CarbonImmutable::instance($endDate)->endOfDay();
+        $this->startDate = CarbonImmutable::instance($startDate);
+        $this->endDate = CarbonImmutable::instance($endDate);
 
         $this->validate();
     }
