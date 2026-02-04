@@ -60,9 +60,12 @@ class DateRange extends ValueObject
         return static::fromString($dateRange['start_date'], $dateRange['end_date']);
     }
 
+    /**
+     * @throws ValidationException
+     */
     public static function singleDay(CarbonInterface $date): static
     {
-        return new static($date, $date);
+        return new static($date->startOfDay(), $date->endOfDay());
     }
 
     public static function currentWeek(): static
@@ -290,9 +293,10 @@ class DateRange extends ValueObject
     public function allDates(): array
     {
         $dates = [];
-        $current = $this->startDate;
+        $current = $this->startDate->startOfDay();
+        $end = $this->endDate->startOfDay();
 
-        while ($current->lte($this->endDate)) {
+        while ($current->lte($end)) {
             $dates[] = $current->toDateString();
             $current = $current->addDay();
         }
