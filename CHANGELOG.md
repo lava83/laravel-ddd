@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.1.4.5 - 2026-02-06
+
+### What's Changed
+
+* Fixes mapper return type by @lava83 in https://github.com/lava83/laravel-ddd/pull/10
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.1.4.4...v0.1.4.5
+
 ## v0.1.4.4 - 2026-02-04
 
 ### What's Changed
