@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Lava83\LaravelDdd\Domain\ValueObjects\Address;
 
 use Carbon\CarbonImmutable;
+use InvalidArgumentException;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
 class GeoAddress extends ValueObject
@@ -42,6 +43,8 @@ class GeoAddress extends ValueObject
      */
     public static function fromArray(array $data): self
     {
+        self::validateRequiredArrayFieldsExists($data);
+
         return new self(
             $data['street'] ?? null,
             $data['streetNumber'] ?? null,
@@ -155,5 +158,16 @@ class GeoAddress extends ValueObject
             'created_at' => $this->createdAt->toIso8601String(),
             'updated_at' => $this->updatedAt->toIso8601String(),
         ];
+    }
+
+    private static function validateRequiredArrayFieldsExists(array $data): void
+    {
+        $requiredFields = ['country', 'precision'];
+
+        foreach ($requiredFields as $field) {
+            if (!array_key_exists($field, $data)) {
+                throw new InvalidArgumentException('Country and precision are required fields');
+            }
+        }
     }
 }
