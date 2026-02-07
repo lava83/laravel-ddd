@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.1.4.6 - 2026-02-07
+
+### What's Changed
+
+* Adds GeoAddress value object by @lava83 in https://github.com/lava83/laravel-ddd/pull/11
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.1.4.5...v0.1.4.6
+
 ## v0.1.4.5 - 2026-02-06
 
 ### What's Changed
