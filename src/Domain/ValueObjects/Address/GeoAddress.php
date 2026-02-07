@@ -53,8 +53,8 @@ class GeoAddress extends ValueObject
             $data['neighborhood'] ?? null,
             $data['country'],
             $data['precision'],
-            isset($data['createdAt']) ? CarbonImmutable::parse($data['createdAt']) : CarbonImmutable::now(),
-            isset($data['updatedAt']) ? CarbonImmutable::parse($data['updatedAt']) : CarbonImmutable::now(),
+            ($data['createdAt'] ?? null) !== null ? CarbonImmutable::parse($data['createdAt']) : CarbonImmutable::now(),
+            ($data['updatedAt'] ?? null) !== null ? CarbonImmutable::parse($data['updatedAt']) : CarbonImmutable::now(),
         );
     }
 
@@ -123,18 +123,17 @@ class GeoAddress extends ValueObject
      */
     public function __toString(): string
     {
-        return sprintf(
-            '%s %s, %s %s, %s, %s, %s, %s, %s',
-            $this->street ?? '',
-            $this->streetNumber ?? '',
-            $this->zipCode ?? '',
-            $this->city ?? '',
-            $this->state ?? '',
-            $this->county ?? '',
-            $this->district ?? '',
-            $this->neighborhood ?? '',
+        $parts = array_filter([
+            trim(($this->street ?? '') . ' ' . ($this->streetNumber ?? '')),
+            trim(($this->zipCode ?? '') . ' ' . ($this->city ?? '')),
+            $this->state,
+            $this->county,
+            $this->district,
+            $this->neighborhood,
             $this->country,
-        );
+        ]);
+
+        return implode(', ', $parts);
     }
 
     /**
@@ -153,8 +152,8 @@ class GeoAddress extends ValueObject
             'neighborhood' => $this->neighborhood,
             'country' => $this->country,
             'precision' => $this->precision,
-            'created_at' => $this->createdAt,
-            'updated_at' => $this->updatedAt,
+            'created_at' => $this->createdAt->toIso8601String(),
+            'updated_at' => $this->updatedAt->toIso8601String(),
         ];
     }
 }
