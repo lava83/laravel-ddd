@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.1.4.7 - 2026-02-07
+
+### What's Changed
+
+* Makes country and precision nullable by @lava83 in https://github.com/lava83/laravel-ddd/pull/12
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.1.4.6...v0.1.4.7
+
 ## v0.1.4.6 - 2026-02-07
 
 ### What's Changed
