@@ -152,7 +152,7 @@ class Json extends ValueObject
                      * @param int|string $key
                      * @return array<string, mixed>
                      */
-                    fn(mixed $value, int|string $key) => [str((string) $key)->snake()->toString() => $value]
+                    fn(mixed $value, int|string $key) => [str((string) $key)->snake()->toString() => $value],
                 )
                 ->toArray(),
         );
