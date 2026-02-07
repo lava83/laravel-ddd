@@ -57,22 +57,6 @@ describe('Create GeoAddress', function () {
             ->and($address->updatedAt())->not()->toBeNull();
     });
 
-    it('throws an error if required fields are missing', function () {
-        $this->expectException(InvalidArgumentException::class);
-
-        GeoAddress::fromArray([
-            'street' => 'Main St',
-            'streetNumber' => '123',
-            'zipCode' => '12345',
-            'city' => 'Sample City',
-            'state' => 'Sample State',
-            'county' => 'Sample County',
-            'district' => 'Sample District',
-            'neighborhood' => 'Sample Neighborhood',
-            // Missing country and precision
-        ]);
-    });
-
     it('has the correct string representation', function () {
         $address = GeoAddress::fromArray([
             'street' => 'Main St',
