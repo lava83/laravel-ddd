@@ -28,6 +28,7 @@ no-boolean-flag-parameter = { enabled = false }
 #todo: enable when fixed: src/Domain/Entities/Entity.php:22:1
 kan-defect = { enabled = false }
 inline-variable-return = { enabled = false }
+excessive-parameter-list = { threshold = 15 }
 
 [analyzer]
 find-unused-definitions = true
