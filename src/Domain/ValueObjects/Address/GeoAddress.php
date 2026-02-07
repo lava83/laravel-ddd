@@ -19,8 +19,8 @@ class GeoAddress extends ValueObject
         private readonly ?string $county,
         private readonly ?string $district,
         private readonly ?string $neighborhood,
-        private readonly string $country,
-        private readonly string $precision,
+        private readonly ?string $country,
+        private readonly ?string $precision,
         private readonly CarbonImmutable $createdAt,
         private readonly CarbonImmutable $updatedAt,
     ) {}
@@ -43,8 +43,6 @@ class GeoAddress extends ValueObject
      */
     public static function fromArray(array $data): self
     {
-        self::validateRequiredArrayFieldsExists($data);
-
         return new self(
             $data['street'] ?? null,
             $data['streetNumber'] ?? null,
@@ -101,12 +99,12 @@ class GeoAddress extends ValueObject
         return $this->neighborhood;
     }
 
-    public function country(): string
+    public function country(): ?string
     {
         return $this->country;
     }
 
-    public function precision(): string
+    public function precision(): ?string
     {
         return $this->precision;
     }
@@ -158,16 +156,5 @@ class GeoAddress extends ValueObject
             'created_at' => $this->createdAt->toIso8601String(),
             'updated_at' => $this->updatedAt->toIso8601String(),
         ];
-    }
-
-    private static function validateRequiredArrayFieldsExists(array $data): void
-    {
-        $requiredFields = ['country', 'precision'];
-
-        foreach ($requiredFields as $field) {
-            if (!array_key_exists($field, $data)) {
-                throw new InvalidArgumentException('Country and precision are required fields');
-            }
-        }
     }
 }
