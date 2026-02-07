@@ -6,6 +6,7 @@ namespace Lava83\LaravelDdd\Domain\ValueObjects\Data;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Fluent;
+use JsonException;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
@@ -70,7 +71,7 @@ class Json extends ValueObject
 
     public function toArray(): array
     {
-        return $this->data->toArray();
+        return $this->data->collect()->toArray();
     }
 
     public function toCollection(): Collection
@@ -137,9 +138,29 @@ class Json extends ValueObject
         return $this->value === $other->value;
     }
 
+    /**
+     * @throws JsonException
+     */
+    public function snakeCaseKeys(): self
+    {
+        return self::fromArray(
+            $this->data
+                ->collect()
+                ->mapWithKeys(
+                    /**
+                     * @param mixed $value
+                     * @param int|string $key
+                     * @return array<string, mixed>
+                     */
+                    fn(mixed $value, int|string $key) => [str((string) $key)->snake()->toString() => $value]
+                )
+                ->toArray(),
+        );
+    }
+
     public function jsonSerialize(): array
     {
-        return $this->data->toArray();
+        return $this->toArray();
     }
 
     private function removeNestedValue(array &$array, string $key): void
@@ -164,15 +185,16 @@ class Json extends ValueObject
         }
     }
 
+    /**
+     * @throws ValidationException
+     */
     private function validate(string $value): void
     {
         if (trim($value) === '') {
             throw new ValidationException('JSON string cannot be empty');
         }
 
-        json_decode($value, true);
-
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        if (!json_validate($value)) {
             throw new ValidationException('Invalid JSON: ' . json_last_error_msg());
         }
     }
