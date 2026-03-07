@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.1.4.8 - 2026-03-07
+
+### What's Changed
+
+* Adds float type support to entities and aggregates by @lava83 in https://github.com/lava83/laravel-ddd/pull/13
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.1.4.7...v0.1.4.8
+
 ## v0.1.4.7 - 2026-02-07
 
 ### What's Changed
