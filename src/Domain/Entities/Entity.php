@@ -27,7 +27,7 @@ use Stringable;
  */
 abstract class Entity implements Stringable
 {
-    /** @var Collection<string, null|bool|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable> */
+    /** @var Collection<string, null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable> */
     protected Collection $dirty;
 
     public function __construct(
@@ -221,7 +221,7 @@ abstract class Entity implements Stringable
     /**
      * Helper method for child entities to update themselves
      *
-     * @param  array<string, null|bool|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable>  $changes  Key-value pairs of changes made to the aggregate
+     * @param  array<string, null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable>  $changes  Key-value pairs of changes made to the aggregate
      *
      * @throws ReflectionException
      */
@@ -242,8 +242,8 @@ abstract class Entity implements Stringable
     /**
      * Collects changes between current entity state and new values
      *
-     * @param  array<string, null|bool|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable>  $newValues  Key-value pairs of new values to compare
-     * @return Collection<string, null|bool|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable> Collection of changes with 'old_' and 'new_' prefixes
+     * @param  array<string, null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable>  $newValues  Key-value pairs of new values to compare
+     * @return Collection<string, null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable> Collection of changes with 'old_' and 'new_' prefixes
      *
      * @throws ReflectionException
      */
@@ -293,7 +293,7 @@ abstract class Entity implements Stringable
      * Applies changes from a collection to the aggregate's properties using reflection
      * Automatically maps properties based on naming convention
      *
-     * @param  Collection<string, null|bool|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable>  $changes  Collection with keys like 'new_{propertyName}'
+     * @param  Collection<string, null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable>  $changes  Collection with keys like 'new_{propertyName}'
      * @param  array<string, callable>  $customSetters  Optional custom setters for specific properties
      *
      * @throws ReflectionException
@@ -352,7 +352,7 @@ abstract class Entity implements Stringable
      */
     protected function setPropertyValue(
         string $property,
-        null|bool|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable $value,
+        null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable $value,
     ): void {
         $reflectionClass = $this->reflectionClass();
 
@@ -365,7 +365,7 @@ abstract class Entity implements Stringable
     /**
      * @throws ReflectionException
      */
-    protected function getPropertyValue(string $property): null|bool|string|int|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable
+    protected function getPropertyValue(string $property): null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable
     {
         $reflectionClass = $this->reflectionClass();
 

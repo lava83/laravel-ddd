@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Lava83\LaravelDdd\Domain\ValueObjects\Address;
 
 use Carbon\CarbonImmutable;
-use InvalidArgumentException;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
 class GeoAddress extends ValueObject
