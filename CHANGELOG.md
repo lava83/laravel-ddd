@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.1.4.9 - 2026-03-19
+
+### What's Changed
+
+* Extends DateRange with period navigation by @lava83 in https://github.com/lava83/laravel-ddd/pull/14
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.1.4.8...v0.1.4.9
+
 ## v0.1.4.8 - 2026-03-07
 
 ### What's Changed
