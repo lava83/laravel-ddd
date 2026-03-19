@@ -323,14 +323,69 @@ class DateRange extends ValueObject
         return $dates;
     }
 
-    public function spansMultipleMonths(): bool
+    public function isBusinessWeek(): bool
     {
-        return $this->startDate->isSameMonth($this->endDate) === false;
+        return $this->startDate->dayOfWeek === 1 && $this->endDate->dayOfWeek === 5;
     }
 
-    public function spansMultipleYears(): bool
+    public function isFullMonth(): bool
     {
-        return $this->startDate->isSameYear($this->endDate) === false;
+        return (
+            $this->startDate->isStartOfMonth()
+            && $this->endDate->isSameMonth($this->startDate)
+            && $this->endDate->isEndOfMonth()
+        );
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    public function previousPeriod(): DateRange
+    {
+        if ($this->isFullMonth()) {
+            return new static(
+                startDate: $this->startDate->subMonth()->startOfMonth(),
+                endDate: $this->startDate->subMonth()->endOfMonth(),
+            );
+        }
+
+        if ($this->isBusinessWeek()) {
+            return new static(
+                startDate: $this->startDate->subWeek()->startOfDay(),
+                endDate: $this->endDate->subWeek()->endOfDay(),
+            );
+        }
+
+        $durationInDays = $this->durationInDays() + 1;
+
+        return new static(
+            startDate: $this->startDate()->subDays($durationInDays)->startOfDay(),
+            endDate: $this->endDate()->subDays($durationInDays)->endOfDay(),
+        );
+    }
+
+    public function nextPeriod(): DateRange
+    {
+        if ($this->isFullMonth()) {
+            return new static(
+                startDate: $this->startDate->addMonth()->startOfMonth(),
+                endDate: $this->startDate->addMonth()->endOfMonth(),
+            );
+        }
+
+        if ($this->isBusinessWeek()) {
+            return new static(
+                startDate: $this->startDate->addWeek()->startOfDay(),
+                endDate: $this->endDate->addWeek()->endOfDay(),
+            );
+        }
+
+        $durationInDays = $this->durationInDays() + 1;
+
+        return new static(
+            startDate: $this->startDate()->addDays($durationInDays)->startOfDay(),
+            endDate: $this->endDate()->addDays($durationInDays)->endOfDay(),
+        );
     }
 
     private function validate(): void

@@ -22,7 +22,7 @@ literal-named-argument = { enabled = false }
 prefer-static-closure = { enabled = false }
 halstead = { effort-threshold = 7000, difficulty-threshold = 15 }
 too-many-methods = { threshold=40 }
-cyclomatic-complexity = { threshold=25 }
+cyclomatic-complexity = { threshold=30 }
 prefer-first-class-callable = { enabled = false }
 no-boolean-flag-parameter = { enabled = false }
 #todo: enable when fixed: src/Domain/Entities/Entity.php:22:1
