@@ -148,8 +148,6 @@ class Json extends ValueObject
                 ->collect()
                 ->mapWithKeys(
                     /**
-                     * @param mixed $value
-                     * @param int|string $key
                      * @return array<string, mixed>
                      */
                     fn(mixed $value, int|string $key) => [str((string) $key)->snake()->toString() => $value],
