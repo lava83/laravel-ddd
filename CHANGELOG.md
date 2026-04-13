@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.1.4.10 - 2026-03-23
+
+### What's Changed
+
+* Adds Eloquent query filtering capabilities by @lava83 in https://github.com/lava83/laravel-ddd/pull/15
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.1.4.9...v0.1.4.10
+
 ## v0.1.4.9 - 2026-03-19
 
 ### What's Changed
