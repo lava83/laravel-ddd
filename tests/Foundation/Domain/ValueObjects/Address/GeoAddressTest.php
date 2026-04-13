@@ -22,7 +22,7 @@ describe('Create GeoAddress', function () {
         ]);
 
         expect($address)->toBeInstanceOf(GeoAddress::class)
-        ->and($address->street())->toBe('Main St')
+            ->and($address->street())->toBe('Main St')
             ->and($address->streetNumber())->toBe('123')
             ->and($address->zipCode())->toBe('12345')
             ->and($address->city())->toBe('Sample City')

@@ -119,7 +119,7 @@ class GeoAddress extends ValueObject
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function __toString(): string
     {
@@ -137,7 +137,7 @@ class GeoAddress extends ValueObject
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function jsonSerialize(): mixed
     {
