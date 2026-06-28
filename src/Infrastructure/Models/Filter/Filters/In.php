@@ -11,6 +11,9 @@ class In extends Filter
 {
     protected FilterType $type = FilterType::In;
 
+    /**
+     * @param  string[]  $value
+     */
     public function __construct(
         protected readonly string $target,
         protected readonly array $value,
@@ -21,6 +24,9 @@ class In extends Filter
         return $this->target;
     }
 
+    /**
+     * @return string[]
+     */
     public function value(): array
     {
         return $this->value;
@@ -38,13 +44,13 @@ class In extends Filter
             'value.*' => [
                 'required',
                 function (string $attribute, mixed $value, Closure $fail) {
-                    if (!is_string($value) && !is_int($value) && !is_float($value)) {
+                    if (! is_string($value) && ! is_int($value) && ! is_float($value)) {
                         $fail("The {$attribute} must be a string, integer, or float.");
                     }
                 },
             ],
         ]);
 
-        return !$validator->fails();
+        return ! $validator->fails();
     }
 }

@@ -36,6 +36,6 @@ class GreaterThan extends Filter
             ],
         ]);
 
-        return !$validator->fails();
+        return ! $validator->fails();
     }
 }

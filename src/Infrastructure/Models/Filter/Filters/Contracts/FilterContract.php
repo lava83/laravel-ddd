@@ -11,9 +11,19 @@ interface FilterContract
 {
     public function target(): string;
 
+    /**
+     * @return Collection<int, string|int|float|bool>|array<int, string|int|float|bool>|string|int|float|bool
+     */
     public function value(): Collection|array|string|int|float|bool;
 
     public function type(): FilterType;
 
+    /**
+     * @return array{
+     *     type: string,
+     *     target: string,
+     *     value: array<int, string|int|float|bool>|string|int|float|bool
+     * }
+     */
     public function toArray(): array;
 }

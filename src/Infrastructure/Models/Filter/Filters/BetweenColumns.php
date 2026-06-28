@@ -23,6 +23,9 @@ class BetweenColumns extends Filter
         return $this->target;
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function value(): array
     {
         return $this->value;
@@ -43,6 +46,6 @@ class BetweenColumns extends Filter
             ],
         ]);
 
-        return !$validator->fails();
+        return ! $validator->fails();
     }
 }

@@ -35,7 +35,7 @@ abstract class EntityMapper implements EntityMapperContract
         Entity $entity,
         string $modelClass,
     ): Model|EloquentModel|PersonalAccessToken {
-        return app($modelClass)->findOr($entity->id(), ['*'], fn() => app($modelClass));
+        return app($modelClass)->findOr($entity->id(), ['*'], fn () => app($modelClass));
     }
 
     /**

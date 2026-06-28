@@ -19,7 +19,7 @@ class Money extends ValueObject
             throw new InvalidArgumentException('Amount cannot be negative');
         }
 
-        if (!in_array($currency, ['USD', 'EUR', 'GBP'], true)) {
+        if (! in_array($currency, ['USD', 'EUR', 'GBP'], true)) {
             throw new InvalidArgumentException('Unsupported currency');
         }
 
@@ -63,7 +63,6 @@ class Money extends ValueObject
             'USD' => '$',
             'EUR' => '€',
             'GBP' => '£',
-            default => throw new InvalidArgumentException('Unsupported currency'),
         };
     }
 

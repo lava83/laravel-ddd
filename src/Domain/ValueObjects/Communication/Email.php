@@ -48,7 +48,7 @@ class Email extends ValueObject
      */
     public static function fromParts(string $localPart, string $domain): static
     {
-        return new static($localPart . '@' . $domain);
+        return new static($localPart.'@'.$domain);
     }
 
     public function value(): Stringable
@@ -113,7 +113,7 @@ class Email extends ValueObject
             'mac.com',
         ];
 
-        return in_array($this->domainWithoutSubdomain(), $personalProviders, true) === false;
+        return in_array((string) $this->domainWithoutSubdomain(), $personalProviders, true) === false;
     }
 
     public function isGermanProvider(): bool
@@ -130,7 +130,7 @@ class Email extends ValueObject
             'mailbox.org',
         ];
 
-        return in_array($this->domainWithoutSubdomain(), $germanProviders, true);
+        return in_array((string) $this->domainWithoutSubdomain(), $germanProviders, true);
     }
 
     public function obfuscate(): Stringable
@@ -148,7 +148,7 @@ class Email extends ValueObject
             $obfuscatedLocal = $obfuscatedLocal->append((string) $this->localPart[$localLength - 1]);
         }
 
-        return str($obfuscatedLocal->toString() . '@' . $this->domain->toString());
+        return str($obfuscatedLocal->toString().'@'.$this->domain->toString());
     }
 
     public function displayName(): Stringable
@@ -170,7 +170,7 @@ class Email extends ValueObject
     {
         $blockedPrefixes = ['noreply', 'no-reply', 'donotreply', 'bounce'];
 
-        return !$this->localPart->startsWith($blockedPrefixes);
+        return ! $this->localPart->startsWith($blockedPrefixes);
     }
 
     public function domainAge(): ?int
@@ -268,7 +268,7 @@ class Email extends ValueObject
         $score = 100;
 
         // Deduct points for personal email providers
-        if (!$this->isCompanyEmail()) {
+        if (! $this->isCompanyEmail()) {
             $score -= 20;
         }
 
@@ -278,7 +278,7 @@ class Email extends ValueObject
         }
 
         // Deduct points if not valid for notifications
-        if (!$this->isValidForNotifications()) {
+        if (! $this->isValidForNotifications()) {
             $score -= 50;
         }
 
@@ -298,7 +298,7 @@ class Email extends ValueObject
             'email' => [
                 'required',
                 'email:rfc',
-                fn(string $attribute, string $value, Closure $fail) => $this->validateBusiness(str($value), $fail),
+                fn (string $attribute, string $value, Closure $fail) => $this->validateBusiness(str($value), $fail),
             ],
         ]);
 
@@ -324,7 +324,7 @@ class Email extends ValueObject
             'throwaway.email',
         ];
 
-        if (in_array($domain, $blockedDomains, true)) {
+        if (in_array((string) $domain, $blockedDomains, true)) {
             $fail('Temporary email addresses are not allowed');
         }
 
@@ -338,7 +338,7 @@ class Email extends ValueObject
         ];
 
         foreach ($suspiciousPatterns as $pattern) {
-            when(preg_match($pattern, (string) $localPart), fn() => $fail(
+            when(preg_match($pattern, (string) $localPart), fn () => $fail(
                 'Email address appears to be invalid or test address',
             ));
         }

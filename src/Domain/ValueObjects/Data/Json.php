@@ -12,6 +12,9 @@ use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
 class Json extends ValueObject
 {
+    /**
+     * @var Fluent<string, mixed>
+     */
     private readonly Fluent $data;
 
     /**
@@ -35,6 +38,9 @@ class Json extends ValueObject
         return $this->value;
     }
 
+    /**
+     * @throws ValidationException
+     */
     public static function fromString(string $json): self
     {
         $trimmed = trim($json);
@@ -42,6 +48,12 @@ class Json extends ValueObject
         return new self($trimmed);
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ValidationException
+     * @throws JsonException
+     */
     public static function fromArray(array $data): self
     {
         $jsonString = json_encode($data, JSON_THROW_ON_ERROR);
@@ -59,6 +71,9 @@ class Json extends ValueObject
         return $this->value;
     }
 
+    /**
+     * @return Fluent<string, mixed>
+     */
     public function data(): Fluent
     {
         return $this->data;
@@ -69,11 +84,17 @@ class Json extends ValueObject
         return $this->value;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return $this->data->collect()->toArray();
     }
 
+    /**
+     * @return Collection<string, mixed>
+     */
     public function toCollection(): Collection
     {
         return $this->data->collect();
@@ -89,6 +110,10 @@ class Json extends ValueObject
         return $this->data->has($key);
     }
 
+    /**
+     * @throws JsonException
+     * @throws ValidationException
+     */
     public function set(string $key, mixed $value): self
     {
         $newData = fluent($this->data->toArray());
@@ -97,6 +122,10 @@ class Json extends ValueObject
         return self::fromArray($newData->toArray());
     }
 
+    /**
+     * @throws ValidationException
+     * @throws JsonException
+     */
     public function merge(self $other): self
     {
         $mergedData = $this->toCollection()->merge($other->toCollection());
@@ -104,6 +133,10 @@ class Json extends ValueObject
         return self::fromArray($mergedData->toArray());
     }
 
+    /**
+     * @throws ValidationException
+     * @throws JsonException
+     */
     public function remove(string $key): self
     {
         $newData = $this->data->toArray();
@@ -123,11 +156,17 @@ class Json extends ValueObject
         return $this->data->isNotEmpty();
     }
 
+    /**
+     * @return Collection<int, string>
+     */
     public function keys(): Collection
     {
         return $this->data->collect()->keys();
     }
 
+    /**
+     * @return Collection<int, mixed>
+     */
     public function values(): Collection
     {
         return collect($this->data->all());
@@ -140,6 +179,7 @@ class Json extends ValueObject
 
     /**
      * @throws JsonException
+     * @throws ValidationException
      */
     public function snakeCaseKeys(): self
     {
@@ -150,17 +190,23 @@ class Json extends ValueObject
                     /**
                      * @return array<string, mixed>
                      */
-                    fn(mixed $value, int|string $key) => [str((string) $key)->snake()->toString() => $value],
+                    fn (mixed $value, int|string $key) => [str((string) $key)->snake()->toString() => $value],
                 )
                 ->toArray(),
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function jsonSerialize(): array
     {
         return $this->toArray();
     }
 
+    /**
+     * @param  array<string, mixed>  $array
+     */
     private function removeNestedValue(array &$array, string $key): void
     {
         $keys = str($key)->explode('.');
@@ -170,7 +216,7 @@ class Json extends ValueObject
          * @var string $nestedKey
          */
         foreach ($keys->take(-1) as $nestedKey) {
-            if (!isset($current[$nestedKey]) || !is_array($current[$nestedKey])) {
+            if (! isset($current[$nestedKey]) || ! is_array($current[$nestedKey])) {
                 return;
             }
 
@@ -178,7 +224,6 @@ class Json extends ValueObject
         }
 
         if (is_string($keys->last())) {
-            // @mago-expect analyzer:possibly-null-array-index
             unset($current[$keys->last()]);
         }
     }
@@ -192,8 +237,8 @@ class Json extends ValueObject
             throw new ValidationException('JSON string cannot be empty');
         }
 
-        if (!json_validate($value)) {
-            throw new ValidationException('Invalid JSON: ' . json_last_error_msg());
+        if (! json_validate($value)) {
+            throw new ValidationException('Invalid JSON: '.json_last_error_msg());
         }
     }
 }

@@ -76,7 +76,7 @@ class Link extends ValueObject
     {
         $parts = parse_url($link);
 
-        if (!isset($parts['scheme'], $parts['host'])) {
+        if (! isset($parts['scheme'], $parts['host'])) {
             throw new ValidationException('Invalid URL format provided');
         }
 

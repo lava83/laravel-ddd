@@ -53,7 +53,7 @@ abstract class Repository
     {
         $model = $this->mapperResolver->resolve($entity::class)->toModel($entity);
 
-        if (!$model->delete()) {
+        if (! $model->delete()) {
             throw new CantDeleteModel('Failed to delete entity');
         }
 
@@ -67,14 +67,13 @@ abstract class Repository
      */
     protected function deleteEntities(Collection $entities): void
     {
-        $entities->map(fn(Entity|Aggregate $entity): null => $this->deleteEntity($entity));
+        $entities->map(fn (Entity|Aggregate $entity): null => $this->deleteEntity($entity));
     }
 
     protected function deleteRelatedEntity(Entity|Aggregate $entity, string $relation, int|string $relatedId): void
     {
         $model = $this->mapperResolver->resolve($entity::class)->toModel($entity);
 
-        // @mago-expect analyzer:mixed-assignment,mixed-method-access,string-member-selector
         $related = $model->$relation()->find($relatedId);
 
         if (
@@ -85,8 +84,8 @@ abstract class Repository
             throw new CantDeleteRelatedModel(sprintf('Relation %s is not a valid Eloquent relation', $relation));
         }
 
-        if (!$related->delete()) {
-            throw new CantDeleteRelatedModel('Failed to delete related entity via relation ' . $relation);
+        if (! $related->delete()) {
+            throw new CantDeleteRelatedModel('Failed to delete related entity via relation '.$relation);
         }
 
         if ($entity instanceof Aggregate) {
@@ -130,7 +129,7 @@ abstract class Repository
             $this->handleOptimisticLocking($model, $entity);
         }
 
-        if (!$model->save()) {
+        if (! $model->save()) {
             throw new CantSaveModel('Failed to save entity');
         }
 

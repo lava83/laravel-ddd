@@ -108,7 +108,7 @@ class Uuid extends Id
      */
     public static function fromArray(array $values): array
     {
-        return array_map(fn(string $value): static => new static(RamseyUuid::fromString($value)), $values);
+        return array_map(fn (string $value): static => new static(RamseyUuid::fromString($value)), $values);
     }
 
     /**
@@ -117,7 +117,7 @@ class Uuid extends Id
      */
     public static function toStringArray(array $ids): array
     {
-        return array_map(fn(Uuid $id): string => $id->value(), $ids);
+        return array_map(fn (Uuid $id): string => $id->value(), $ids);
     }
 
     public function value(): string
@@ -248,8 +248,8 @@ class Uuid extends Id
             throw new ValidationException('Id cannot be empty');
         }
 
-        if (!RamseyUuid::isValid($value)) {
-            throw new ValidationException('Invalid UUID format: ' . $value);
+        if (! RamseyUuid::isValid($value)) {
+            throw new ValidationException('Invalid UUID format: '.$value);
         }
     }
 }

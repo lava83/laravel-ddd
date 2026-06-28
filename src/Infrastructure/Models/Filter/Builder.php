@@ -30,7 +30,7 @@ final readonly class Builder implements Countable
      * @param  Collection<int, Filter>  $filters
      */
     public function __construct(
-        private Collection $filters = new Collection(),
+        private Collection $filters = new Collection,
     ) {}
 
     public function eq(string $target, string|int|float|bool $value): self
@@ -182,7 +182,7 @@ final readonly class Builder implements Countable
     public function toArray(): array
     {
         /** @var array<int, array{type: string, target: string, value: array<int, string|int|float>|string|int|float|bool}> $result */
-        $result = $this->filters->map(fn(Filter $filter): array => $filter->toArray())->toArray();
+        $result = $this->filters->map(fn (Filter $filter): array => $filter->toArray())->toArray();
 
         return $result;
     }

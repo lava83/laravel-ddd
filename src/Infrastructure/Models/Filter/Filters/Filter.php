@@ -22,14 +22,14 @@ abstract class Filter implements FilterContract
      * @return array{
      *     type: string,
      *     target: string,
-     *     value: array|string|int|float|bool
+     *     value: array<int, string|int|float|bool>|string|int|float|bool
      * }
      *
      * @throws FilterValueNotValid
      */
     public function toArray(): array
     {
-        if (!$this->valueIsValid()) {
+        if (! $this->valueIsValid()) {
             throw FilterValueNotValid::make($this->value());
         }
 
