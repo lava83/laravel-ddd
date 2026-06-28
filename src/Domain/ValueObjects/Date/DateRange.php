@@ -37,10 +37,13 @@ class DateRange extends ValueObject
         );
     }
 
+    /**
+     * @throws ValidationException
+     */
     public static function fromString(string $startDate, string $endDate): static
     {
         try {
-            return new self(CarbonImmutable::parse($startDate), CarbonImmutable::parse($endDate));
+            return new static(CarbonImmutable::parse($startDate), CarbonImmutable::parse($endDate));
         } catch (Exception) {
             throw new ValidationException('Invalid date format provided');
         }

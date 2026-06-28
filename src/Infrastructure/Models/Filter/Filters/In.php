@@ -11,6 +11,9 @@ class In extends Filter
 {
     protected FilterType $type = FilterType::In;
 
+    /**
+     * @param  string[]  $value
+     */
     public function __construct(
         protected readonly string $target,
         protected readonly array $value,
@@ -21,6 +24,9 @@ class In extends Filter
         return $this->target;
     }
 
+    /**
+     * @return string[]
+     */
     public function value(): array
     {
         return $this->value;

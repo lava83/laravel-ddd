@@ -7,8 +7,6 @@ namespace Lava83\LaravelDdd\Domain\Entities;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
-use Illuminate\Database\Eloquent\Model as EloquentModel;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\MongoObjectId;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Uuid;
@@ -23,11 +21,13 @@ use Stringable;
  * Base class for all entities (both aggregate roots and child entities)
  * Contains common entity functionality without domain event handling
  *
+ * @phpstan-type EntityPropertyValue null|bool|string|int|float|array<array-key, mixed>|BackedEnum|Collection<array-key, mixed>|ValueObject|Entity|CarbonImmutable
+ *
  * @todo fix: error[kan-defect]: Class has a high kan defect score (1.61).
  */
 abstract class Entity implements Stringable
 {
-    /** @var Collection<string, null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable> */
+    /** @var Collection<string, EntityPropertyValue> */
     protected Collection $dirty;
 
     public function __construct(
@@ -89,17 +89,15 @@ abstract class Entity implements Stringable
         return $this->version;
     }
 
-    public function hydrate(Model|EloquentModel $model): void
+    public function hydrate(Model $model): void
     {
-        /** @var Carbon $createdAt */
         $createdAt = $model->created_at;
         $this->createdAt = $createdAt->toImmutable();
 
-        /** @var Carbon|null $updatedAt */
         $updatedAt = $model->updated_at;
         $this->updatedAt = $updatedAt?->toImmutable();
 
-        $this->version = (int) $model->version;
+        $this->version = $model->version;
     }
 
     /**
@@ -206,6 +204,9 @@ abstract class Entity implements Stringable
         return $this->dirty->isNotEmpty();
     }
 
+    /**
+     * @return Collection<string, EntityPropertyValue>
+     */
     public function dirty(): Collection
     {
         return $this->dirty;
@@ -221,7 +222,8 @@ abstract class Entity implements Stringable
     /**
      * Helper method for child entities to update themselves
      *
-     * @param  array<string, null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable>  $changes  Key-value pairs of changes made to the aggregate
+     * @param  array{}|array<string, EntityPropertyValue>  $changes  Key-value pairs of changes made to the aggregate
+     * @return Collection<string, EntityPropertyValue>
      *
      * @throws ReflectionException
      */
@@ -229,7 +231,7 @@ abstract class Entity implements Stringable
     {
         $changes = $this->collectChanges($changes);
 
-        if ($changes->isEmpty()) {
+        if ($changes->toArray() === []) {
             return $changes;
         }
 
@@ -242,8 +244,8 @@ abstract class Entity implements Stringable
     /**
      * Collects changes between current entity state and new values
      *
-     * @param  array<string, null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable>  $newValues  Key-value pairs of new values to compare
-     * @return Collection<string, null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable> Collection of changes with 'old_' and 'new_' prefixes
+     * @param  array<string, EntityPropertyValue>  $newValues  Key-value pairs of new values to compare
+     * @return Collection<string, EntityPropertyValue> Collection of changes with 'old_' and 'new_' prefixes
      *
      * @throws ReflectionException
      */
@@ -293,7 +295,7 @@ abstract class Entity implements Stringable
      * Applies changes from a collection to the aggregate's properties using reflection
      * Automatically maps properties based on naming convention
      *
-     * @param  Collection<string, null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable>  $changes  Collection with keys like 'new_{propertyName}'
+     * @param  Collection<string, EntityPropertyValue>  $changes  Collection with keys like 'new_{propertyName}'
      * @param  array<string, callable>  $customSetters  Optional custom setters for specific properties
      *
      * @throws ReflectionException
@@ -348,6 +350,8 @@ abstract class Entity implements Stringable
     }
 
     /**
+     * @param  EntityPropertyValue  $value
+     *
      * @throws ReflectionException
      */
     protected function setPropertyValue(
@@ -363,6 +367,8 @@ abstract class Entity implements Stringable
     }
 
     /**
+     * @return EntityPropertyValue
+     *
      * @throws ReflectionException
      */
     protected function getPropertyValue(string $property): null|bool|string|int|float|array|BackedEnum|Collection|ValueObject|Entity|CarbonImmutable
@@ -373,7 +379,7 @@ abstract class Entity implements Stringable
 
         $reflectionProperty = $reflectionClass->getProperty($property);
 
-        /** @var null|string|int|array|Collection|ValueObject $value */
+        /** @var EntityPropertyValue $value */
         $value = $reflectionProperty->getValue($this);
 
         return $value;
@@ -392,6 +398,8 @@ abstract class Entity implements Stringable
     }
 
     /**
+     * @return ReflectionClass<$this>
+     *
      * @throws ReflectionException
      */
     private function reflectionClass(): ReflectionClass

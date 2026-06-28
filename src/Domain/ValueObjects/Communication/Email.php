@@ -113,7 +113,7 @@ class Email extends ValueObject
             'mac.com',
         ];
 
-        return in_array($this->domainWithoutSubdomain(), $personalProviders, true) === false;
+        return in_array((string) $this->domainWithoutSubdomain(), $personalProviders, true) === false;
     }
 
     public function isGermanProvider(): bool
@@ -130,7 +130,7 @@ class Email extends ValueObject
             'mailbox.org',
         ];
 
-        return in_array($this->domainWithoutSubdomain(), $germanProviders, true);
+        return in_array((string) $this->domainWithoutSubdomain(), $germanProviders, true);
     }
 
     public function obfuscate(): Stringable
@@ -324,7 +324,7 @@ class Email extends ValueObject
             'throwaway.email',
         ];
 
-        if (in_array($domain, $blockedDomains, true)) {
+        if (in_array((string) $domain, $blockedDomains, true)) {
             $fail('Temporary email addresses are not allowed');
         }
 

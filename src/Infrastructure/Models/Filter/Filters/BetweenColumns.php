@@ -23,6 +23,9 @@ class BetweenColumns extends Filter
         return $this->target;
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function value(): array
     {
         return $this->value;

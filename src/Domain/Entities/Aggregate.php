@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Domain\Entities;
 
+use BackedEnum;
+use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
@@ -17,6 +19,8 @@ use ReflectionException;
 /**
  * Base class for Aggregate Root entities
  * Extends BaseEntity and adds domain event handling
+ *
+ * @phpstan-type EntityPropertyValue null|bool|string|int|float|array<array-key, mixed>|BackedEnum|Collection<array-key, mixed>|ValueObject|Entity|CarbonImmutable
  */
 abstract class Aggregate extends Entity implements AggregateRoot
 {
@@ -147,7 +151,7 @@ abstract class Aggregate extends Entity implements AggregateRoot
     /**
      * Helper method for aggregate roots to update and record change event
      *
-     * @param  array<string, null|bool|string|int|float|array|Collection|ValueObject>  $changes  Key-value pairs of changes made to the aggregate
+     * @param  array<string, EntityPropertyValue>  $changes  Key-value pairs of changes made to the aggregate
      * @param  class-string<DomainEventClass>|null  $eventClass  Optional event class to instantiate
      * @param  DomainEvent|null  $event  Optional pre-created event instance
      *
@@ -156,15 +160,16 @@ abstract class Aggregate extends Entity implements AggregateRoot
     protected function updateAggregateRoot(array $changes, ?string $eventClass = null, ?DomainEvent $event = null): void
     {
         /**
-         * @var Collection<string, mixed> $changesCollection
+         * @var Collection<string, EntityPropertyValue> $changesCollection
          */
         $changesCollection = $this->updateEntity($changes);
 
-        if ($changesCollection->isEmpty()) {
+        if ($changesCollection->toArray() === []) {
             return;
         }
 
         if ($eventClass !== null) {
+            /** @phpstan-ignore function.alreadyNarrowedType */
             if (! is_a($eventClass, DomainEvent::class, true)) {
                 throw new LogicException(sprintf('Event class %s must implement DomainEvent interface', $eventClass));
             }

@@ -24,6 +24,9 @@ class Between extends Filter
         return $this->target;
     }
 
+    /**
+     * @return array<int, string|int|float|bool>
+     */
     public function value(): array
     {
         return $this->value;

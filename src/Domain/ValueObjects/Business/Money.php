@@ -63,7 +63,6 @@ class Money extends ValueObject
             'USD' => '$',
             'EUR' => '€',
             'GBP' => '£',
-            default => throw new InvalidArgumentException('Unsupported currency'),
         };
     }
 
