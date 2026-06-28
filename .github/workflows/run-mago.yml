@@ -1,24 +1,30 @@
-name: run-mago.yml
+name: run-qa
 on:
   push:
     paths:
       - '**.php'
-      - '.github/workflows/run-mago.yml'
+      - '.github/workflows/run-qa.yml'
       - 'composer.json'
       - 'composer.lock'
+      - 'phpstan.neon'
+      - 'pint.json'
+      - 'deptrac.yaml'
   pull_request:
     paths:
       - '**.php'
-      - '.github/workflows/run-mago.yml'
+      - '.github/workflows/run-qa.yml'
       - 'composer.json'
       - 'composer.lock'
+      - 'phpstan.neon'
+      - 'pint.json'
+      - 'deptrac.yaml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  mago-lint:
+  qa:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 5
     strategy:
@@ -29,7 +35,7 @@ jobs:
         laravel: [ 13.* ]
         stability: [ prefer-stable ]
 
-    name: Mago Lint - P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
+    name: QA - P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
 
     steps:
       - name: Checkout code
@@ -51,12 +57,11 @@ jobs:
           composer require "laravel/framework:${{ matrix.laravel }}" --no-interaction --no-update
           composer update --${{ matrix.stability }} --prefer-dist --no-interaction
 
-      - name: Setup Mago
-        uses: nhedger/setup-mago@v1
+      - name: Check code style (Pint)
+        run: vendor/bin/pint --test
 
-      - name: Run Mago
-        run: |
-          mago format --dry-run
-          mago lint --reporting-format=github
-          mago analyze --reporting-format=github
-          mago guard --reporting-format=github
+      - name: Static analysis (PHPStan/Larastan)
+        run: vendor/bin/phpstan analyse --error-format=github --no-progress
+
+      - name: Architecture (Deptrac)
+        run: vendor/bin/deptrac analyse --formatter=json --no-progress
