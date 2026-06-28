@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.5.0 - 2026-06-28
+
+### What's Changed
+
+* Adopts PHPStan, Pint, and Deptrac for QA by @lava83 in https://github.com/lava83/laravel-ddd/pull/17
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.2.0...v0.5.0
+
 ## v0.1.4.10 - 2026-03-23
 
 ### What's Changed
