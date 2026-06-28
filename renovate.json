@@ -1,0 +1,49 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:recommended"
+    ],
+    "timezone": "Europe/Berlin",
+    "schedule": [
+        "* 0-6 * * 0"
+    ],
+    "prConcurrentLimit": 10,
+    "prHourlyLimit": 0,
+    "minimumReleaseAge": "3 days",
+    "internalChecksFilter": "strict",
+    "dependencyDashboard": true,
+    "rangeStrategy": "bump",
+    "labels": [
+        "dependencies"
+    ],
+    "packageRules": [
+        {
+            "description": "Composer (PHP) updates",
+            "matchManagers": ["composer"],
+            "addLabels": ["php"]
+        },
+        {
+            "description": "GitHub Actions updates",
+            "matchManagers": ["github-actions"],
+            "addLabels": ["github-actions"]
+        },
+        {
+            "description": "Spatie packages grouped",
+            "matchManagers": ["composer"],
+            "matchPackageNames": ["spatie/**"],
+            "groupName": "spatie packages"
+        },
+        {
+            "description": "Illuminate (laravel) core grouped",
+            "matchManagers": ["composer"],
+            "matchPackageNames": ["illuminate/**"],
+            "groupName": "illuminate (laravel) packages"
+        },
+        {
+            "description": "Laravel core grouped",
+            "matchManagers": ["composer"],
+            "matchPackageNames": ["laravel/**"],
+            "groupName": "laravel packages"
+        }
+    ]
+}
