@@ -74,7 +74,6 @@ abstract class Repository
     {
         $model = $this->mapperResolver->resolve($entity::class)->toModel($entity);
 
-        // @mago-expect analyzer:mixed-assignment,mixed-method-access,string-member-selector
         $related = $model->$relation()->find($relatedId);
 
         if (
