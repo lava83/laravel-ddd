@@ -1,0 +1,95 @@
+parameters:
+  paths:
+    - ./src
+
+  layers:
+    # --- Architectural layers (core -> infrastructure) ---
+    -   name: Domain
+        collectors:
+          -   type: classNameRegex
+              value: '#^Lava83\\LaravelDdd\\Domain\\#'
+
+    -   name: Application
+        collectors:
+          -   type: classNameRegex
+              value: '#^Lava83\\LaravelDdd\\Application\\#'
+
+    -   name: Facades
+        collectors:
+          -   type: classNameRegex
+              value: '#^Lava83\\LaravelDdd\\Facades\\#'
+
+    -   name: Infrastructure
+        collectors:
+          # Everything in Infrastructure EXCEPT the Model base class,
+          # which is hoisted into its own layer below so the Domain may use it.
+          -   type: bool
+              must:
+                -   type: classNameRegex
+                    value: '#^Lava83\\LaravelDdd\\Infrastructure\\#'
+              must_not:
+                -   type: classNameRegex
+                    value: '#^Lava83\\LaravelDdd\\Infrastructure\\Models\\Model$#'
+
+    -   name: Root
+        collectors:
+          -   type: classNameRegex
+              value: '#^Lava83\\LaravelDdd\\LaravelDdd(ServiceProvider)?$#'
+
+    # --- The single Infrastructure class the Domain is allowed to touch ---
+    -   name: InfraModel
+        collectors:
+          -   type: classNameRegex
+              value: '#^Lava83\\LaravelDdd\\Infrastructure\\Models\\Model$#'
+
+    # --- Whitelisted framework / vendor primitives the Domain may depend on ---
+    -   name: AllowedPrimitives
+        collectors:
+          -   type: classNameRegex
+              value: '#^Illuminate\\Support\\Collection$#'
+          -   type: classNameRegex
+              value: '#^Illuminate\\Support\\Stringable$#'
+          -   type: classNameRegex
+              value: '#^Illuminate\\Validation\\Rule$#'
+          -   type: classNameRegex
+              value: '#^Illuminate\\Database\\RecordsNotFoundException$#'
+          -   type: classNameRegex
+              value: '#^Carbon\\CarbonImmutable$#'
+          -   type: classNameRegex
+              value: '#^Carbon\\CarbonInterface$#'
+          -   type: classNameRegex
+              value: '#^Ramsey\\Uuid\\#'
+          -   type: classNameRegex
+              value: '#^libphonenumber\\#'
+
+  ruleset:
+    InfraModel:
+      - Infrastructure
+      - AllowedPrimitives
+
+    Domain:
+      - AllowedPrimitives
+      - InfraModel
+
+    Application:
+      - Domain
+      - AllowedPrimitives
+
+    Facades:
+      - Root
+      - Domain
+      - AllowedPrimitives
+
+    Infrastructure:
+      - Domain
+      - Application
+      - InfraModel
+      - AllowedPrimitives
+
+    Root:
+      - Domain
+      - Application
+      - Facades
+      - Infrastructure
+      - InfraModel
+      - AllowedPrimitives

@@ -49,9 +49,20 @@
         "post-autoload-dump": "@composer run prepare",
         "prepare": "@php vendor/bin/testbench package:discover --ansi",
         "analyse": "vendor/bin/phpstan analyse",
+        "deptrac": "vendor/bin/deptrac analyse",
+        "format": "vendor/bin/pint",
+        "format-check": "vendor/bin/pint --test",
         "test": "vendor/bin/pest",
-        "test-coverage": "vendor/bin/pest --coverage",
-        "format": "vendor/bin/pint"
+        "test-coverage": "vendor/bin/pest --coverage --coverage-html=storage/coverage",
+        "lint": [
+            "@format",
+            "@analyse",
+            "@deptrac"
+        ],
+        "qa": [
+            "@lint",
+            "@test"
+        ]
     },
     "config": {
         "sort-packages": true,
