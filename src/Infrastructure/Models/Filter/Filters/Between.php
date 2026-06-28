@@ -41,13 +41,13 @@ class Between extends Filter
             'value.*' => [
                 'required',
                 function (string $attribute, mixed $value, Closure $fail) {
-                    if (!is_string($value) && !is_int($value) && !is_float($value)) {
+                    if (! is_string($value) && ! is_int($value) && ! is_float($value)) {
                         $fail("The {$attribute} must be a string, integer, or float.");
                     }
                 },
             ],
         ]);
 
-        return !$validator->fails();
+        return ! $validator->fails();
     }
 }

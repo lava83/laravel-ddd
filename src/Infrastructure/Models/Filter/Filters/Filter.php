@@ -29,7 +29,7 @@ abstract class Filter implements FilterContract
      */
     public function toArray(): array
     {
-        if (!$this->valueIsValid()) {
+        if (! $this->valueIsValid()) {
             throw FilterValueNotValid::make($this->value());
         }
 

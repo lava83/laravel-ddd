@@ -16,16 +16,16 @@ describe('Json behavior', function () {
             'last_name' => 'Doe',
         ])
             ->and($json->snakeCaseKeys()->jsonSerialize())->toEqual([
-            'first_name' => 'John',
-            'last_name' => 'Doe',
-        ])
+                'first_name' => 'John',
+                'last_name' => 'Doe',
+            ])
             ->and($json->toArray())->toEqual([
-            'firstName' => 'John',
-            'lastName' => 'Doe',
-        ])
+                'firstName' => 'John',
+                'lastName' => 'Doe',
+            ])
             ->and($json->jsonSerialize())->toEqual([
-            'firstName' => 'John',
-            'lastName' => 'Doe',
-        ]);
+                'firstName' => 'John',
+                'lastName' => 'Doe',
+            ]);
     });
 });

@@ -53,7 +53,7 @@ class DateRange extends ValueObject
      */
     public static function fromArray(array $dateRange): static
     {
-        if (!isset($dateRange['start_date']) || !isset($dateRange['end_date'])) {
+        if (! isset($dateRange['start_date']) || ! isset($dateRange['end_date'])) {
             throw new ValidationException('Date range must contain start_date and end_date');
         }
 
@@ -196,7 +196,7 @@ class DateRange extends ValueObject
 
     public function merge(DateRange $other): DateRange
     {
-        if (!$this->overlaps($other) && !$this->touches($other)) {
+        if (! $this->overlaps($other) && ! $this->touches($other)) {
             throw new ValidationException('Cannot merge non-overlapping and non-touching date ranges');
         }
 
@@ -205,7 +205,7 @@ class DateRange extends ValueObject
 
     public function intersect(DateRange $other): ?DateRange
     {
-        if (!$this->overlaps($other)) {
+        if (! $this->overlaps($other)) {
             return null;
         }
 
@@ -219,7 +219,7 @@ class DateRange extends ValueObject
     {
         $split = CarbonImmutable::instance($splitDate);
 
-        if (!$this->contains($split)) {
+        if (! $this->contains($split)) {
             throw new ValidationException('Split date must be within the date range');
         }
 
@@ -330,11 +330,10 @@ class DateRange extends ValueObject
 
     public function isFullMonth(): bool
     {
-        return (
+        return
             $this->startDate->isStartOfMonth()
             && $this->endDate->isSameMonth($this->startDate)
-            && $this->endDate->isEndOfMonth()
-        );
+            && $this->endDate->isEndOfMonth();
     }
 
     /**

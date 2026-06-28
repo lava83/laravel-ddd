@@ -124,8 +124,8 @@ class GeoAddress extends ValueObject
     public function __toString(): string
     {
         $parts = array_filter([
-            trim(($this->street ?? '') . ' ' . ($this->streetNumber ?? '')),
-            trim(($this->zipCode ?? '') . ' ' . ($this->city ?? '')),
+            trim(($this->street ?? '').' '.($this->streetNumber ?? '')),
+            trim(($this->zipCode ?? '').' '.($this->city ?? '')),
             $this->state,
             $this->county,
             $this->district,

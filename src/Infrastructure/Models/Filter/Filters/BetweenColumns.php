@@ -43,6 +43,6 @@ class BetweenColumns extends Filter
             ],
         ]);
 
-        return !$validator->fails();
+        return ! $validator->fails();
     }
 }

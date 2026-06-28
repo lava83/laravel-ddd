@@ -35,6 +35,6 @@ class Like extends Filter
             ],
         ]);
 
-        return !$validator->fails();
+        return ! $validator->fails();
     }
 }

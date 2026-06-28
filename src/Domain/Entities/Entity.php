@@ -31,7 +31,7 @@ abstract class Entity implements Stringable
     protected Collection $dirty;
 
     public function __construct(
-        protected CarbonImmutable $createdAt = new CarbonImmutable(),
+        protected CarbonImmutable $createdAt = new CarbonImmutable,
         protected ?CarbonImmutable $updatedAt = null,
         protected int $version = 0,
     ) {
@@ -132,7 +132,7 @@ abstract class Entity implements Stringable
      */
     public function isRecentlyUpdated(): bool
     {
-        if (!$this->updatedAt instanceof CarbonImmutable) {
+        if (! $this->updatedAt instanceof CarbonImmutable) {
             return false;
         }
 
@@ -255,8 +255,8 @@ abstract class Entity implements Stringable
             $currentValue = $this->getPropertyValue($property);
 
             if ($this->hasChanged($currentValue, $newValue)) {
-                $this->dirty->put('old_' . $property, $currentValue);
-                $this->dirty->put('new_' . $property, $newValue);
+                $this->dirty->put('old_'.$property, $currentValue);
+                $this->dirty->put('new_'.$property, $newValue);
             }
         }
 
@@ -270,7 +270,7 @@ abstract class Entity implements Stringable
         }
 
         if ($current instanceof Entity && $new instanceof Entity) {
-            return !$current->equals($new);
+            return ! $current->equals($new);
         }
 
         if ($current instanceof BackedEnum && $new instanceof BackedEnum) {
@@ -306,13 +306,13 @@ abstract class Entity implements Stringable
 
         $constructor = $reflectionClass->getConstructor();
 
-        if (!$constructor) {
+        if (! $constructor) {
             return;
         }
 
         foreach ($constructor->getParameters() as $parameter) {
             // Only process promoted properties
-            if (!$parameter->isPromoted()) {
+            if (! $parameter->isPromoted()) {
                 continue;
             }
 
@@ -323,9 +323,9 @@ abstract class Entity implements Stringable
                 continue;
             }
 
-            $changeKey = 'new_' . $propertyName;
+            $changeKey = 'new_'.$propertyName;
 
-            if (!$changes->has($changeKey)) {
+            if (! $changes->has($changeKey)) {
                 continue;
             }
 
@@ -386,8 +386,8 @@ abstract class Entity implements Stringable
     {
         $reflectionClass = $this->reflectionClass();
 
-        if (!$reflectionClass->hasProperty($property)) {
-            throw new LogicException("Property {$property} does not exist on " . static::class);
+        if (! $reflectionClass->hasProperty($property)) {
+            throw new LogicException("Property {$property} does not exist on ".static::class);
         }
     }
 
@@ -396,7 +396,7 @@ abstract class Entity implements Stringable
      */
     private function reflectionClass(): ReflectionClass
     {
-        return once(fn(): ReflectionClass => new ReflectionClass($this));
+        return once(fn (): ReflectionClass => new ReflectionClass($this));
     }
 
     private function carbonHasChanged(CarbonImmutable $current, CarbonImmutable $new): bool

@@ -41,6 +41,6 @@ class IsNull extends Filter
             ],
         ]);
 
-        return !$validator->fails();
+        return ! $validator->fails();
     }
 }

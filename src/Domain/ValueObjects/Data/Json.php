@@ -150,7 +150,7 @@ class Json extends ValueObject
                     /**
                      * @return array<string, mixed>
                      */
-                    fn(mixed $value, int|string $key) => [str((string) $key)->snake()->toString() => $value],
+                    fn (mixed $value, int|string $key) => [str((string) $key)->snake()->toString() => $value],
                 )
                 ->toArray(),
         );
@@ -170,7 +170,7 @@ class Json extends ValueObject
          * @var string $nestedKey
          */
         foreach ($keys->take(-1) as $nestedKey) {
-            if (!isset($current[$nestedKey]) || !is_array($current[$nestedKey])) {
+            if (! isset($current[$nestedKey]) || ! is_array($current[$nestedKey])) {
                 return;
             }
 
@@ -192,8 +192,8 @@ class Json extends ValueObject
             throw new ValidationException('JSON string cannot be empty');
         }
 
-        if (!json_validate($value)) {
-            throw new ValidationException('Invalid JSON: ' . json_last_error_msg());
+        if (! json_validate($value)) {
+            throw new ValidationException('Invalid JSON: '.json_last_error_msg());
         }
     }
 }

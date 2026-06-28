@@ -97,8 +97,8 @@ class Phonenumber extends ValueObject
     private function buildNormalizedNumber(): Stringable
     {
         return str(
-            $this->countryAreaCode->value . $this->localAreaCode->substr(1)->toString()
-                . $this->subscriberNumber->toString(),
+            $this->countryAreaCode->value.$this->localAreaCode->substr(1)->toString()
+                .$this->subscriberNumber->toString(),
         );
     }
 
@@ -109,7 +109,7 @@ class Phonenumber extends ValueObject
         $validator = validator(['number' => $number], [
             'number' => [
                 'required',
-                fn(string $attribute, string $value, Closure $fail) => $this->validatePhoneNumber($value, $fail),
+                fn (string $attribute, string $value, Closure $fail) => $this->validatePhoneNumber($value, $fail),
             ],
         ]);
 
@@ -123,7 +123,7 @@ class Phonenumber extends ValueObject
         try {
             $this->numberProto($value);
         } catch (NumberParseException $numberParseException) {
-            $fail('Failed to parse phone number: ' . $numberParseException->getMessage());
+            $fail('Failed to parse phone number: '.$numberParseException->getMessage());
         }
     }
 
@@ -135,7 +135,7 @@ class Phonenumber extends ValueObject
             try {
                 return $phoneNumberUtil->parse($value);
             } catch (NumberParseException $numberParseException) {
-                throw new ValidationException('Failed to parse phone number: ' . $numberParseException->getMessage());
+                throw new ValidationException('Failed to parse phone number: '.$numberParseException->getMessage());
             }
         });
     }
