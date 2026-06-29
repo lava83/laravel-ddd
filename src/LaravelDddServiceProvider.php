@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd;
 
+use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapperResolverContract;
 use Lava83\LaravelDdd\Infrastructure\Contracts\PolymorphicReferenceResolver;
+use Lava83\LaravelDdd\Infrastructure\Mappers\EntityMapperResolver;
 use Lava83\LaravelDdd\Infrastructure\Mappers\PolymorphicReferenceMapper;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -33,6 +35,10 @@ class LaravelDddServiceProvider extends PackageServiceProvider
         $this->app->singleton(
             PolymorphicReferenceResolver::class,
             PolymorphicReferenceMapper::class,
+        );
+        $this->app->singleton(
+            EntityMapperResolverContract::class,
+            EntityMapperResolver::class,
         );
     }
 }
