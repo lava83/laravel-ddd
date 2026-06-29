@@ -107,7 +107,7 @@ abstract class Entity implements Stringable
     public function toArray(): array
     {
         return [
-            'id' => $this->id()->toString(),
+            'id' => $this->id()->value(),
             'created_at' => $this->createdAt->format('Y-m-d H:i:s'),
             'updated_at' => $this->updatedAt?->format('Y-m-d H:i:s'),
             'version' => $this->version,

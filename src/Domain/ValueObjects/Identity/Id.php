@@ -27,4 +27,9 @@ abstract class Id extends ValueObject
     {
         return (string) $this->value === (string) $other->value;
     }
+
+    public function value(): int|string|UuidInterface
+    {
+        return $this->value;
+    }
 }
