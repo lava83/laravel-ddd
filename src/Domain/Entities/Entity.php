@@ -7,10 +7,11 @@ namespace Lava83\LaravelDdd\Domain\Entities;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
-use Lava83\LaravelDdd\Infrastructure\Models\Model;
 use LogicException;
 use ReflectionClass;
 use ReflectionException;
@@ -90,13 +91,26 @@ abstract class Entity implements Stringable
 
     public function hydrate(Model $model): void
     {
-        $createdAt = $model->created_at;
-        $this->createdAt = $createdAt->toImmutable();
+        if ($model->hasAttribute('created_at')) {
+            /**
+             * @var Carbon $createdAtOnModel
+             */
+            $createdAtOnModel = $model->getAttribute('created_at');
+            $this->createdAt = $createdAtOnModel->toImmutable();
+        }
 
-        $updatedAt = $model->updated_at;
-        $this->updatedAt = $updatedAt?->toImmutable();
+        if ($model->hasAttribute('updated_at')) {
+            /**
+             * @var Carbon $updatedAtOnModel
+             */
+            $updatedAtOnModel = $model->getAttribute('updated_at');
+            $this->updatedAt = $updatedAtOnModel->toImmutable();
+        }
 
-        $this->version = $model->version;
+        if ($model->hasAttribute('version')) {
+            $versionOnModel = (int) $model->getAttribute('version');
+            $this->version = $versionOnModel;
+        }
     }
 
     /**
