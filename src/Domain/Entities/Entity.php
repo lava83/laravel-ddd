@@ -104,7 +104,9 @@ abstract class Entity implements Stringable
              * @var Carbon $updatedAtOnModel
              */
             $updatedAtOnModel = $model->getAttribute('updated_at');
-            $this->updatedAt = $updatedAtOnModel->toImmutable();
+            $this->updatedAt = filled($updatedAtOnModel)
+                ? $updatedAtOnModel->toImmutable()
+                : null;
         }
 
         if ($model->hasAttribute('version')) {
