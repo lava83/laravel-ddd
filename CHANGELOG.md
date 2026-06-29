@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.5.5 - 2026-06-29
+
+### What's Changed
+
+* feat: Provide default EntityMapperResolver and bind it by @lava83 in https://github.com/lava83/laravel-ddd/pull/24
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.4...v0.5.5
+
 ## v0.5.4 - 2026-06-29
 
 ### What's Changed
