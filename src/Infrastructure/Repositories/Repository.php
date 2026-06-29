@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Infrastructure\Repositories;
 
-use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Laravel\Sanctum\PersonalAccessToken;
 use Lava83\LaravelDdd\Domain\Entities\Aggregate;
 use Lava83\LaravelDdd\Domain\Entities\Entity;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper;
@@ -15,11 +14,12 @@ use Lava83\LaravelDdd\Infrastructure\Exceptions\CantDeleteModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantDeleteRelatedModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantSaveModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\ConcurrencyException;
-use Lava83\LaravelDdd\Infrastructure\Models\Model;
 use Lava83\LaravelDdd\Infrastructure\Services\DomainEventPublisher;
 
 abstract class Repository
 {
+    const int DEFAULT_VERSION = 0;
+
     /**
      * @property class-string<Aggregate> $aggregateClass
      */
@@ -36,7 +36,7 @@ abstract class Repository
         return $this->mapperResolver->resolve($this->aggregateClass);
     }
 
-    protected function saveEntity(Entity|Aggregate $entity): Model|Authenticatable|PersonalAccessToken
+    protected function saveEntity(Entity|Aggregate $entity): Model
     {
         $model = $this->mapperResolver->resolve($entity::class)->toModel($entity);
 
@@ -78,8 +78,6 @@ abstract class Repository
 
         if (
             $related instanceof Model === false
-            && $related instanceof Authenticatable === false
-            && $related instanceof PersonalAccessToken === false
         ) {
             throw new CantDeleteRelatedModel(sprintf('Relation %s is not a valid Eloquent relation', $relation));
         }
@@ -101,10 +99,10 @@ abstract class Repository
         }
     }
 
-    protected function handleOptimisticLocking(Model|Authenticatable|PersonalAccessToken $model, Entity $entity): void
+    protected function handleOptimisticLocking(Model $model, Entity $entity): void
     {
         $expectedDatabaseVersion = $entity->version();
-        $modelVersion = $model instanceof Model ? (int) $model->version : (int) ($model->getAttribute('version') ?? 0);
+        $modelVersion = (int) ($model->getAttribute('version') ?? self::DEFAULT_VERSION);
 
         if ($modelVersion !== $expectedDatabaseVersion) {
             throw new ConcurrencyException(sprintf(
@@ -116,14 +114,14 @@ abstract class Repository
         }
     }
 
-    protected function syncEntityFromModel(Entity $entity, Model|Authenticatable|PersonalAccessToken $model): void
+    protected function syncEntityFromModel(Entity $entity, Model $model): void
     {
         $entity->hydrate($model);
     }
 
     private function persistDirtyEntity(
         Entity|Aggregate $entity,
-        Model|Authenticatable|PersonalAccessToken $model,
+        Model $model,
     ): void {
         if ($model->exists) {
             $this->handleOptimisticLocking($model, $entity);

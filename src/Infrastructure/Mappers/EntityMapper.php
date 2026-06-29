@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Infrastructure\Mappers;
 
-use Illuminate\Database\Eloquent\Model as EloquentModel;
-use Laravel\Sanctum\PersonalAccessToken;
+use Illuminate\Database\Eloquent\Model;
 use Lava83\LaravelDdd\Domain\Entities\Entity;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper as EntityMapperContract;
-use Lava83\LaravelDdd\Infrastructure\Models\Model;
 
 abstract class EntityMapper implements EntityMapperContract
 {
@@ -20,7 +18,7 @@ abstract class EntityMapper implements EntityMapperContract
         Entity $entity,
         string $modelClass,
         array $data,
-    ): Model|EloquentModel|PersonalAccessToken {
+    ): Model {
         $model = static::findOrCreateModel($entity, $modelClass);
 
         $model->fill(self::mergeWithDefaultData($entity, $data));
@@ -34,8 +32,10 @@ abstract class EntityMapper implements EntityMapperContract
     protected static function findOrCreateModel(
         Entity $entity,
         string $modelClass,
-    ): Model|EloquentModel|PersonalAccessToken {
-        return app($modelClass)->findOr($entity->id(), ['*'], fn () => app($modelClass));
+    ): Model {
+        return app($modelClass)
+            ->newQuery()
+            ->findOr($entity->id(), ['*'], fn () => app($modelClass));
     }
 
     /**
