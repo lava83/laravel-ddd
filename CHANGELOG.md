@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.5.2 - 2026-06-29
+
+### What's Changed
+
+* Adds integer ID value object by @lava83 in https://github.com/lava83/laravel-ddd/pull/20
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.1...v0.5.2
+
 ## v0.5.1 - 2026-06-29
 
 ### What's Changed
