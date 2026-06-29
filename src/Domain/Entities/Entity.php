@@ -9,8 +9,6 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
-use Lava83\LaravelDdd\Domain\ValueObjects\Identity\MongoObjectId;
-use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Uuid;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 use Lava83\LaravelDdd\Infrastructure\Models\Model;
 use LogicException;
