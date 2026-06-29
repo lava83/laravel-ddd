@@ -13,6 +13,11 @@ abstract class Id extends ValueObject
         protected readonly int|string|UuidInterface $value,
     ) {}
 
+    public static function fromValue(int|string|UuidInterface $value): self
+    {
+        return new static($value);
+    }
+
     public static function fromString(string $value): self
     {
         return new static($value);
@@ -21,5 +26,10 @@ abstract class Id extends ValueObject
     public function equals(Id $other): bool
     {
         return (string) $this->value === (string) $other->value;
+    }
+
+    public function value(): int|string|UuidInterface
+    {
+        return $this->value;
     }
 }

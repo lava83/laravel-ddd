@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.5.1 - 2026-06-29
+
+### What's Changed
+
+* refactor: Make Entity::id() return generic Id value object by @lava83 in https://github.com/lava83/laravel-ddd/pull/19
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.0...v0.5.1
+
 ## v0.5.0 - 2026-06-28
 
 ### What's Changed

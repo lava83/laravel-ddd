@@ -8,8 +8,7 @@ use BackedEnum;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
-use Lava83\LaravelDdd\Domain\ValueObjects\Identity\MongoObjectId;
-use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Uuid;
+use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 use Lava83\LaravelDdd\Infrastructure\Models\Model;
 use LogicException;
@@ -52,7 +51,7 @@ abstract class Entity implements Stringable
      *
      * @todo here we expect only an Id not the types of it
      */
-    abstract public function id(): Uuid|MongoObjectId;
+    abstract public function id(): Id;
 
     abstract public static function fromState(Model $state): self;
 
@@ -108,7 +107,7 @@ abstract class Entity implements Stringable
     public function toArray(): array
     {
         return [
-            'id' => $this->id()->toString(),
+            'id' => $this->id()->value(),
             'created_at' => $this->createdAt->format('Y-m-d H:i:s'),
             'updated_at' => $this->updatedAt?->format('Y-m-d H:i:s'),
             'version' => $this->version,
