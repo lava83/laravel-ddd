@@ -13,6 +13,11 @@ abstract class Id extends ValueObject
         protected readonly int|string|UuidInterface $value,
     ) {}
 
+    public static function fromValue(int|string|UuidInterface $value): self
+    {
+        return new static($value);
+    }
+
     public static function fromString(string $value): self
     {
         return new static($value);

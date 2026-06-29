@@ -8,6 +8,7 @@ use BackedEnum;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
+use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\MongoObjectId;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Uuid;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
@@ -52,7 +53,7 @@ abstract class Entity implements Stringable
      *
      * @todo here we expect only an Id not the types of it
      */
-    abstract public function id(): Uuid|MongoObjectId;
+    abstract public function id(): Id;
 
     abstract public static function fromState(Model $state): self;
 
