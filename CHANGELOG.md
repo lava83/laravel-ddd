@@ -2,6 +2,15 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.5.3 - 2026-06-29
+
+### What's Changed
+
+* Adds polymorphic reference value object by @lava83 in https://github.com/lava83/laravel-ddd/pull/21
+* Adds Sqid value object by @lava83 in https://github.com/lava83/laravel-ddd/pull/22
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.2...v0.5.3
+
 ## v0.5.2 - 2026-06-29
 
 ### What's Changed
