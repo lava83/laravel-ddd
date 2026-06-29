@@ -18,7 +18,7 @@ use Lava83\LaravelDdd\Infrastructure\Services\DomainEventPublisher;
 
 abstract class Repository
 {
-    const int DEFAULT_VERSION = 1;
+    const int DEFAULT_VERSION = 0;
 
     /**
      * @property class-string<Aggregate> $aggregateClass
