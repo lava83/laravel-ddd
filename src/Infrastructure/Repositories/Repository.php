@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Entities\Aggregate;
 use Lava83\LaravelDdd\Domain\Entities\Entity;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper;
-use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapperResolver;
+use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapperResolverContract;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantDeleteModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantDeleteRelatedModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantSaveModel;
@@ -26,7 +26,7 @@ abstract class Repository
     protected string $aggregateClass;
 
     public function __construct(
-        protected EntityMapperResolver $mapperResolver,
+        protected EntityMapperResolverContract $mapperResolver,
     ) {
         // @todo implement ensuring of aggregate class being set and is a subclass of Aggregate
     }

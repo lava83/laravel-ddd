@@ -6,7 +6,7 @@ namespace Lava83\LaravelDdd\Infrastructure\Contracts;
 
 use Lava83\LaravelDdd\Domain\Entities\Entity;
 
-interface EntityMapperResolver
+interface EntityMapperResolverContract
 {
     public function resolve(string $entityClass): EntityMapper;
 
