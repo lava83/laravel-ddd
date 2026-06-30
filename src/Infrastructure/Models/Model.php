@@ -12,6 +12,7 @@ use Illuminate\Support\Carbon;
 use IndexZer0\EloquentFiltering\Filter\Contracts\AllowedFilterList;
 use IndexZer0\EloquentFiltering\Filter\Traits\Filterable;
 use Lava83\LaravelDdd\Domain\Entities\Entity;
+use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapperResolverContract;
 use Lava83\LaravelDdd\Infrastructure\Models\Exceptions\EntityClassNotAvailable;
 
@@ -51,14 +52,23 @@ abstract class Model extends EloquentModel
      */
     public function toEntity(): Entity
     {
+        return $this->entityMapper()
+            ->toEntity($this);
+    }
+
+    /**
+     * @throws CircularDependencyException
+     * @throws BindingResolutionException
+     * @throws EntityClassNotAvailable
+     */
+    public function entityMapper(): EntityMapper
+    {
         if (blank($this->entityClassName)) {
             throw EntityClassNotAvailable::make($this::class);
         }
 
-        $entityMapper = app(EntityMapperResolverContract::class)
+        return app(EntityMapperResolverContract::class)
             ->resolve($this->entityClassName);
-
-        return $entityMapper->toEntity($this);
     }
 
     protected function casts(): array
