@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.5.7 - 2026-06-30
+
+### What's Changed
+
+* refactor: Unify aggregate ID types to use generic Id VO by @lava83 in https://github.com/lava83/laravel-ddd/pull/26
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.6...v0.5.7
+
 ## v0.5.6 - 2026-06-30
 
 ### What's Changed
