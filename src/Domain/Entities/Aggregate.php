@@ -14,6 +14,7 @@ use Lava83\LaravelDdd\Domain\Contracts\DomainEvent;
 use Lava83\LaravelDdd\Domain\Events\DomainEvent as DomainEventClass;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 use LogicException;
+use Ramsey\Uuid\UuidInterface;
 use ReflectionException;
 
 /**
@@ -109,13 +110,13 @@ abstract class Aggregate extends Entity implements AggregateRoot
     /**
      * Get summary of uncommitted events for debugging
      *
-     * @return Collection<int, array{event_name:string,aggregate_id:string,occurred_on:string}>
+     * @return Collection<int, array{event_name:string,aggregate_id:int|string|UuidInterface,occurred_on:string}>
      */
     public function eventSummary(): Collection
     {
         return $this->domainEvents->map(fn (DomainEvent $event): array => [
             'event_name' => $event->eventName(),
-            'aggregate_id' => $event->aggregateId()->toString(),
+            'aggregate_id' => $event->aggregateId()->value(),
             'occurred_on' => $event->occurredOn()->format(DateTimeInterface::ATOM),
         ]);
     }
