@@ -10,7 +10,7 @@ use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Contracts\DomainEvent as DomainEventContract;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 
-abstract class DomainEvent implements DomainEventContract
+abstract readonly class DomainEvent implements DomainEventContract
 {
     private CarbonImmutable $occurredOn;
 
