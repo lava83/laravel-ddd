@@ -8,10 +8,9 @@ use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Contracts\DomainEvent as DomainEventContract;
-use Lava83\LaravelDdd\Domain\ValueObjects\Identity\MongoObjectId;
-use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Uuid;
+use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 
-abstract class DomainEvent implements DomainEventContract
+abstract readonly class DomainEvent implements DomainEventContract
 {
     private CarbonImmutable $occurredOn;
 
@@ -19,15 +18,14 @@ abstract class DomainEvent implements DomainEventContract
      * @param  Collection<string, mixed>  $eventData
      */
     final public function __construct(
-        /** @todo here we expect only an Id not the types of it */
-        private readonly Uuid|MongoObjectId $aggregateId,
+        private readonly Id $aggregateId,
         private readonly Collection $eventData = new Collection,
         private readonly int $eventVersion = 1,
     ) {
         $this->occurredOn = CarbonImmutable::now();
     }
 
-    public function aggregateId(): MongoObjectId|Uuid
+    public function aggregateId(): Id
     {
         return $this->aggregateId;
     }
