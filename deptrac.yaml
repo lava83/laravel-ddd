@@ -64,6 +64,7 @@ parameters:
 
   ruleset:
     InfraModel:
+      - Domain
       - Infrastructure
       - AllowedPrimitives
 
