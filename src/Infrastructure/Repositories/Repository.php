@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Infrastructure\Repositories;
 
+use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Contracts\Container\CircularDependencyException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Entities\Aggregate;
@@ -14,6 +16,7 @@ use Lava83\LaravelDdd\Infrastructure\Exceptions\CantDeleteModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantDeleteRelatedModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantSaveModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\ConcurrencyException;
+use Lava83\LaravelDdd\Infrastructure\Repositories\Exceptions\EntityClassNotAvailable;
 use Lava83\LaravelDdd\Infrastructure\Services\DomainEventPublisher;
 
 abstract class Repository
@@ -21,24 +24,35 @@ abstract class Repository
     const int DEFAULT_VERSION = 0;
 
     /**
-     * @property class-string<Aggregate> $aggregateClass
+     * @property class-string<Aggregate>|null $entityClassName
      */
-    protected string $aggregateClass;
+    protected ?string $entityClassName = null;
 
-    public function __construct(
-        protected EntityMapperResolverContract $mapperResolver,
-    ) {
-        // @todo implement ensuring of aggregate class being set and is a subclass of Aggregate
-    }
-
+    /**
+     * @throws CircularDependencyException
+     * @throws BindingResolutionException
+     * @throws EntityClassNotAvailable
+     */
     protected function entityMapper(): EntityMapper
     {
-        return $this->mapperResolver->resolve($this->aggregateClass);
+        if (blank($this->entityClassName)) {
+            throw EntityClassNotAvailable::make($this::class);
+        }
+
+        return app(EntityMapperResolverContract::class)
+            ->resolve($this->entityClassName);
     }
 
+    /**
+     * @throws CircularDependencyException
+     * @throws BindingResolutionException
+     * @throws EntityClassNotAvailable
+     */
     protected function saveEntity(Entity|Aggregate $entity): Model
     {
-        $model = $this->mapperResolver->resolve($entity::class)->toModel($entity);
+        $model = $this
+            ->entityMapper()
+            ->toModel($entity);
 
         if ($entity->isDirty() || $model->exists === false) {
             $this->persistDirtyEntity($entity, $model);
@@ -49,9 +63,16 @@ abstract class Repository
         return $model;
     }
 
+    /**
+     * @throws CircularDependencyException
+     * @throws BindingResolutionException
+     * @throws EntityClassNotAvailable
+     */
     protected function deleteEntity(Entity|Aggregate $entity): void
     {
-        $model = $this->mapperResolver->resolve($entity::class)->toModel($entity);
+        $model = $this
+            ->entityMapper()
+            ->toModel($entity);
 
         if (! $model->delete()) {
             throw new CantDeleteModel('Failed to delete entity');
@@ -70,9 +91,14 @@ abstract class Repository
         $entities->map(fn (Entity|Aggregate $entity): null => $this->deleteEntity($entity));
     }
 
+    /**
+     * @throws CircularDependencyException
+     * @throws BindingResolutionException
+     * @throws EntityClassNotAvailable
+     */
     protected function deleteRelatedEntity(Entity|Aggregate $entity, string $relation, int|string $relatedId): void
     {
-        $model = $this->mapperResolver->resolve($entity::class)->toModel($entity);
+        $model = $this->entityMapper()->toModel($entity);
 
         $related = $model->$relation()->find($relatedId);
 
