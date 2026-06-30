@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.5.6 - 2026-06-30
+
+### What's Changed
+
+* feat: Add toEntity helper method on models by @lava83 in https://github.com/lava83/laravel-ddd/pull/25
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.5...v0.5.6
+
 ## v0.5.5 - 2026-06-29
 
 ### What's Changed
