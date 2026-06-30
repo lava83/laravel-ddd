@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace Lava83\LaravelDdd\Infrastructure\Models;
 
 use Closure;
+use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Contracts\Container\CircularDependencyException;
 use Illuminate\Database\Eloquent\Model as EloquentModel;
 use Illuminate\Support\Carbon;
 use IndexZer0\EloquentFiltering\Filter\Contracts\AllowedFilterList;
 use IndexZer0\EloquentFiltering\Filter\Traits\Filterable;
-use Lava83\LaravelDdd\Infrastructure\Models\Concerns\HasUuids;
+use Lava83\LaravelDdd\Domain\Entities\Entity;
+use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapperResolverContract;
+use Lava83\LaravelDdd\Infrastructure\Models\Exceptions\EntityClassNotAvailable;
 
 /**
  * @property int $version *
@@ -24,7 +28,11 @@ use Lava83\LaravelDdd\Infrastructure\Models\Concerns\HasUuids;
 abstract class Model extends EloquentModel
 {
     use Filterable;
-    use HasUuids;
+
+    /**
+     * @var class-string<Entity>|null
+     */
+    protected ?string $entityClassName = null;
 
     public function allowedFilters(): ?AllowedFilterList
     {
@@ -34,6 +42,23 @@ abstract class Model extends EloquentModel
     public function getFillable(): array
     {
         return array_merge(['id', 'version', 'created_at', 'updated_at'], $this->fillable);
+    }
+
+    /**
+     * @throws CircularDependencyException
+     * @throws BindingResolutionException
+     * @throws EntityClassNotAvailable
+     */
+    public function toEntity(): Entity
+    {
+        if (blank($this->entityClassName)) {
+            throw EntityClassNotAvailable::make($this::class);
+        }
+
+        $entityMapper = app(EntityMapperResolverContract::class)
+            ->resolve($this->entityClassName);
+
+        return $entityMapper->toEntity($this);
     }
 
     protected function casts(): array
