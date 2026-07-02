@@ -33,7 +33,7 @@ abstract class Entity implements Stringable
     public function __construct(
         protected CarbonImmutable $createdAt = new CarbonImmutable,
         protected ?CarbonImmutable $updatedAt = null,
-        protected int $version = 0,
+        protected int $version = 1,
     ) {
         $this->dirty = collect();
     }
@@ -55,6 +55,16 @@ abstract class Entity implements Stringable
     abstract public function id(): Id;
 
     abstract public static function fromState(Model $state): self;
+
+    /**
+     * @throws ReflectionException
+     */
+    public function idFromPersistence(Id $id): void
+    {
+        $this->updateEntity([
+            'id' => $id,
+        ]);
+    }
 
     /**
      * Compare entities by ID for equality
@@ -317,7 +327,7 @@ abstract class Entity implements Stringable
      */
     protected function applyChanges(Collection $changes, array $customSetters = []): void
     {
-        $excludedProperties = ['id', 'version', 'createdAt', 'updatedAt', 'domainEvents'];
+        $excludedProperties = ['version', 'createdAt', 'updatedAt', 'domainEvents'];
 
         $reflectionClass = $this->reflectionClass();
 

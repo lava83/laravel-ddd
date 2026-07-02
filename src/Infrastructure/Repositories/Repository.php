@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Entities\Aggregate;
 use Lava83\LaravelDdd\Domain\Entities\Entity;
+use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Integer;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapperResolverContract;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantDeleteModel;
@@ -18,10 +19,11 @@ use Lava83\LaravelDdd\Infrastructure\Exceptions\CantSaveModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\ConcurrencyException;
 use Lava83\LaravelDdd\Infrastructure\Repositories\Exceptions\EntityClassNotAvailable;
 use Lava83\LaravelDdd\Infrastructure\Services\DomainEventPublisher;
+use ReflectionException;
 
 abstract class Repository
 {
-    const int DEFAULT_VERSION = 0;
+    const int DEFAULT_VERSION = 1;
 
     /**
      * @property class-string<Aggregate>|null $entityClassName
@@ -128,9 +130,9 @@ abstract class Repository
     protected function handleOptimisticLocking(Model $model, Entity $entity): void
     {
         $expectedDatabaseVersion = $entity->version();
-        $modelVersion = (int) ($model->getAttribute('version') ?? self::DEFAULT_VERSION);
+        $modelVersion = $model->getAttribute('version') ?? self::DEFAULT_VERSION;
 
-        if ($modelVersion !== $expectedDatabaseVersion) {
+        if ((int)$modelVersion !== (int)$expectedDatabaseVersion) {
             throw new ConcurrencyException(sprintf(
                 'Entity %s was modified by another process. Expected version: %d, Actual version: %d',
                 $entity->id()->value(),
@@ -145,16 +147,21 @@ abstract class Repository
         $entity->hydrate($model);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     private function persistDirtyEntity(
         Entity|Aggregate $entity,
         Model $model,
     ): void {
-        if ($model->exists) {
-            $this->handleOptimisticLocking($model, $entity);
-        }
+        $this->handleOptimisticLocking($model, $entity);
 
         if (! $model->save()) {
             throw new CantSaveModel('Failed to save entity');
+        }
+
+        if ($entity->id() instanceof Integer) {
+            $entity->idFromPersistence($entity->id()::fromValue($model->getKey()));
         }
 
         if ($entity instanceof Aggregate) {
