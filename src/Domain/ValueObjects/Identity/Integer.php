@@ -9,6 +9,11 @@ use Ramsey\Uuid\UuidInterface;
 
 abstract class Integer extends Id
 {
+    public static function new(): static
+    {
+        return new static(0);
+    }
+
     public static function fromValue(UuidInterface|int|string $value): static
     {
         self::validate($value);
