@@ -6,10 +6,8 @@ namespace Lava83\LaravelDdd\Infrastructure\Repositories;
 
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Container\CircularDependencyException;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Entities\Aggregate;
-use Lava83\LaravelDdd\Domain\Entities\Entity;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Integer;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapperResolverContract;
@@ -17,20 +15,27 @@ use Lava83\LaravelDdd\Infrastructure\Exceptions\CantDeleteModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantDeleteRelatedModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantSaveModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\ConcurrencyException;
+use Lava83\LaravelDdd\Infrastructure\Models\Model;
 use Lava83\LaravelDdd\Infrastructure\Repositories\Exceptions\EntityClassNotAvailable;
 use Lava83\LaravelDdd\Infrastructure\Services\DomainEventPublisher;
 use ReflectionException;
 
+/**
+ * @template TModel of Model
+ * @template TAggregate of Aggregate<TModel, *>
+ */
 abstract class Repository
 {
     const int DEFAULT_VERSION = 1;
 
     /**
-     * @property class-string<Aggregate>|null $entityClassName
+     * @var class-string<TAggregate>|null
      */
     protected ?string $entityClassName = null;
 
     /**
+     * @return EntityMapper<TAggregate, TModel>
+     *
      * @throws CircularDependencyException
      * @throws BindingResolutionException
      * @throws EntityClassNotAvailable
@@ -41,66 +46,79 @@ abstract class Repository
             throw EntityClassNotAvailable::make($this::class);
         }
 
-        return app(EntityMapperResolverContract::class)
+        /** @var EntityMapper<TAggregate, TModel> $mapper */
+        $mapper = app(EntityMapperResolverContract::class)
             ->resolve($this->entityClassName);
+
+        return $mapper;
     }
 
     /**
+     * @param  TAggregate  $aggregate
+     * @return TModel
+     *
      * @throws CircularDependencyException
      * @throws BindingResolutionException
      * @throws EntityClassNotAvailable
+     * @throws ReflectionException
      */
-    protected function saveEntity(Entity|Aggregate $entity): Model
+    protected function saveEntity(Aggregate $aggregate): Model
     {
         $model = $this
             ->entityMapper()
-            ->toModel($entity);
+            ->toModel($aggregate);
 
-        if ($entity->isDirty() || $model->exists === false) {
-            $this->persistDirtyEntity($entity, $model);
+        if ($aggregate->isDirty() || $model->exists === false) {
+            $this->persistDirtyEntity($aggregate, $model);
         }
 
-        $this->syncEntityFromModel($entity, $model);
+        $this->syncEntityFromModel($aggregate, $model);
 
         return $model;
     }
 
     /**
+     * @param  TAggregate  $aggregate
+     *
      * @throws CircularDependencyException
      * @throws BindingResolutionException
      * @throws EntityClassNotAvailable
      */
-    protected function deleteEntity(Entity|Aggregate $entity): void
+    protected function deleteEntity(Aggregate $aggregate): void
     {
         $model = $this
             ->entityMapper()
-            ->toModel($entity);
+            ->toModel($aggregate);
 
         if (! $model->delete()) {
             throw new CantDeleteModel('Failed to delete entity');
         }
 
-        if ($entity instanceof Aggregate) {
-            $this->dispatchUncommittedEvents($entity);
-        }
+        $this->dispatchUncommittedEvents($aggregate);
     }
 
     /**
-     * @param  Collection<int, Entity|Aggregate>  $entities
-     */
-    protected function deleteEntities(Collection $entities): void
-    {
-        $entities->map(fn (Entity|Aggregate $entity): null => $this->deleteEntity($entity));
-    }
-
-    /**
+     * @param  Collection<int, TAggregate>  $entities
+     *
      * @throws CircularDependencyException
      * @throws BindingResolutionException
      * @throws EntityClassNotAvailable
      */
-    protected function deleteRelatedEntity(Entity|Aggregate $entity, string $relation, int|string $relatedId): void
+    protected function deleteEntities(Collection $entities): void
     {
-        $model = $this->entityMapper()->toModel($entity);
+        $entities->each(fn (Aggregate $entity): null => $this->deleteEntity($entity));
+    }
+
+    /**
+     * @param  TAggregate  $aggregate
+     *
+     * @throws CircularDependencyException
+     * @throws BindingResolutionException
+     * @throws EntityClassNotAvailable
+     */
+    protected function deleteRelatedEntity(Aggregate $aggregate, string $relation, int|string $relatedId): void
+    {
+        $model = $this->entityMapper()->toModel($aggregate);
 
         $related = $model->$relation()->find($relatedId);
 
@@ -114,58 +132,68 @@ abstract class Repository
             throw new CantDeleteRelatedModel('Failed to delete related entity via relation '.$relation);
         }
 
-        if ($entity instanceof Aggregate) {
-            $this->dispatchUncommittedEvents($entity);
+        $this->dispatchUncommittedEvents($aggregate);
+    }
+
+    /**
+     * @param  TAggregate  $aggregate
+     */
+    protected function dispatchUncommittedEvents(Aggregate $aggregate): void
+    {
+        if ($aggregate->hasUncommittedEvents()) {
+            app(DomainEventPublisher::class)->publishEvents($aggregate->uncommittedEvents());
+            $aggregate->markEventsAsCommitted();
         }
     }
 
-    protected function dispatchUncommittedEvents(Aggregate $entity): void
+    /**
+     * @param  TAggregate  $aggregate
+     * @param  TModel  $model
+     */
+    protected function handleOptimisticLocking(Aggregate $aggregate, Model $model): void
     {
-        if ($entity->hasUncommittedEvents()) {
-            app(DomainEventPublisher::class)->publishEvents($entity->uncommittedEvents());
-            $entity->markEventsAsCommitted();
-        }
-    }
-
-    protected function handleOptimisticLocking(Model $model, Entity $entity): void
-    {
-        $expectedDatabaseVersion = $entity->version();
+        $expectedDatabaseVersion = $aggregate->version();
         $modelVersion = $model->getAttribute('version') ?? self::DEFAULT_VERSION;
 
         if ((int) $modelVersion !== (int) $expectedDatabaseVersion) {
             throw new ConcurrencyException(sprintf(
                 'Entity %s was modified by another process. Expected version: %d, Actual version: %d',
-                $entity->id()->value(),
+                $aggregate->id()->value(),
                 $expectedDatabaseVersion,
                 $modelVersion,
             ));
         }
     }
 
-    protected function syncEntityFromModel(Entity $entity, Model $model): void
+    /**
+     * @param  TAggregate  $aggregate
+     * @param  TModel  $model
+     */
+    protected function syncEntityFromModel(Aggregate $aggregate, Model $model): void
     {
-        $entity->hydrate($model);
+        $aggregate->hydrate($model);
     }
 
     /**
+     * @param  TAggregate  $aggregate
+     * @param  TModel  $model
+     *
      * @throws ReflectionException
      */
     private function persistDirtyEntity(
-        Entity|Aggregate $entity,
+        Aggregate $aggregate,
         Model $model,
     ): void {
-        $this->handleOptimisticLocking($model, $entity);
+        $this->handleOptimisticLocking($aggregate, $model);
 
         if (! $model->save()) {
             throw new CantSaveModel('Failed to save entity');
         }
 
-        if ($entity->id() instanceof Integer) {
-            $entity->idFromPersistence($entity->id()::fromValue($model->getKey()));
+        if ($aggregate->id() instanceof Integer) {
+            $aggregate->idFromPersistence($aggregate->id()::fromValue($model->getKey()));
         }
 
-        if ($entity instanceof Aggregate) {
-            $this->dispatchUncommittedEvents($entity);
-        }
+        $this->dispatchUncommittedEvents($aggregate);
     }
 }

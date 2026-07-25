@@ -12,7 +12,9 @@ use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Contracts\AggregateRoot;
 use Lava83\LaravelDdd\Domain\Contracts\DomainEvent;
 use Lava83\LaravelDdd\Domain\Events\DomainEvent as DomainEventClass;
+use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
+use Lava83\LaravelDdd\Infrastructure\Models\Model;
 use LogicException;
 use Ramsey\Uuid\UuidInterface;
 use ReflectionException;
@@ -21,7 +23,12 @@ use ReflectionException;
  * Base class for Aggregate Root entities
  * Extends BaseEntity and adds domain event handling
  *
- * @phpstan-type EntityPropertyValue null|bool|string|int|float|array<array-key, mixed>|BackedEnum|Collection<array-key, mixed>|ValueObject|Entity|CarbonImmutable
+ * @template TModel of Model
+ * @template TId of Id
+ *
+ * @extends Entity<TModel, TId>
+ *
+ * @phpstan-type EntityPropertyValue null|bool|string|int|float|array<array-key, mixed>|BackedEnum|Collection<array-key, mixed>|ValueObject|Entity<*,*>|CarbonImmutable
  */
 abstract class Aggregate extends Entity implements AggregateRoot
 {

@@ -17,21 +17,20 @@ use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapperResolverContract;
 use Lava83\LaravelDdd\Infrastructure\Models\Exceptions\EntityClassNotAvailable;
 
 /**
- * @property int $version *
+ * @template TEntity of Entity<*,*>
+ *
+ * @property int $version
  * @property-read Carbon $created_at
  * @property-read ?Carbon $updated_at
  *
- * @method Model findOr($id, $columns = ['*'], Closure $callback = null)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Model newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Model newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Model query()
+ * @method static findOr($id, $columns = ['*'], Closure $callback = null)
  */
 abstract class Model extends EloquentModel
 {
     use Filterable;
 
     /**
-     * @var class-string<Entity>|null
+     * @var class-string<TEntity>|null
      */
     protected ?string $entityClassName = null;
 
@@ -46,6 +45,8 @@ abstract class Model extends EloquentModel
     }
 
     /**
+     * @return TEntity
+     *
      * @throws CircularDependencyException
      * @throws BindingResolutionException
      * @throws EntityClassNotAvailable
@@ -57,6 +58,8 @@ abstract class Model extends EloquentModel
     }
 
     /**
+     * @return EntityMapper<TEntity, static>
+     *
      * @throws CircularDependencyException
      * @throws BindingResolutionException
      * @throws EntityClassNotAvailable
@@ -67,8 +70,11 @@ abstract class Model extends EloquentModel
             throw EntityClassNotAvailable::make($this::class);
         }
 
-        return app(EntityMapperResolverContract::class)
+        /** @var EntityMapper<TEntity, static> $mapper */
+        $mapper = app(EntityMapperResolverContract::class)
             ->resolve($this->entityClassName);
+
+        return $mapper;
     }
 
     protected function casts(): array

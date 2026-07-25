@@ -33,6 +33,11 @@ final readonly class Builder implements Countable
         private Collection $filters = new Collection,
     ) {}
 
+    public static function make(): self
+    {
+        return new self;
+    }
+
     public function eq(string $target, string|int|float|bool $value): self
     {
         $this->filters->add(new Equal($target, $value));

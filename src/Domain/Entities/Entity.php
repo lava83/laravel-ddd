@@ -7,11 +7,11 @@ namespace Lava83\LaravelDdd\Domain\Entities;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
+use Lava83\LaravelDdd\Infrastructure\Models\Model;
 use LogicException;
 use ReflectionClass;
 use ReflectionException;
@@ -21,9 +21,10 @@ use Stringable;
  * Base class for all entities (both aggregate roots and child entities)
  * Contains common entity functionality without domain event handling
  *
- * @phpstan-type EntityPropertyValue null|bool|string|int|float|array<array-key, mixed>|BackedEnum|Collection<array-key, mixed>|ValueObject|Entity|CarbonImmutable
+ * @template TModel of Model
+ * @template TId of Id
  *
- * @todo fix: error[kan-defect]: Class has a high kan defect score (1.61).
+ * @phpstan-type EntityPropertyValue null|bool|string|int|float|array<array-key, mixed>|BackedEnum|Collection<array-key, mixed>|ValueObject|Entity<Model<Entity<*, *>>, Id>|CarbonImmutable
  */
 abstract class Entity implements Stringable
 {
@@ -51,12 +52,19 @@ abstract class Entity implements Stringable
      * Must be implemented by concrete entities
      *
      * @todo here we expect only an Id not the types of it
+     *
+     * @return TId
      */
     abstract public function id(): Id;
 
-    abstract public static function fromState(Model $state): self;
+    /**
+     * @param  TModel  $state
+     */
+    abstract public static function fromState(Model $state): static;
 
     /**
+     * @param  TId  $id
+     *
      * @throws ReflectionException
      */
     public function idFromPersistence(Id $id): void
@@ -68,6 +76,8 @@ abstract class Entity implements Stringable
 
     /**
      * Compare entities by ID for equality
+     *
+     * @param  self<TModel, TId>  $other
      */
     public function equals(self $other): bool
     {
@@ -99,6 +109,9 @@ abstract class Entity implements Stringable
         return $this->version;
     }
 
+    /**
+     * @param  TModel  $model
+     */
     public function hydrate(Model $model): void
     {
         if ($model->hasAttribute('created_at')) {

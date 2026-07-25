@@ -28,7 +28,7 @@ interface Repository
     /**
      * Get all aggregates
      *
-     * @return Collection<int, Aggregate>
+     * @return Collection<int, Aggregate<*,*>>
      */
     public function all(): Collection;
 

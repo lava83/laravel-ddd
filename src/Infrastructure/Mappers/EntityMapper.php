@@ -8,11 +8,19 @@ use Illuminate\Database\Eloquent\Model;
 use Lava83\LaravelDdd\Domain\Entities\Entity;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper as EntityMapperContract;
 
+/**
+ * @template TEntity of Entity<*,*>
+ * @template TModel of Model
+ *
+ * @implements EntityMapperContract<TEntity, TModel>
+ */
 abstract class EntityMapper implements EntityMapperContract
 {
     /**
-     * @param  class-string<Model>  $modelClass
+     * @param  TEntity  $entity
+     * @param  class-string<TModel>  $modelClass
      * @param  array<string, string>  $data
+     * @return TModel
      */
     protected static function findOrCreateModelFillData(
         Entity $entity,
@@ -27,7 +35,8 @@ abstract class EntityMapper implements EntityMapperContract
     }
 
     /**
-     * @param  class-string<Model>  $modelClass
+     * @param  TEntity  $entity
+     * @param  class-string<TModel>  $modelClass
      */
     protected static function findOrCreateModel(
         Entity $entity,
@@ -39,6 +48,7 @@ abstract class EntityMapper implements EntityMapperContract
     }
 
     /**
+     * @param  TEntity  $entity
      * @param  array<string, string>  $data
      * @return array<string, string>
      */
