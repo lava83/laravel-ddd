@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 use Lava83\LaravelDdd\Infrastructure\Models\Model;
@@ -31,11 +32,18 @@ abstract class Entity implements Stringable
     /** @var Collection<string, EntityPropertyValue> */
     protected Collection $dirty;
 
+    /**
+     * @throws ValidationException
+     */
     public function __construct(
         protected CarbonImmutable $createdAt = new CarbonImmutable,
         protected ?CarbonImmutable $updatedAt = null,
         protected int $version = 1,
     ) {
+        if ($this->isValid() === false) {
+            throw ValidationException::fromArray($this->validate());
+        }
+
         $this->dirty = collect();
     }
 

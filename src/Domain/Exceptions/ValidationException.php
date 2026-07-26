@@ -19,7 +19,7 @@ class ValidationException extends Exception
      */
     public static function fromArray(array $errors): self
     {
-        $message = implode(', ', $errors);
+        $message = implode(' ', $errors);
 
         return new self($message);
     }
