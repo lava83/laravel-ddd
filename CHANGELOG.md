@@ -2,6 +2,10 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.5.11 - 2026-07-26
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.10...v0.5.11
+
 ## v0.5.10 - 2026-07-14
 
 **Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.9...v0.5.10
