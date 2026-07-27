@@ -2,15 +2,17 @@
 
 ## Project Overview
 
-This is a DDD (Domain-Driven Design) foundation package for Laravel 12+ applications. It provides base classes for Aggregates, Entities, Value Objects, Repositories, and Domain Events.
+This is a DDD (Domain-Driven Design) foundation package for Laravel 13 applications. It provides base classes for Aggregates, Entities, Value Objects, Repositories, and Domain Events.
 
 ## Tech Stack
 
-- **PHP**: 8.3+
-- **Laravel**: 12+
+- **PHP**: 8.4+
+- **Laravel**: 13 (`illuminate/contracts` `^13.0`)
 - **Testing**: Pest PHP
-- **Static Analysis**: Mago
-- **Dependencies**: Spatie Laravel Data, Ramsey UUID
+- **Static Analysis & Linting**: PHPStan / Larastan (with baseline)
+- **Code Style**: Laravel Pint
+- **Layering**: Deptrac (Domain → Application → Facades → Infrastructure)
+- **Key Dependencies**: Spatie Laravel Data, Eloquent Filtering (`indexzer0/eloquent-filtering`), libphonenumber-for-php, Laravel Sqid
 
 ## Architecture - Layer Separation
 
@@ -173,9 +175,14 @@ composer test-coverage
 # Format code
 composer format
 
-# Static analysis (Mago)
-mago lint
-mago analyze
+# Static analysis (PHPStan / Larastan)
+composer analyse
+
+# Check architectural layering (Deptrac)
+composer deptrac
+
+# Everything at once: format + analyse + deptrac + tests
+composer qa
 ```
 
 ## Common Patterns
