@@ -135,6 +135,8 @@ final class Article extends Aggregate
 }
 ```
 
+**Trap — serialization silently drops `private` aggregate properties.** `Aggregate::__sleep()` derives its allow-list from `get_object_vars($this)` evaluated in `Aggregate` scope, which cannot see a property declared `private` in a subclass. Serialising an aggregate (queue, cache, session) omits every such property, and `unserialize()` leaves it uninitialised — the first `id()` after a round-trip throws `Error: Typed property … must not be accessed before initialization`. Declare an aggregate's identity and fields `protected`, not `private`. The `Article` sketch above uses `private` for brevity and would lose both properties if serialised.
+
 State changes go through two **protected** helpers — they are internal machinery, not public API:
 
 - `protected Entity::updateEntity(array $changes): Collection` — diffs, applies, bumps version and `updatedAt`. Returns the dirty collection, or an empty one if nothing changed.
