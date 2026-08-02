@@ -16,8 +16,6 @@ abstract class Integer extends Id
 
     public static function fromValue(UuidInterface|int|string $value): static
     {
-        self::validate($value);
-
         return new static($value);
     }
 
@@ -41,7 +39,7 @@ abstract class Integer extends Id
         return (int) $this->value;
     }
 
-    protected static function validate(int|string|UuidInterface $value): void
+    protected function validate(int|string|UuidInterface $value): void
     {
         if (blank($value)) {
             throw new InvalidArgumentException('Integer ID cannot be empty');

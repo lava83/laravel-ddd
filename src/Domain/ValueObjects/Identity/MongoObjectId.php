@@ -42,8 +42,10 @@ class MongoObjectId extends Id
     /**
      * @throws ValidationException
      */
-    protected function validate(string $value): void
+    protected function validate(string|int|UuidInterface $value): void
     {
+        $value = (string) $value;
+
         // ObjectId must be exactly 24 hexadecimal characters
         if (! preg_match('/^[a-f0-9]{24}$/i', $value)) {
             throw new ValidationException('Invalid ObjectId format. Expected 24 hexadecimal characters, got: '

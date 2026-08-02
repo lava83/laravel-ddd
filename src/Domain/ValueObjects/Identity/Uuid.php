@@ -31,9 +31,25 @@ class Uuid extends Id
     /**
      * @throws ValidationException
      */
+    public static function fromValue(UuidInterface|int|string $value): static
+    {
+        if ($value instanceof UuidInterface) {
+            return new static($value);
+        }
+
+        if (is_int($value)) {
+            return new static(RamseyUuid::fromInteger((string) $value));
+        }
+
+        return static::fromString($value);
+    }
+
+    /**
+     * @throws ValidationException
+     */
     public static function fromString(string $value): static
     {
-        self::validate($value);
+        self::assertValidUuidString($value);
 
         return new static(RamseyUuid::fromString($value));
     }
@@ -242,7 +258,7 @@ class Uuid extends Id
     /**
      * @throws ValidationException
      */
-    private static function validate(string $value): void
+    private static function assertValidUuidString(string $value): void
     {
         if (blank($value)) {
             throw new ValidationException('Id cannot be empty');

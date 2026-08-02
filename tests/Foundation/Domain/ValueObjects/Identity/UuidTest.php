@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Uuid;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\ValueObjects\Identity\PrefixedTestId;
+use Ramsey\Uuid\Uuid as RamseyUuid;
 use Ramsey\Uuid\UuidInterface;
 
 describe('Uuid', function (): void {
@@ -58,6 +59,38 @@ describe('Uuid', function (): void {
 
             expect($copy)->not->toBe($source)
                 ->and($copy->equals($source))->toBeTrue();
+        });
+    });
+
+    describe('fromValue', function (): void {
+        it('builds from a valid uuid string', function (): void {
+            expect(Uuid::fromValue('019fc26d-2e9c-73e8-9395-063403aa4dfb')->value())
+                ->toBe('019fc26d-2e9c-73e8-9395-063403aa4dfb');
+        });
+
+        it('wraps a UuidInterface directly', function (): void {
+            $native = RamseyUuid::fromString('019fc26d-2e9c-73e8-9395-063403aa4dfb');
+
+            expect(Uuid::fromValue($native)->value())->toBe('019fc26d-2e9c-73e8-9395-063403aa4dfb');
+        });
+
+        it('builds from an integer via its 128-bit value', function (): void {
+            expect(Uuid::fromValue(5)->value())->toBe('00000000-0000-0000-0000-000000000005');
+        });
+
+        it('returns the concrete subclass', function (): void {
+            expect(PrefixedTestId::fromValue('019fc26d-2e9c-73e8-9395-063403aa4dfb'))
+                ->toBeInstanceOf(PrefixedTestId::class);
+        });
+
+        it('throws a domain ValidationException for a malformed string', function (): void {
+            expect(fn () => Uuid::fromValue('not-a-uuid'))
+                ->toThrow(ValidationException::class, 'Invalid UUID format: not-a-uuid');
+        });
+
+        it('throws a domain ValidationException for an empty string', function (): void {
+            expect(fn () => Uuid::fromValue(''))
+                ->toThrow(ValidationException::class, 'Id cannot be empty');
         });
     });
 
