@@ -6,6 +6,7 @@ namespace Lava83\LaravelDdd\Infrastructure\Mappers;
 
 use Lava83\LaravelDdd\Domain\Entities\Entity;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper as EntityMapperContract;
+use Lava83\LaravelDdd\Infrastructure\Mappers\Exceptions\ModelClassNotDefined;
 use Lava83\LaravelDdd\Infrastructure\Models\Model;
 
 /**
@@ -13,21 +14,25 @@ use Lava83\LaravelDdd\Infrastructure\Models\Model;
  * @template TModel of Model
  *
  * @implements EntityMapperContract<TEntity, TModel>
+ *
+ * @property-read ?class-string<TModel> $modelClass
  */
 abstract class EntityMapper implements EntityMapperContract
 {
+    protected static ?string $modelClass = null;
+
     /**
      * @param  TEntity  $entity
-     * @param  class-string<TModel>  $modelClass
      * @param  array<string, string>  $data
      * @return TModel
      */
     protected static function findOrCreateModelFillData(
         Entity $entity,
-        string $modelClass,
         array $data,
     ): Model {
-        $model = static::findOrCreateModel($entity, $modelClass);
+        static::ensureModelClassIsDefined();
+
+        $model = static::findOrCreateModel($entity);
 
         $model->fill(self::mergeWithDefaultData($entity, $data));
 
@@ -36,21 +41,28 @@ abstract class EntityMapper implements EntityMapperContract
 
     /**
      * @param  TEntity  $entity
-     * @param  class-string<TModel>  $modelClass
      * @return TModel
      */
     protected static function findOrCreateModel(
         Entity $entity,
-        string $modelClass,
     ): Model {
+        static::ensureModelClassIsDefined();
+
         /**
          * @var TModel<TEntity> $model
          */
-        $model = app($modelClass)
+        $model = app(static::$modelClass)
             ->newQuery()
-            ->findOr($entity->id(), ['*'], fn () => app($modelClass));
+            ->findOr($entity->id(), ['*'], fn () => app(static::$modelClass));
 
         return $model;
+    }
+
+    protected static function ensureModelClassIsDefined(): void
+    {
+        if (static::$modelClass === null) {
+            throw new ModelClassNotDefined('Model class is not defined.');
+        }
     }
 
     /**
@@ -61,7 +73,7 @@ abstract class EntityMapper implements EntityMapperContract
     private static function mergeWithDefaultData(Entity $entity, array $data): array
     {
         return array_merge([
-            'id' => (string) $entity->id(),
+            app(static::$modelClass)->getKeyName() => (string) $entity->id(),
             'version' => (string) $entity->version(),
             'created_at' => (string) $entity->createdAt(),
             'updated_at' => (string) $entity->updatedAt(),
