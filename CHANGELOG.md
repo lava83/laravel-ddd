@@ -2,6 +2,40 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.5.12 - 2026-08-03
+
+### What's Changed
+
+Domain Entities can now map themselves to their persistence models, and the package's advertised core — `Entity`, `Aggregate`, and the value-object identity family — gets its first comprehensive test coverage.
+
+#### New features
+
+- **`Entity::toState()` — entities map themselves to models.** A Domain Entity can now convert itself into its `Infrastructure\Models\Model` via its registered `EntityMapper`, alongside a new `entityMapper()` accessor. (`1f83467`)
+
+#### Improvements
+
+- **Centralized `Id` validation.** The base `Id` constructor now calls a protected, overridable `validate()` method, so every identity is validated on construction regardless of which factory method built it. `Integer` and `MongoObjectId` were updated to the new signature. (`27309a1`)
+- **`Uuid::fromValue()` accepts more input types** — `UuidInterface`, `int`, and `string`. (`27309a1`)
+
+#### Architecture
+
+- New **`MapperContracts` Deptrac layer** lets the Domain depend on `EntityMapper` contracts, via a deliberate and documented dependency cycle (`MapperContracts` ↔ `Domain` / `InfraModel`) needed to carry entity and model types in mapper signatures. (`1f83467`)
+
+#### Testing
+
+First comprehensive unit coverage for the core building blocks:
+
+- **`Entity`** — construction & validation, identity/equality, timestamps & version accessors, `updateEntity()` change tracking, `hasChanged()` across CarbonImmutable/enums/VOs/nested entities, serialization & hydration. (`c58a989`)
+- **`Aggregate`** — event recording, querying & buffer management, `updateAggregateRoot()` event-handling strategies, reconstitution from state, owned-child change detection, and the `private`-property serialization trap. (`14e1d27`)
+- **`Uuid` and the full `Id` family** (`Id`, `Integer`, `MongoObjectId`, `Uuid`) — construction, validation, equality, serialization, prefixing, display helpers, and collection operations. New `PlainTestId`, `IntegerTestId`, and `PrefixedTestId` fixtures. (`27309a1`, `fcb3b67`)
+
+#### Documentation
+
+- Consolidated scattered AI-guidance files into a single `CLAUDE.md` covering layering, non-negotiables, known gaps, and testing conventions. (`c58a989`)
+- Documented the `Aggregate` serialization trap for `private` subclass properties in `.claude/domain.md` (use `protected` for identity and fields). (`14e1d27`)
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.11...v0.5.12
+
 ## v0.5.11 - 2026-07-26
 
 **Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.10...v0.5.11
