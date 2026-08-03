@@ -7,11 +7,15 @@ namespace Lava83\LaravelDdd\Domain\Entities;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
+use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Contracts\Container\CircularDependencyException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
+use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper;
+use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapperResolverContract;
 use Lava83\LaravelDdd\Infrastructure\Models\Model;
 use LogicException;
 use ReflectionClass;
@@ -256,6 +260,33 @@ abstract class Entity implements Stringable
     public function dirty(): Collection
     {
         return $this->dirty;
+    }
+
+    /**
+     * @return TModel
+     *
+     * @throws CircularDependencyException
+     * @throws BindingResolutionException
+     */
+    public function toState(): Model
+    {
+        return $this->entityMapper()
+            ->toModel($this);
+    }
+
+    /**
+     * @return EntityMapper<static, TModel>
+     *
+     * @throws CircularDependencyException
+     * @throws BindingResolutionException
+     */
+    public function entityMapper(): EntityMapper
+    {
+        /** @var EntityMapper<static, TModel> $mapper */
+        $mapper = app(EntityMapperResolverContract::class)
+            ->resolve($this::class);
+
+        return $mapper;
     }
 
     protected function touch(): void

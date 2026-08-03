@@ -30,6 +30,10 @@ parameters:
               must_not:
                 -   type: classNameRegex
                     value: '#^Lava83\\LaravelDdd\\Infrastructure\\Models\\Model$#'
+                # EntityMapper contracts are hoisted into MapperContracts below
+                # so the Domain (Entity::toState()) may depend on them.
+                -   type: classNameRegex
+                    value: '#^Lava83\\LaravelDdd\\Infrastructure\\Contracts\\EntityMapper(ResolverContract)?$#'
 
     -   name: Root
         collectors:
@@ -41,6 +45,12 @@ parameters:
         collectors:
           -   type: classNameRegex
               value: '#^Lava83\\LaravelDdd\\Infrastructure\\Models\\Model$#'
+
+    # --- Mapper contracts the Domain is allowed to touch (Entity::toState()) ---
+    -   name: MapperContracts
+        collectors:
+          -   type: classNameRegex
+              value: '#^Lava83\\LaravelDdd\\Infrastructure\\Contracts\\EntityMapper(ResolverContract)?$#'
 
     # --- Whitelisted framework / vendor primitives the Domain may depend on ---
     -   name: AllowedPrimitives
@@ -67,10 +77,12 @@ parameters:
       - Domain
       - Infrastructure
       - AllowedPrimitives
+      - MapperContracts
 
     Domain:
       - AllowedPrimitives
       - InfraModel
+      - MapperContracts
 
     Application:
       - Domain
@@ -86,6 +98,7 @@ parameters:
       - Application
       - InfraModel
       - AllowedPrimitives
+      - MapperContracts
 
     Root:
       - Domain
@@ -94,3 +107,12 @@ parameters:
       - Infrastructure
       - InfraModel
       - AllowedPrimitives
+      - MapperContracts
+
+    # The mapper contracts reference Domain\Entity and Infrastructure\Models\Model in
+    # their signatures. Together with Domain -> MapperContracts and InfraModel ->
+    # MapperContracts, this closes a deliberate cycle across Domain, InfraModel and
+    # MapperContracts.
+    MapperContracts:
+      - Domain
+      - InfraModel

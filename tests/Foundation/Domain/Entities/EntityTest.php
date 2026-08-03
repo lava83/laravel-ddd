@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
+use Lava83\LaravelDdd\Infrastructure\Mappers\Exceptions\NoMapperFoundForEntity;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\BodyPropertyEntity;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\EntityTestId;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\EntityTestModel;
@@ -12,6 +13,7 @@ use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\EntityTestStatus;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\EntityTestSubject;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\RichEntity;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\ValidatingEntity;
+use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Mappers\EntityTestMapper;
 
 /**
  * Rebuild an EntityTestSubject from persisted model state.
@@ -338,5 +340,70 @@ describe('serialization and hydration', function (): void {
             ->and($entity->name())->toBe('Persisted')
             ->and($entity->version())->toBe(3)
             ->and($entity->createdAt()->getTimestamp())->toBe($createdAt->getTimestamp());
+    });
+});
+
+describe('toState and entityMapper', function (): void {
+    it('resolves the exact mapper registered for its concrete class', function (): void {
+        $mapper = new EntityTestMapper;
+        entity_mapper_resolver()->registerMapper(EntityTestSubject::class, $mapper);
+
+        $entity = new EntityTestSubject(EntityTestId::generate(), 'Alice');
+
+        expect($entity->entityMapper())->toBe($mapper);
+    });
+
+    it('keys mapper resolution by the concrete entity class', function (): void {
+        $subjectMapper = new EntityTestMapper;
+        $bodyMapper = new EntityTestMapper;
+
+        entity_mapper_resolver()
+            ->registerMapper(EntityTestSubject::class, $subjectMapper)
+            ->registerMapper(BodyPropertyEntity::class, $bodyMapper);
+
+        $subject = new EntityTestSubject(EntityTestId::generate(), 'Alice');
+        $body = new BodyPropertyEntity(EntityTestId::generate());
+
+        expect($subject->entityMapper())->toBe($subjectMapper)
+            ->and($body->entityMapper())->toBe($bodyMapper);
+    });
+
+    it('maps itself to a persistence model through the registered mapper', function (): void {
+        entity_mapper_resolver()->registerMapper(EntityTestSubject::class, new EntityTestMapper);
+
+        $entity = new EntityTestSubject(EntityTestId::generate(), 'Alice');
+
+        $model = $entity->toState();
+
+        expect($model)->toBeInstanceOf(EntityTestModel::class)
+            ->and($model->getAttribute('id'))->toBe($entity->id()->value())
+            ->and($model->getAttribute('name'))->toBe('Alice')
+            ->and($model->getAttribute('version'))->toBe(1);
+    });
+
+    it('reflects live entity state in the produced model', function (): void {
+        entity_mapper_resolver()->registerMapper(EntityTestSubject::class, new EntityTestMapper);
+
+        $entity = new EntityTestSubject(EntityTestId::generate(), 'Old');
+        $entity->rename('New');
+
+        $model = $entity->toState();
+
+        expect($model->getAttribute('name'))->toBe('New')
+            ->and($model->getAttribute('version'))->toBe(2);
+    });
+
+    it('propagates NoMapperFoundForEntity from toState when none is registered', function (): void {
+        $entity = new EntityTestSubject(EntityTestId::generate(), 'Alice');
+
+        expect(fn () => $entity->toState())
+            ->toThrow(NoMapperFoundForEntity::class, EntityTestSubject::class);
+    });
+
+    it('throws from entityMapper when none is registered', function (): void {
+        $entity = new EntityTestSubject(EntityTestId::generate(), 'Alice');
+
+        expect(fn () => $entity->entityMapper())
+            ->toThrow(NoMapperFoundForEntity::class);
     });
 });

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Infrastructure\Mappers;
 
-use Illuminate\Database\Eloquent\Model;
 use Lava83\LaravelDdd\Domain\Entities\Entity;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper as EntityMapperContract;
+use Lava83\LaravelDdd\Infrastructure\Models\Model;
 
 /**
  * @template TEntity of Entity<*,*>
@@ -37,14 +37,20 @@ abstract class EntityMapper implements EntityMapperContract
     /**
      * @param  TEntity  $entity
      * @param  class-string<TModel>  $modelClass
+     * @return TModel
      */
     protected static function findOrCreateModel(
         Entity $entity,
         string $modelClass,
     ): Model {
-        return app($modelClass)
+        /**
+         * @var TModel<TEntity> $model
+         */
+        $model = app($modelClass)
             ->newQuery()
             ->findOr($entity->id(), ['*'], fn () => app($modelClass));
+
+        return $model;
     }
 
     /**
