@@ -2,6 +2,53 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.5.13 - 2026-08-03
+
+### v0.5.13
+
+EntityMappers now declare their persistence model **once**, as a static property, instead of threading it through every base-helper call.
+
+#### ⚠️ Breaking
+
+The `string $modelClass` parameter was removed from the protected `findOrCreateModel()` and `findOrCreateModelFillData()` helpers on `EntityMapper`. Mappers that extend the base class must declare the model as a static `$modelClass` property and drop the argument:
+
+```php
+// Before
+final class ArticleMapper extends BaseMapper implements EntityMapper
+{
+    public static function toModel(Entity $entity): ArticleModel
+    {
+        return self::findOrCreateModelFillData($entity, ArticleModel::class, [
+            'title' => (string) $entity->title(),
+        ]);
+    }
+}
+
+// After
+final class ArticleMapper extends BaseMapper implements EntityMapper
+{
+    protected static ?string $modelClass = ArticleModel::class;
+
+    public static function toModel(Entity $entity): ArticleModel
+    {
+        return self::findOrCreateModelFillData($entity, [
+            'title' => (string) $entity->title(),
+        ]);
+    }
+}
+
+```
+#### Added
+
+- A `protected static ?string $modelClass` property on `EntityMapper`. Subclasses set it once; the base helpers read it via late static binding.
+- `Lava83\LaravelDdd\Infrastructure\Mappers\Exceptions\ModelClassNotDefined` (extends `RuntimeException`), thrown when `findOrCreateModel()` / `findOrCreateModelFillData()` run without `$modelClass` set.
+
+#### Fixed
+
+- The default-attribute merge now resolves the primary-key name from the model via `getKeyName()` instead of assuming `'id'`, so mappers backing a model with a custom primary key fill the correct key.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.12...v0.5.13
+
 ## v0.5.12 - 2026-08-03
 
 ### What's Changed
