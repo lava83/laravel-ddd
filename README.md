@@ -451,7 +451,74 @@ $repository->save($loaded); // version is bumped; optimistic locking guards conc
 
 ## What else is in the box
 
-Beyond the slice above, the package provides an `AggregateRoot` contract with domain-event recording: events collected through `updateAggregateRoot($changes, $eventClass)` are dispatched automatically via Laravel's event system after a successful `save()`, then cleared from the aggregate. Every aggregate carries a `version` for optimistic locking and raises a `ConcurrencyException` on conflicting writes. You also get a growing catalogue of ready-made value objects — `Uuid`, `Email`, `Phonenumber`, `Money`, `Link`, `Json`, `GeoAddress` and more — plus a fluent Eloquent filtering layer on the base `Model`.
+Beyond the slice above, the package provides an `AggregateRoot` contract with domain-event recording: events collected through `updateAggregateRoot($changes, $eventClass)` are dispatched automatically via Laravel's event system after a successful `save()`, then cleared from the aggregate. Every aggregate carries a `version` for optimistic locking and raises a `ConcurrencyException` on conflicting writes. You also get a growing catalogue of ready-made value objects — `Uuid`, `Email`, `Phonenumber`, `Money`, `Link`, `Json`, `GeoAddress` and more — plus a fluent Eloquent filtering layer on the base `Model` (see [Filtering](#filtering)).
+
+## Filtering
+
+The base `Model` ships with a filtering layer built on [`indexzer0/eloquent-filtering`](https://github.com/IndexZer0/eloquent-filtering). `Infrastructure\Models\Filter\Builder` composes a set of filters fluently and serialises them — via `toArray()` — to the operator-array shape the model's `filter()` query scope consumes.
+
+### Building and applying filters
+
+```php
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder;
+
+$builder = Builder::make()
+    ->like('title', 'DDD')
+    ->eq('status', 'published')
+    ->in('category', ['laravel', 'php'])
+    ->gte('reading_time', 5)
+    ->isNull('archived_at');
+
+// `filter()` is a query scope from the Filterable trait; each filter must be
+// permitted by the model's allowedFilters() list.
+$articles = ArticleModel::query()->filter($builder->toArray())->get();
+```
+
+`toArray()` produces one MongoDB-style operator entry per filter (`$eq`, `$gte`, `$in`, `$null`, …):
+
+```php
+[
+    ['type' => '$like', 'target' => 'title',        'value' => 'DDD'],
+    ['type' => '$eq',   'target' => 'status',       'value' => 'published'],
+    ['type' => '$in',   'target' => 'category',     'value' => ['laravel', 'php']],
+    ['type' => '$gte',  'target' => 'reading_time', 'value' => 5],
+    ['type' => '$null', 'target' => 'archived_at',  'value' => true],
+]
+```
+
+### Reconstructing filters from a request
+
+`Builder::fromArray()` is the inverse of `toArray()` — it rebuilds a `Builder` from that array shape, for example from filters that arrive over HTTP. It validates strictly and throws `Filter\Filters\Exceptions\FilterArrayNotValid` on a missing key, an unknown operator, or a value whose type does not match the operator.
+
+Because the check is strict, **carry the filters as JSON rather than as bracket-notation query parameters.** PHP parses every query-string value as a string, so `?filters[0][type]=$gte&filters[0][value]=18` yields the string `"18"` — which the numeric operators (`$gt`, `$gte`, `$lt`, `$lte`) and `$null` reject, while string-friendly operators like `$eq` and `$in` would still pass, making bracket notation deceptively half-working. A JSON payload preserves `int` and `bool`:
+
+```text
+GET /api/articles?filters=[{"type":"$like","target":"title","value":"DDD"},{"type":"$eq","target":"status","value":"published"},{"type":"$in","target":"category","value":["laravel","php"]},{"type":"$gte","target":"reading_time","value":5},{"type":"$null","target":"archived_at","value":true}]
+```
+
+> URL-encode the `filters` value in practice (`[` → `%5B`, `"` → `%22`, `$` → `%24`, …); it is shown decoded here for readability.
+
+On the server, decode the JSON and hand the array to `fromArray()`:
+
+```php
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder;
+
+/** @var array<int, array<string, mixed>> $decoded */
+$decoded = json_decode($request->query('filters', '[]'), true, flags: JSON_THROW_ON_ERROR);
+
+$articles = ArticleModel::query()->filter(Builder::fromArray($decoded)->toArray())->get();
+```
+
+The request above reconstructs exactly:
+
+```php
+Builder::make()
+    ->like('title', 'DDD')
+    ->eq('status', 'published')
+    ->in('category', ['laravel', 'php'])
+    ->gte('reading_time', 5)
+    ->isNull('archived_at');
+```
 
 ## Development
 

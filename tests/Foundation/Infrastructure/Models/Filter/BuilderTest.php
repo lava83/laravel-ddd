@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Enums\MergeStrategy;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Between;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\BetweenColumns;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterArrayNotValid;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThan;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThanEqualTo;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\In;
@@ -469,5 +471,188 @@ describe('Builder not between columns', function () {
         ];
 
         expect($builder->toArray())->toBe($expectedArray);
+    });
+});
+
+describe('Builder fromArray', function () {
+    it('builds an empty builder from an empty array', function () {
+        expect(Builder::fromArray([]))->toHaveCount(0);
+    });
+
+    it('round trips every filter type through toArray', function () {
+        $builder = Builder::make()
+            ->eq('a', 'x')
+            ->neq('b', 'y')
+            ->between('c', [1, 2])
+            ->notBetween('d', [3, 4])
+            ->betweenColumns('e', ['c1', 'c2'])
+            ->notBetweenColumns('f', ['c3', 'c4'])
+            ->gt('g', 5)
+            ->gte('h', 6)
+            ->in('i', ['p', 'q'])
+            ->notIn('j', ['r', 's'])
+            ->like('k', 'z')
+            ->notLike('l', 'w')
+            ->lt('m', 7)
+            ->lte('n', 8)
+            ->isNull('o')
+            ->isNotNull('p');
+
+        $array = $builder->toArray();
+
+        expect(Builder::fromArray($array)->toArray())->toBe($array);
+    });
+
+    it('reconstructs the concrete filter instance', function () {
+        $builder = Builder::fromArray([
+            ['type' => '$eq', 'target' => 'foo', 'value' => 'bar'],
+        ]);
+
+        expect($builder)->toHaveCount(1)
+            ->and($builder->filters()->first())->toBeInstanceOf(Equal::class);
+    });
+
+    it('maps $null with a true value to IsNull', function () {
+        $builder = Builder::fromArray([
+            ['type' => '$null', 'target' => 'foo', 'value' => true],
+        ]);
+
+        expect($builder->filters()->first())->toBeInstanceOf(IsNull::class);
+    });
+
+    it('maps $null with a false value to IsNotNull', function () {
+        $builder = Builder::fromArray([
+            ['type' => '$null', 'target' => 'foo', 'value' => false],
+        ]);
+
+        expect($builder->filters()->first())->toBeInstanceOf(IsNotNull::class);
+    });
+
+    it('throws when a row is missing the type key', function () {
+        expect(fn () => Builder::fromArray([
+            ['target' => 'foo', 'value' => 'bar'],
+        ]))->toThrow(FilterArrayNotValid::class);
+    });
+
+    it('throws when a row is missing the value key', function () {
+        expect(fn () => Builder::fromArray([
+            ['type' => '$eq', 'target' => 'foo'],
+        ]))->toThrow(FilterArrayNotValid::class);
+    });
+
+    it('throws on an unknown filter type', function () {
+        expect(fn () => Builder::fromArray([
+            ['type' => '$nope', 'target' => 'foo', 'value' => 'bar'],
+        ]))->toThrow(FilterArrayNotValid::class);
+    });
+
+    it('throws when the target is not a string', function () {
+        expect(fn () => Builder::fromArray([
+            ['type' => '$eq', 'target' => 123, 'value' => 'bar'],
+        ]))->toThrow(FilterArrayNotValid::class);
+    });
+
+    it('throws when an array is given to a scalar filter', function () {
+        expect(fn () => Builder::fromArray([
+            ['type' => '$eq', 'target' => 'foo', 'value' => ['bar']],
+        ]))->toThrow(FilterArrayNotValid::class);
+    });
+
+    it('throws when a scalar is given to an array filter', function () {
+        expect(fn () => Builder::fromArray([
+            ['type' => '$between', 'target' => 'foo', 'value' => 'not-an-array'],
+        ]))->toThrow(FilterArrayNotValid::class);
+    });
+
+    it('throws when a non-numeric value is given to a numeric filter', function () {
+        expect(fn () => Builder::fromArray([
+            ['type' => '$gt', 'target' => 'foo', 'value' => 'not-a-number'],
+        ]))->toThrow(FilterArrayNotValid::class);
+    });
+});
+
+describe('Builder merge', function () {
+    it('returns a new builder and mutates neither operand', function () {
+        $defaults = Builder::make()->eq('tenant_id', 'A');
+        $incoming = Builder::make()->eq('status', 'active');
+
+        $result = $defaults->merge($incoming);
+
+        expect($result)->not->toBe($defaults)
+            ->and($result)->not->toBe($incoming)
+            ->and($defaults)->toHaveCount(1)
+            ->and($incoming)->toHaveCount(1)
+            ->and($result)->toHaveCount(2);
+    });
+
+    it('appends incoming filters by default', function () {
+        $defaults = Builder::make()->eq('tenant_id', 'A');
+        $incoming = Builder::make()->eq('status', 'active');
+
+        $merged = $defaults->merge($incoming)->toArray();
+
+        expect($merged)->toBe([
+            ['type' => '$eq', 'target' => 'tenant_id', 'value' => 'A'],
+            ['type' => '$eq', 'target' => 'status', 'value' => 'active'],
+        ]);
+    });
+
+    it('keeps a protected filter when the incoming set targets the same column', function () {
+        $defaults = Builder::make()->eq('tenant_id', 'A');
+        $incoming = Builder::make()->eq('tenant_id', 'B');
+
+        $merged = $defaults->merge($incoming, MergeStrategy::KeepExisting)->toArray();
+
+        expect($merged)->toBe([
+            ['type' => '$eq', 'target' => 'tenant_id', 'value' => 'A'],
+            ['type' => '$eq', 'target' => 'tenant_id', 'value' => 'B'],
+        ]);
+    });
+
+    it('lets an incoming filter override an existing one on the same target and operator', function () {
+        $defaults = Builder::make()->eq('tenant_id', 'A');
+        $incoming = Builder::make()->eq('tenant_id', 'B');
+
+        $merged = $defaults->merge($incoming, MergeStrategy::Override)->toArray();
+
+        expect($merged)->toBe([
+            ['type' => '$eq', 'target' => 'tenant_id', 'value' => 'B'],
+        ]);
+    });
+
+    it('does not override when the operator differs on the same target', function () {
+        $defaults = Builder::make()->gte('age', 18);
+        $incoming = Builder::make()->lte('age', 65);
+
+        $merged = $defaults->merge($incoming, MergeStrategy::Override)->toArray();
+
+        expect($merged)->toBe([
+            ['type' => '$gte', 'target' => 'age', 'value' => 18],
+            ['type' => '$lte', 'target' => 'age', 'value' => 65],
+        ]);
+    });
+
+    it('overrides only the matching operator and keeps the rest', function () {
+        $defaults = Builder::make()
+            ->gte('age', 18)
+            ->eq('tenant_id', 'A');
+        $incoming = Builder::make()->gte('age', 21);
+
+        $merged = $defaults->merge($incoming, MergeStrategy::Override)->toArray();
+
+        expect($merged)->toBe([
+            ['type' => '$eq', 'target' => 'tenant_id', 'value' => 'A'],
+            ['type' => '$gte', 'target' => 'age', 'value' => 21],
+        ]);
+    });
+
+    it('merging an empty builder leaves the filters unchanged', function () {
+        $defaults = Builder::make()->eq('tenant_id', 'A');
+
+        $merged = $defaults->merge(Builder::make())->toArray();
+
+        expect($merged)->toBe([
+            ['type' => '$eq', 'target' => 'tenant_id', 'value' => 'A'],
+        ]);
     });
 });
