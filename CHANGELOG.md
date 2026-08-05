@@ -2,6 +2,38 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.5.14 - 2026-08-05
+
+The Eloquent filter `Builder` gains two additions: reconstruct a filter set from a plain array (e.g. an HTTP request payload), and merge two filter sets with explicit control over whether existing filters may be overridden. Both are backward compatible — no breaking changes.
+
+### Added
+
+- **`Builder::fromArray()` — rebuild a filter Builder from an array.** The inverse of `toArray()`: it reconstructs a `Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder` from the operator-array shape (`[['type' => '$eq', 'target' => …, 'value' => …], …]`), so a filter set that arrives over HTTP can be turned straight back into a Builder. Validation is strict — it throws the new `Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterArrayNotValid` on a missing key, an unknown operator, or a value whose type does not match the operator. Carry the payload as JSON rather than bracket-notation query parameters: query-string values are always strings, which the numeric (`$gt`, `$gte`, `$lt`, `$lte`) and `$null` operators reject. See the new [Filtering](README.md#filtering) section for the request example.
+  
+- **`Builder::merge()` — combine two filter sets with override control.** Merges another Builder into this one and returns a **new** Builder, mutating neither operand. Behaviour is governed by the new `Lava83\LaravelDdd\Infrastructure\Models\Filter\Enums\MergeStrategy` enum:
+  
+  - `MergeStrategy::KeepExisting` (default) — appends the incoming filters and never removes an existing one, so default filters (e.g. tenant scoping) always survive.
+  - `MergeStrategy::Override` — lets an incoming filter replace existing filters that match on **both** target and operator (type).
+  
+  This makes it safe to layer request-supplied filters on top of protected defaults: an existing filter can only be replaced when `Override` is passed explicitly.
+  
+
+```php
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Enums\MergeStrategy;
+
+$defaults = Builder::make()->eq('tenant_id', $tenantId);
+$incoming = Builder::fromArray($decodedRequestFilters);
+
+// Default: the tenant scope is preserved, incoming filters are appended.
+$filters = $defaults->merge($incoming);
+
+// Opt in to replacement — only for trusted filter sources.
+$filters = $defaults->merge($incoming, MergeStrategy::Override);
+
+```
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.13...v0.5.14
+
 ## v0.5.13 - 2026-08-03
 
 ### v0.5.13
@@ -36,6 +68,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 ```
 #### Added
