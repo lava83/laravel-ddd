@@ -28,7 +28,7 @@ class LaravelDddServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package->name('laravel-ddd')
-            ->hasConfigFile()
+            ->hasConfigFile('laravel-ddd')
             ->hasConsoleCommands(
                 Commands\MakeAggregateCommand::class,
             );

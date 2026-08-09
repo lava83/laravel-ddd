@@ -20,7 +20,7 @@ It enforces a strict layer separation (`Domain`, `Application`, `Infrastructure`
 composer require lava83/laravel-ddd
 ```
 
-The service provider and the `LaravelDdd` facade are registered automatically through Laravel package discovery. There is no configuration or migration to publish — you build your own domains on top of the provided base classes, as shown below.
+The service provider and the `LaravelDdd` facade are registered automatically through Laravel package discovery. There are no migrations to publish, and no configuration is required — you build your own domains on top of the provided base classes, as shown below. An optional config file tunes the `make:aggregate` scaffolder (see [Scaffolding](#scaffolding)).
 
 ## Quick start
 
@@ -447,6 +447,76 @@ $repository->save($article);
 $loaded = $repository->findOrFail($article->id());
 $loaded->rename(Title::fromString('Hello, Domain-Driven Design'));
 $repository->save($loaded); // version is bumped; optimistic locking guards concurrent writes
+```
+
+## Scaffolding
+
+Rather than writing every class by hand (as the [Quick start](#quick-start) does), `make:aggregate` generates the building blocks for an aggregate in a bounded context: the identity value object, the aggregate root and the Eloquent model, and — optionally — a repository (contract plus Eloquent implementation) and an entity mapper.
+
+Run it interactively and answer the prompts (aggregate name, bounded context, identity type, and whether to also create a repository and a mapper):
+
+```bash
+php artisan make:aggregate
+```
+
+Or pass everything up front:
+
+```bash
+php artisan make:aggregate Order OrderProcessing --with-repository --with-entity-mapper --id-type=uuid
+```
+
+### Options
+
+- `name` — the aggregate name (e.g. `Order`); prompted when omitted.
+- `bounded-context` — the context it lives in (e.g. `OrderProcessing`); prompted when omitted.
+- `--with-repository` — also generate the repository contract and its Eloquent implementation.
+- `--with-entity-mapper` — also generate the entity mapper.
+- `--id-type=` — identity type, `uuid` (default) or `integer`.
+- `--force` — overwrite existing files instead of skipping them.
+
+In non-interactive contexts (e.g. CI) the prompts are skipped: arguments and options drive everything, the identity type defaults to `uuid`, and the repository and mapper are generated only when their flags are present.
+
+### What it generates
+
+Always:
+
+- **`{Name}Id`** — identity value object extending the package `Uuid` or `Integer` base.
+- **`{Name}`** — the aggregate root, typed `Aggregate<{Name}Model, {Name}Id>`, with `create()` / `fromState()` factory methods and a `validate()` hook.
+- **`{Name}Model`** — an Eloquent model extending the package `Model`, with a `#[Table]` attribute derived from the snake-cased plural name (and the `HasUuids` concern for UUID identities).
+
+On request:
+
+- `--with-repository` → **`{Name}RepositoryContract`** (`findAll`, `findOrFail`, `save`, `remove`) and **`Eloquent{Name}Repository`**.
+- `--with-entity-mapper` → **`{Name}Mapper`** with `toEntity()` / `toModel()`.
+
+The generated files are skeletons: the model and mapper carry a `name` placeholder column, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to complete. Existing files are reported as `SKIPPED (exists)` and left untouched unless you pass `--force`. After writing, the command prints the service-provider bindings to register — the mapper via `entity_mapper_resolver()->registerMapper(...)` and the repository via `$this->app->bind(...)` — and warns if the target root namespace isn't autoloaded yet.
+
+### Namespaces
+
+Two keys in `config/laravel-ddd.php` decide where the classes land:
+
+- `bounded_contexts_root_namespace` — root namespace for generated code (default `App\BoundedContexts`).
+- `bounded_contexts_without_own_layers` — whether bounded contexts share the layer namespaces (default `true`).
+
+With the defaults, `make:aggregate Order OrderProcessing --with-repository --with-entity-mapper` writes:
+
+```
+App\BoundedContexts\Domain\OrderProcessing\Aggregates\Order
+App\BoundedContexts\Domain\OrderProcessing\ValueObjects\Identity\OrderId
+App\BoundedContexts\Domain\OrderProcessing\Contracts\OrderRepositoryContract
+App\BoundedContexts\Infrastructure\OrderProcessing\Models\OrderModel
+App\BoundedContexts\Infrastructure\OrderProcessing\Mappers\OrderMapper
+App\BoundedContexts\Infrastructure\OrderProcessing\Repositories\EloquentOrderRepository
+```
+
+Set `bounded_contexts_without_own_layers` to `false` and each context owns its layers instead — the context and layer segments swap, e.g. `App\BoundedContexts\OrderProcessing\Domain\Aggregates\Order`.
+
+Target paths are resolved from your `composer.json` PSR-4 map; if the root namespace isn't mapped yet, the command prints the `autoload` entry to add and reminds you to run `composer dump-autoload`.
+
+Publish the config to change these defaults:
+
+```bash
+php artisan vendor:publish --tag=ddd-config
 ```
 
 ## What else is in the box
