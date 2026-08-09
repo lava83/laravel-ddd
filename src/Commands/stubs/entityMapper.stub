@@ -1,0 +1,42 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ entityMapperNamespace }};
+
+use Illuminate\Database\Eloquent\Model;
+use Lava83\LaravelDdd\Domain\Entities\Entity;
+use Lava83\LaravelDdd\Infrastructure\Mappers\EntityMapper;
+use {{ aggregateAggregateNamespace }}\{{ aggregateName }};
+use {{ aggregateModelNamespace }}\{{ aggregateModelName }};
+
+/**
+ * @extends EntityMapper<{{ aggregateName }}, {{ aggregateModelName }}>
+ */
+class {{ entityMapperName }} extends EntityMapper
+{
+    protected static ?string $modelClass = {{ aggregateModelName }}::class;
+
+    /**
+     * @param  {{ aggregateModelName }}  $model
+     */
+    public static function toEntity(Model $model, bool $deep = false): {{ aggregateName }}
+    {
+        return {{ aggregateName }}::fromState($model);
+    }
+
+    /**
+     * @param  {{ aggregateName }}  $entity
+     */
+    public static function toModel(Entity $entity): {{ aggregateModelName }}
+    {
+        $data = [
+            // map the aggregate's value objects to model columns, e.g. 'name' => (string) $entity->name(),
+        ];
+
+        /** @var {{ aggregateModelName }} $model */
+        $model = self::findOrCreateModelFillData($entity, $data);
+
+        return $model;
+    }
+}

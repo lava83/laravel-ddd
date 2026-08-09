@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ aggregateRepositoryNamespace }};
+
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Lava83\LaravelDdd\Infrastructure\Repositories\Repository;
+use {{ aggregateAggregateNamespace }}\{{ aggregateName }};
+use {{ aggregateContractsNamespace }}\{{ aggregateRepositoryContractName }};
+use {{ aggregateModelNamespace }}\{{ aggregateModelName }};
+
+/**
+ * @extends Repository<{{ aggregateModelName }}, {{ aggregateName }}>
+ */
+class {{ aggregateEloquentRepositoryName }} extends Repository implements {{ aggregateRepositoryContractName }}
+{
+    protected ?string $entityClassName = {{ aggregateName }}::class;
+
+    /**
+     * @return Collection<int, {{ aggregateName }}>
+     */
+    public function findAll(): Collection
+    {
+        return {{ aggregateModelName }}::query()
+            ->get()
+            ->map(fn ({{ aggregateModelName }} $model): {{ aggregateName }} => $model->toEntity());
+    }
+
+    public function findOrFail(mixed $aggregateId): {{ aggregateName }}
+    {
+        /** @var {{ aggregateModelName }} $model */
+        $model = {{ aggregateModelName }}::query()->findOrFail($aggregateId);
+
+        return $model->toEntity();
+    }
+
+    public function save({{ aggregateName }} $aggregate): void
+    {
+        DB::connection(app({{ aggregateModelName }}::class)->getConnectionName())
+            ->transaction(fn () => $this->saveEntity($aggregate));
+    }
+
+    public function remove({{ aggregateName }} $aggregate): void
+    {
+        DB::connection(app({{ aggregateModelName }}::class)->getConnectionName())
+            ->transaction(fn () => $this->deleteEntity($aggregate));
+    }
+}

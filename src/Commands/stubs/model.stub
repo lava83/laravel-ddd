@@ -1,0 +1,20 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ aggregateModelNamespace }};
+
+use {{ aggregateAggregateNamespace }}\{{ aggregateName }};
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
+{{ modelImports }}use Lava83\LaravelDdd\Infrastructure\Models\Model;
+
+/**
+ * @extends Model<{{ aggregateName }}>
+ */
+#[Table('{{ aggregateModelTable }}')]
+#[Fillable('name')]
+class {{ aggregateModelName }} extends Model
+{
+{{ modelTraits }}    protected ?string $entityClassName = {{ aggregateName }}::class;
+}

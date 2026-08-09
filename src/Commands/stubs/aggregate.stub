@@ -1,0 +1,60 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ aggregateNamespace }};
+
+use Illuminate\Database\Eloquent\Model;
+use Lava83\LaravelDdd\Domain\Entities\Aggregate;
+use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
+use {{ aggregateVosNamespace }}\{{ aggregateIdName }};
+use {{ aggregateModelNamespace }}\{{ aggregateModelName }};
+
+/**
+ * @extends Aggregate<{{ aggregateModelName }}, {{ aggregateIdName }}>
+ */
+final class {{ aggregateName }} extends Aggregate
+{
+    public function __construct(
+        protected {{ aggregateIdReadonly }}{{ aggregateIdName }} $id,
+    ) {
+        parent::__construct();
+    }
+
+    // region factory methods
+    public static function fromState(Model $state): static
+    {
+        $aggregate = new {{ aggregateName }}(
+            id: {{ aggregateIdFromState }},
+        );
+
+        $aggregate->hydrate($state);
+
+        return $aggregate;
+    }
+
+    public static function create(): self
+    {
+        return new {{ aggregateName }}(
+            id: {{ aggregateIdNew }},
+        );
+    }
+    // endregion
+
+    // region getters
+    public function id(): {{ aggregateIdName }}
+    {
+        return $this->id;
+    }
+    // endregion
+
+    // region validation
+    /**
+     * @return array<string>
+     */
+    public function validate(): array
+    {
+        return parent::validate();
+    }
+    // endregion
+}

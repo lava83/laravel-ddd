@@ -1,0 +1,22 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ aggregateContractsNamespace }};
+
+use Illuminate\Support\Collection;
+use {{ aggregateAggregateNamespace }}\{{ aggregateName }};
+
+interface {{ aggregateRepositoryContractName }}
+{
+    /**
+     * @return Collection<int, {{ aggregateName }}>
+     */
+    public function findAll(): Collection;
+
+    public function findOrFail(mixed $aggregateId): {{ aggregateName }};
+
+    public function save({{ aggregateName }} $aggregate): void;
+
+    public function remove({{ aggregateName }} $aggregate): void;
+}

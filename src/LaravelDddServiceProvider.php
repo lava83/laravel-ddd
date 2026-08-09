@@ -27,7 +27,11 @@ class LaravelDddServiceProvider extends PackageServiceProvider
          *
          * More info: https://github.com/spatie/laravel-package-tools
          */
-        $package->name('laravel-ddd');
+        $package->name('laravel-ddd')
+            ->hasConfigFile()
+            ->hasConsoleCommands(
+                Commands\MakeAggregateCommand::class,
+            );
     }
 
     private function bindSingletons(): void
