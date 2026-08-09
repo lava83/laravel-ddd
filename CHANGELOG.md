@@ -2,6 +2,59 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.6.0 - 2026-08-09
+
+### v0.6.0 - 2026-08-09
+
+A new `make:aggregate` Artisan command scaffolds the core DDD building blocks for a bounded context in one step — the aggregate root, its identity Value Object, and an Eloquent model — with optional repository and entity-mapper generation. The package now also ships a publishable config file that controls the root namespace and how bounded contexts map onto the layer namespaces.
+
+#### Added
+
+- **`make:aggregate` — scaffold an aggregate and its supporting classes.** Given an aggregate name and a bounded context, the command always generates three files and can generate three more on request:
+  
+  Always:
+  
+  - the **identity Value Object** `{Name}Id` (in `Domain\…\ValueObjects\Identity`), extending the package's `Uuid` or `Integer` base;
+  - the **aggregate root** `{Name}` (in `Domain\…\Aggregates`), typed `@extends Aggregate<{Name}Model, {Name}Id>`, with `create()` / `fromState()` factory methods and a `validate()` hook;
+  - the **Eloquent model** `{Name}Model` (in `Infrastructure\…\Models`), extending `Lava83\LaravelDdd\Infrastructure\Models\Model`, with a `#[Table]` attribute derived from the snake-cased plural name and a `#[Fillable('name')]` placeholder.
+  
+  Optional:
+  
+  - `--with-repository` adds the **repository contract** `{Name}RepositoryContract` (`findAll`, `findOrFail`, `save`, `remove`) and the **Eloquent implementation** `Eloquent{Name}Repository`, with `save`/`remove` wrapped in a connection-aware transaction;
+  - `--with-entity-mapper` adds the **entity mapper** `{Name}Mapper` (`@extends EntityMapper<{Name}, {Name}Model>`) with `toEntity()` / `toModel()` stubs to fill in.
+  
+- **Choice of identity type — UUID v7 or auto-increment integer.** Pass `--id-type=uuid` (default) or `--id-type=integer`, or pick from the prompt. UUID identities generate a `readonly` id via `{Name}Id::generate()` and add the `HasUuids` trait to the model; integer identities use `{Name}Id::new()`. An invalid `--id-type` fails the command with a clear message.
+  
+- **Interactive prompts with non-interactive fallback.** Run it bare and it prompts for the aggregate name, bounded context, id type, and whether to also create a repository and mapper (both default to yes). In non-interactive contexts (e.g. CI) it takes everything from arguments and options, defaults the id type to `uuid`, and only scaffolds the repository/mapper when their flags are present.
+  
+- **Layer-aware namespacing, driven by config.** Namespaces are built from the new `bounded_contexts_root_namespace` and honour `bounded_contexts_without_own_layers`:
+  
+  - `true` (default) — shared layers: `{Root}\{Layer}\{BoundedContext}\{Sub}`
+  - `false` — each context owns its layers: `{Root}\{BoundedContext}\{Layer}\{Sub}`
+  
+  Target file paths are resolved from your `composer.json` PSR-4 map (longest-prefix match across `autoload` and `autoload-dev`), falling back to a top-level directory named after the root namespace.
+  
+- **Publishable config file `config/laravel-ddd.php`.** The service provider now registers the config file and the command. Two keys, both env-overridable:
+  
+  - `bounded_contexts_root_namespace` — default `App\BoundedContexts` (env `BOUNDED_CONTEXTS_ROOT_NAMESPACE`)
+  - `bounded_contexts_without_own_layers` — default `true` (env `BOUNDED_CONTEXTS_WITHOUT_OWN_LAYERS`)
+  
+- **Safe writes and next-step guidance.** Existing files are reported as `SKIPPED (exists)` and left untouched unless you pass `--force`; each written file is listed as `CREATED`. After scaffolding, the command warns if the root namespace isn't autoloaded yet (with the PSR-4 snippet and `composer dump-autoload` to run) and prints the service-provider bindings to register — the mapper via `entity_mapper_resolver()->registerMapper(...)` and the repository via `$this->app->bind(Contract::class, Implementation::class)`.
+  
+
+```bash
+# Interactive — prompts for everything
+php artisan make:aggregate
+
+# Fully specified
+php artisan make:aggregate Order OrderProcessing \
+    --with-repository --with-entity-mapper --id-type=uuid
+
+```
+The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.14...v0.6.0
+
 ## v0.5.14 - 2026-08-05
 
 The Eloquent filter `Builder` gains two additions: reconstruct a filter set from a plain array (e.g. an HTTP request payload), and merge two filter sets with explicit control over whether existing filters may be overridden. Both are backward compatible — no breaking changes.
@@ -30,6 +83,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 ```
 **Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.13...v0.5.14
@@ -68,6 +122,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 ```
