@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.6.2 - 2026-08-12
+
+### What's Changed
+
+* Adds ReadModel and JsonResource for 201 responses by @lava83 in https://github.com/lava83/laravel-ddd/pull/27
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.6.0...v0.6.2
+
 ## v0.6.1 - 2026-08-10
 
 **Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.5.14...v0.6.1
@@ -55,6 +63,7 @@ php artisan make:aggregate Order OrderProcessing \
     --with-repository --with-entity-mapper --id-type=uuid
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -88,6 +97,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -128,6 +138,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 
