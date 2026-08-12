@@ -55,7 +55,7 @@
         "deptrac": "vendor/bin/deptrac analyse",
         "format": "vendor/bin/pint",
         "format-check": "vendor/bin/pint --test",
-        "test": "vendor/bin/pest",
+        "test": "vendor/bin/pest --tia --parallel --stop-on-failure --stop-on-error --stop-on-defect",
         "test-coverage": "vendor/bin/pest --coverage --coverage-html=storage/coverage",
         "lint": [
             "@format",
