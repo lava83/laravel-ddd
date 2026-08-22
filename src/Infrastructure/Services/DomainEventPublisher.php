@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Infrastructure\Services;
 
-use Illuminate\Events\Dispatcher;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Contracts\DomainEvent;
 

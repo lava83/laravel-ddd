@@ -8,7 +8,6 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Container\CircularDependencyException;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Entities\Aggregate;
-use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Integer;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapperResolverContract;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantDeleteModel;
@@ -26,8 +25,6 @@ use ReflectionException;
  */
 abstract class Repository
 {
-    const int DEFAULT_VERSION = 1;
-
     /**
      * @var class-string<TAggregate>|null
      */
@@ -71,8 +68,6 @@ abstract class Repository
         if ($aggregate->isDirty() || $model->exists === false) {
             $this->persistDirtyEntity($aggregate, $model);
         }
-
-        $this->syncEntityFromModel($aggregate, $model);
 
         return $model;
     }
@@ -149,29 +144,37 @@ abstract class Repository
     /**
      * @param  TAggregate  $aggregate
      * @param  TModel  $model
+     *
+     * @throws ReflectionException
      */
-    protected function handleOptimisticLocking(Aggregate $aggregate, Model $model): void
+    protected function syncEntityFromModel(Aggregate $aggregate, Model $model): void
     {
-        $expectedDatabaseVersion = $aggregate->version();
-        $modelVersion = $model->getAttribute('version') ?? self::DEFAULT_VERSION;
-
-        if ((int) $modelVersion !== (int) $expectedDatabaseVersion) {
-            throw new ConcurrencyException(sprintf(
-                'Entity %s was modified by another process. Expected version: %d, Actual version: %d',
-                $aggregate->id()->value(),
-                $expectedDatabaseVersion,
-                $modelVersion,
-            ));
-        }
+        $aggregate->hydrate($model);
     }
 
     /**
      * @param  TAggregate  $aggregate
      * @param  TModel  $model
      */
-    protected function syncEntityFromModel(Aggregate $aggregate, Model $model): void
+    protected function updateWithVersionGuard(Aggregate $aggregate, Model $model): void
     {
-        $aggregate->hydrate($model);
+        $base = $aggregate->persistedVersion();
+        $model->setAttribute('version', $base + 1);
+
+        $affected = $model->newQuery()
+            ->whereKey($model->getKey())
+            ->where('version', $base)
+            ->update($model->getDirty());
+
+        if ($affected !== 1) {
+            throw new ConcurrencyException(sprintf(
+                'Entity %s was modified by another process. Expected version %d.',
+                $aggregate->id()->value(),
+                $base,
+            ));
+        }
+
+        $model->syncOriginal();
     }
 
     /**
@@ -184,16 +187,31 @@ abstract class Repository
         Aggregate $aggregate,
         Model $model,
     ): void {
-        $this->handleOptimisticLocking($aggregate, $model);
+        if ($model->exists) {
+            $this->updateWithVersionGuard($aggregate, $model);
+        } else {
+            $this->handleAutoIncrementFields($model);
 
-        if (! $model->save()) {
-            throw new CantSaveModel('Failed to save entity');
+            if (! $model->save()) {
+                throw new CantSaveModel('Failed to save entity');
+            }
         }
 
-        if ($aggregate->id() instanceof Integer) {
-            $aggregate->idFromPersistence($aggregate->id()::fromValue($model->getKey()));
-        }
-
+        $this->syncEntityFromModel($aggregate, $model);
         $this->dispatchUncommittedEvents($aggregate);
+    }
+
+    /**
+     * @param  TModel  $model
+     */
+    private function handleAutoIncrementFields(
+        Model $model,
+    ): void {
+        if (
+            $model->getKeyType() === 'int'
+            && $model->exists === false
+        ) {
+            $model->setAttribute($model->getKeyName(), null);
+        }
     }
 }

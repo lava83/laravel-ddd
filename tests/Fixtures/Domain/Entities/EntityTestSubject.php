@@ -21,7 +21,7 @@ use Lava83\LaravelDdd\Infrastructure\Models\Model;
 final class EntityTestSubject extends Entity
 {
     public function __construct(
-        private readonly EntityTestId $id,
+        private EntityTestId $id,
         protected string $name,
     ) {
         parent::__construct();

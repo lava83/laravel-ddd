@@ -33,6 +33,8 @@ use Stringable;
  */
 abstract class Entity implements Stringable
 {
+    private const int DEFAULT_VERSION = 1;
+
     /** @var Collection<string, EntityPropertyValue> */
     protected Collection $dirty;
 
@@ -42,7 +44,8 @@ abstract class Entity implements Stringable
     public function __construct(
         protected CarbonImmutable $createdAt = new CarbonImmutable,
         protected ?CarbonImmutable $updatedAt = null,
-        protected int $version = 1,
+        protected int $version = self::DEFAULT_VERSION,
+        protected int $persistedVersion = self::DEFAULT_VERSION,
     ) {
         if ($this->isValid() === false) {
             throw ValidationException::fromArray($this->validate());
@@ -121,11 +124,24 @@ abstract class Entity implements Stringable
         return $this->version;
     }
 
+    public function persistedVersion(): int
+    {
+        return $this->persistedVersion;
+    }
+
     /**
      * @param  TModel  $model
+     *
+     * @throws ReflectionException
      */
     public function hydrate(Model $model): void
     {
+        if ($model->getKeyType() === 'int') {
+            $this->idFromPersistence($this->id()::fromValue((int) $model->getKey()));
+        } else {
+            $this->idFromPersistence($this->id()::fromString((string) $model->getKey()));
+        }
+
         if ($model->hasAttribute('created_at')) {
             /**
              * @var Carbon $createdAtOnModel
@@ -147,6 +163,7 @@ abstract class Entity implements Stringable
         if ($model->hasAttribute('version')) {
             $versionOnModel = (int) $model->getAttribute('version');
             $this->version = $versionOnModel;
+            $this->persistedVersion = $versionOnModel;
         }
     }
 
@@ -379,7 +396,7 @@ abstract class Entity implements Stringable
      */
     protected function applyChanges(Collection $changes, array $customSetters = []): void
     {
-        $excludedProperties = ['version', 'createdAt', 'updatedAt', 'domainEvents'];
+        $excludedProperties = ['version', 'createdAt', 'updatedAt', 'domainEvents', 'persistedVersion'];
 
         $reflectionClass = $this->reflectionClass();
 
