@@ -23,7 +23,7 @@ abstract class EntityMapper implements EntityMapperContract
 
     /**
      * @param  TEntity  $entity
-     * @param  array<string, string>  $data
+     * @param  array<string, mixed>  $data
      * @return TModel
      */
     protected static function findOrCreateModelFillData(
