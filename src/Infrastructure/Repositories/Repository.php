@@ -211,7 +211,10 @@ abstract class Repository
             $model->getKeyType() === 'int'
             && $model->exists === false
         ) {
-            $model->setAttribute($model->getKeyName(), null);
+            $model->setAttribute(
+                $model->getKeyName(),
+                (int) $model->newQuery()->max($model->getKeyName()) + 1,
+            );
         }
     }
 }
