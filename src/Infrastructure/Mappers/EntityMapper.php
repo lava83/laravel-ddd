@@ -55,7 +55,7 @@ abstract class EntityMapper implements EntityMapperContract
             ->newQuery()
             ->findOr($entity->id(), ['*'], fn () => app(static::$modelClass));
 
-        return $model;
+        return $model->refreshForUpdate();
     }
 
     protected static function ensureModelClassIsDefined(): void
