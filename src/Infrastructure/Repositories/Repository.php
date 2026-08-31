@@ -61,9 +61,7 @@ abstract class Repository
      */
     protected function saveEntity(Aggregate $aggregate): Model
     {
-        $model = $this
-            ->entityMapper()
-            ->toModel($aggregate);
+        $model = $this->makeModel($aggregate);
 
         if ($aggregate->isDirty() || $model->exists === false) {
             $this->persistDirtyEntity($aggregate, $model);
@@ -81,9 +79,7 @@ abstract class Repository
      */
     protected function deleteEntity(Aggregate $aggregate): void
     {
-        $model = $this
-            ->entityMapper()
-            ->toModel($aggregate);
+        $model = $this->makeModel($aggregate);
 
         if (! $model->delete()) {
             throw new CantDeleteModel('Failed to delete entity');
@@ -113,7 +109,7 @@ abstract class Repository
      */
     protected function deleteRelatedEntity(Aggregate $aggregate, string $relation, int|string $relatedId): void
     {
-        $model = $this->entityMapper()->toModel($aggregate);
+        $model = $this->makeModel($aggregate);
 
         $related = $model->$relation()->find($relatedId);
 
@@ -199,6 +195,19 @@ abstract class Repository
 
         $this->syncEntityFromModel($aggregate, $model);
         $this->dispatchUncommittedEvents($aggregate);
+    }
+
+    /**
+     * @param  TAggregate  $aggregate
+     * @return TModel
+     *
+     * @throws BindingResolutionException
+     * @throws CircularDependencyException
+     * @throws EntityClassNotAvailable
+     */
+    protected function makeModel(Aggregate $aggregate): Model
+    {
+        return $this->entityMapper()->toModel($aggregate);
     }
 
     /**
