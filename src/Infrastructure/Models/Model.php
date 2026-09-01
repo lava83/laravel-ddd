@@ -9,7 +9,9 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Container\CircularDependencyException;
 use Illuminate\Database\Eloquent\Model as EloquentModel;
 use Illuminate\Support\Carbon;
+use IndexZer0\EloquentFiltering\Contracts\IsFilterable;
 use IndexZer0\EloquentFiltering\Filter\Contracts\AllowedFilterList;
+use IndexZer0\EloquentFiltering\Filter\Filterable\Filter;
 use IndexZer0\EloquentFiltering\Filter\Traits\Filterable;
 use Lava83\LaravelDdd\Domain\Entities\Entity;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapper;
@@ -25,7 +27,7 @@ use Lava83\LaravelDdd\Infrastructure\Models\Exceptions\EntityClassNotAvailable;
  *
  * @method static findOr($id, $columns = ['*'], Closure $callback = null)
  */
-abstract class Model extends EloquentModel
+abstract class Model extends EloquentModel implements IsFilterable
 {
     use Filterable;
 
@@ -34,9 +36,9 @@ abstract class Model extends EloquentModel
      */
     protected ?string $entityClassName = null;
 
-    public function allowedFilters(): ?AllowedFilterList
+    public function allowedFilters(): AllowedFilterList
     {
-        return null;
+        return Filter::none();
     }
 
     public function getFillable(): array
