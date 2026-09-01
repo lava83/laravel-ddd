@@ -36,7 +36,23 @@ abstract class EntityMapper implements EntityMapperContract
 
         $model->fill(self::mergeWithDefaultData($entity, $data));
 
+        self::incrementIntegerPrimaryKey($model);
+
         return $model;
+    }
+
+    /**
+     * @param  TModel  $model
+     */
+    protected static function incrementIntegerPrimaryKey(Model $model): void
+    {
+        if (
+            $model->exists === false
+            && $model->getIncrementing()
+            && $model->getKeyType() === 'int'
+        ) {
+            $model->setAttribute($model->getKeyName(), null);
+        }
     }
 
     /**
@@ -67,16 +83,16 @@ abstract class EntityMapper implements EntityMapperContract
 
     /**
      * @param  TEntity  $entity
-     * @param  array<string, string>  $data
-     * @return array<string, string>
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
      */
     private static function mergeWithDefaultData(Entity $entity, array $data): array
     {
         return array_merge([
             app(static::$modelClass)->getKeyName() => (string) $entity->id(),
-            'version' => (string) $entity->version(),
-            'created_at' => (string) $entity->createdAt(),
-            'updated_at' => (string) $entity->updatedAt(),
+            'version' => $entity->version(),
+            'created_at' => $entity->createdAt(),
+            'updated_at' => $entity->updatedAt(),
         ], $data);
     }
 }

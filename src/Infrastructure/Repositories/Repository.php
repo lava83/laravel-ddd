@@ -186,8 +186,6 @@ abstract class Repository
         if ($model->exists) {
             $this->updateWithVersionGuard($aggregate, $model);
         } else {
-            $this->handleAutoIncrementFields($model);
-
             if (! $model->save()) {
                 throw new CantSaveModel('Failed to save entity');
             }
@@ -208,22 +206,5 @@ abstract class Repository
     protected function makeModel(Aggregate $aggregate): Model
     {
         return $this->entityMapper()->toModel($aggregate);
-    }
-
-    /**
-     * @param  TModel  $model
-     */
-    private function handleAutoIncrementFields(
-        Model $model,
-    ): void {
-        if (
-            $model->getKeyType() === 'int'
-            && $model->exists === false
-        ) {
-            $model->setAttribute(
-                $model->getKeyName(),
-                (int) $model->newQuery()->max($model->getKeyName()) + 1,
-            );
-        }
     }
 }
