@@ -71,11 +71,14 @@ describe('EntityMapper::toModel()', function (): void {
     });
 
     describe('auto-incrementing integer key', function (): void {
-        it('nulls the Integer::new() placeholder on a fresh entity so the database owns the key', function (): void {
+        it('removes the placeholder key so every driver assigns it (pgsql omits the column)', function (): void {
             $model = CounterTestMapper::toModel(CounterTestSubject::create('one'));
 
+            // The key must be absent from the attribute bag, not present-and-null:
+            // Postgres' serial default only fires when the column is omitted from
+            // the INSERT, whereas an explicit NULL raises a NOT NULL violation.
             expect($model->exists)->toBeFalse()
-                ->and($model->getKey())->toBeNull();
+                ->and($model->getAttributes())->not->toHaveKey($model->getKeyName());
         });
 
         it('lets the database sequence assign keys on save, not a max()+1 read', function (): void {

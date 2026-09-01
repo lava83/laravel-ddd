@@ -36,7 +36,7 @@ abstract class EntityMapper implements EntityMapperContract
 
         $model->fill(self::mergeWithDefaultData($entity, $data));
 
-        self::incrementIntegerPrimaryKey($model);
+        self::releaseAutoIncrementKey($model);
 
         return $model;
     }
@@ -44,14 +44,14 @@ abstract class EntityMapper implements EntityMapperContract
     /**
      * @param  TModel  $model
      */
-    protected static function incrementIntegerPrimaryKey(Model $model): void
+    protected static function releaseAutoIncrementKey(Model $model): void
     {
         if (
             $model->exists === false
             && $model->getIncrementing()
             && $model->getKeyType() === 'int'
         ) {
-            $model->setAttribute($model->getKeyName(), null);
+            $model->offsetUnset($model->getKeyName());
         }
     }
 
