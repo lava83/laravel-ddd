@@ -2,6 +2,10 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.6.9 - 2026-09-01
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.6.8...v0.6.9
+
 ## v0.6.8 - 2026-09-01
 
 **Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.6.7...v0.6.8
@@ -94,6 +98,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -127,6 +132,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -174,6 +180,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 
