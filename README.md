@@ -290,7 +290,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
 
 ### 5. Repository
 
-Keep the contract in the domain layer and the Eloquent implementation in the infrastructure layer. The base `Repository` provides `saveEntity()` / `deleteEntity()`, the optimistic-locking check and automatic domain-event dispatching; you add the read methods your application needs.
+Keep the contract in the domain layer and the Eloquent implementation in the infrastructure layer. The base `Repository` provides `saveEntity()` / `deleteEntity()`, a version-guarded optimistic-locking check, a `syncDependencies()` hook for persisting dependent rows, and automatic domain-event dispatching; you add the read methods your application needs.
 
 ```php
 <?php
@@ -389,6 +389,29 @@ final class EloquentArticleRepository extends Repository implements ArticleRepos
     }
 }
 ```
+
+#### Persisting dependent rows: the `syncDependencies()` hook
+
+`saveEntity()` persists the aggregate's own row, then calls a protected `syncDependencies()` hook, and only **after** that dispatches the aggregate's domain events (which are deferred to the surrounding transaction's commit). Override the hook to persist child rows or pivot records that belong to the same write — they land *before* any event fires, and inside your `DB::transaction()`:
+
+```php
+use Lava83\LaravelDdd\Domain\Entities\Aggregate;
+use Lava83\LaravelDdd\Infrastructure\Models\Model;
+
+// in EloquentArticleRepository
+
+/**
+ * @param  Article       $aggregate
+ * @param  ArticleModel  $model
+ */
+protected function syncDependencies(Aggregate $aggregate, Model $model): void
+{
+    // $model is the row that was just persisted; associate related records to
+    // it here. The aggregate's domain events dispatch only after this returns.
+}
+```
+
+The base implementation is an empty no-op, so repositories with no dependent rows override nothing. Because dispatch is deferred to the transaction commit, the events for the aggregate *and* everything `syncDependencies()` writes are published together once the whole `save()` commits — and dropped together if it rolls back.
 
 ### 6. Wire it up
 
@@ -521,7 +544,7 @@ php artisan vendor:publish --tag=ddd-config
 
 ## What else is in the box
 
-Beyond the slice above, the package provides an `AggregateRoot` contract with domain-event recording: events collected through `updateAggregateRoot($changes, $eventClass)` are dispatched automatically via Laravel's event system after a successful `save()`, then cleared from the aggregate. Every aggregate carries a `version` for optimistic locking and raises a `ConcurrencyException` on conflicting writes. You also get a growing catalogue of ready-made value objects — `Uuid`, `Email`, `Phonenumber`, `Money`, `Link`, `Json`, `GeoAddress` and more — plus a fluent Eloquent filtering layer on the base `Model` (see [Filtering](#filtering)).
+Beyond the slice above, the package provides an `AggregateRoot` contract with domain-event recording: events collected through `updateAggregateRoot($changes, $eventClass)` are dispatched automatically via Laravel's event system once the surrounding transaction commits — deferred with `DB::afterCommit()` — then cleared from the aggregate. Every aggregate carries a `version` for optimistic locking and raises a `ConcurrencyException` on conflicting writes. You also get a growing catalogue of ready-made value objects — `Uuid`, `Email`, `Phonenumber`, `Money`, `Link`, `Json`, `GeoAddress` and more — plus a fluent Eloquent filtering layer on the base `Model` (see [Filtering](#filtering)).
 
 ## Filtering
 

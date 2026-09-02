@@ -136,9 +136,10 @@ An unregistered entity class throws `Mappers\Exceptions\NoMapperFoundForEntity` 
 
 The base gives you protected building blocks; the public read/write surface is yours:
 
-- `saveEntity(Aggregate): Model` — maps to a model, persists **only if the aggregate is dirty or the row is new**, then re-hydrates the aggregate from the model
+- `saveEntity(Aggregate): Model` — maps to a model, persists **only if the aggregate is dirty or the row is new**, re-hydrates the aggregate, then runs the `syncDependencies()` hook, and finally dispatches the aggregate's uncommitted events
+- `syncDependencies(Aggregate, Model)` — **no-op extension hook** run inside `saveEntity()` after the row is persisted and *before* events dispatch; override it to persist dependent rows (child records, pivot rows) that belong to the same write. See the Rules below.
 - `deleteEntity(Aggregate)`, `deleteEntities(Collection)`, `deleteRelatedEntity(Aggregate, string $relation, int|string $relatedId)`
-- `handleOptimisticLocking(Aggregate, Model)`, `dispatchUncommittedEvents(Aggregate)`, `syncEntityFromModel(Aggregate, Model)`
+- `updateWithVersionGuard(Aggregate, Model)`, `dispatchUncommittedEvents(Aggregate)`, `syncEntityFromModel(Aggregate, Model)`, `makeModel(Aggregate): Model`
 - `entityMapper(): EntityMapper`
 
 ```php
@@ -185,25 +186,27 @@ final class EloquentArticleRepository extends Repository implements ArticleRepos
 
 Rules:
 
-- Wrap every write in `DB::transaction()`. The base class does not open one.
-- Sync many-to-many relations **after** `saveEntity()` returns, inside the same transaction, using the returned model.
+- Wrap every write in `DB::transaction()`. The base class does not open one — and event dispatch is now deferred to that transaction's commit (see Domain events), so the wrapper is what buys correct ordering and rollback safety, not just atomicity.
+- Sync dependent rows (child records, pivot rows) by **overriding `syncDependencies(Aggregate, Model)`**, not after `saveEntity()` returns. The hook runs inside `saveEntity()` after the aggregate's own row is persisted and before its events dispatch, so relations are in place before any listener sees the event. The `$model` argument is the just-persisted row — associate related records to it.
 - Bind the domain contract to the Eloquent implementation in a service provider.
 
 ## Domain events
 
-`saveEntity()` → `persistDirtyEntity()` → `dispatchUncommittedEvents()`, which hands `uncommittedEvents()` to `Services\DomainEventPublisher` and then marks them committed. The publisher pushes each event through Laravel's `Illuminate\Events\Dispatcher`, so domain events are ordinary Laravel events — listeners subscribe to the event class.
+`saveEntity()` runs `syncDependencies()` and then `dispatchUncommittedEvents()`, which hands `uncommittedEvents()` to `Services\DomainEventPublisher` and marks them committed. The publisher wraps each dispatch in `DB::afterCommit()` and pushes it through Laravel's `Illuminate\Events\Dispatcher`, so domain events are ordinary Laravel events — listeners subscribe to the event class.
 
-**Dispatch gate.** `persistDirtyEntity()` is the only dispatcher on the save path, and `saveEntity()` calls it only when `$aggregate->isDirty() || $model->exists === false`. An event recorded via `recordEvent()` without a tracked property change, on a row that already exists, is silently never published — and `saveEntity()` still returns normally, so the call looks successful. Record events through `updateAggregateRoot()`, or assert dispatch explicitly.
+**Dispatch is unconditional on the save path.** `dispatchUncommittedEvents()` is called on every `saveEntity()`, independent of the persist gate; it only no-ops when the aggregate has no uncommitted events. An event recorded without a tracked property change on an existing row is therefore still published — the earlier dirty-gated "silently dropped" behaviour is gone. Record state changes through `updateAggregateRoot()` for the version bump; a bare `recordEvent()` now dispatches too.
 
-Events also fire from `deleteEntity()` and `deleteRelatedEntity()`. In all cases dispatch happens inside your transaction, so a later rollback cannot unsend them — keep listeners idempotent or queue them.
+**Dispatch is deferred to the transaction commit.** Because the publisher uses `DB::afterCommit()`, events fire only when the outermost transaction commits — after `syncDependencies()` and after every dependent write. A rollback drops them; they are never sent for work that was undone. With **no** open transaction the dispatch runs immediately (the fail-safe), so ordering and rollback-safety hold only when the write is wrapped in `DB::transaction()`. Listeners run *after* commit, i.e. outside the aggregate's transaction — do not rely on a listener writing inside that same transaction.
+
+Events also fire from `deleteEntity()` and `deleteRelatedEntity()`, through the same after-commit publisher.
 
 ## Optimistic locking
 
-`handleOptimisticLocking()` compares `$model->getAttribute('version')` with `$aggregate->version()` and throws `Exceptions\ConcurrencyException` on mismatch. `Entity::touch()` (protected) bumps the entity version on every applied change.
+Updates go through `updateWithVersionGuard()`. It reads the base version from `$aggregate->persistedVersion()` (the version loaded from the row, not the in-memory one), sets the model's `version` to `base + 1`, and issues a guarded write — `UPDATE ... WHERE key = ? AND version = <base>`. When no row matches (`affected !== 1`) another process advanced the row in the meantime, and it throws `Exceptions\ConcurrencyException`.
 
-**As implemented it cannot detect a concurrent write.** `findOrCreateModelFillData()` fills `version` from the aggregate, `version` is fillable, and the comparison runs after that fill — both sides come from the same object, so the check is a tautology. There is no version-guarded `UPDATE ... WHERE version = ?` and no `lockForUpdate()` anywhere in `src/`. Treat the feature as a placeholder, not a guarantee, and don't cite it as working in review.
+**This is real optimistic locking** and is covered by `RepositoryTest` (a stale second writer is rejected; the row is left on the first write). It is *optimistic* only: a version-guarded `UPDATE`, no `lockForUpdate()`.
 
-The inverse trap, if a mapper does *not* fill `version`: an aggregate mutated in memory to version 2 and then inserted as a new row hits the `?? DEFAULT_VERSION` fallback and throws `ConcurrencyException` spuriously.
+Because the guard keys off `persistedVersion()`, several in-memory mutations collapse into a single stored revision: two `updateAggregateRoot()` calls take the entity to in-memory version 3, but the store still moves `1 → 2` with no false conflict, and `syncEntityFromModel()` then re-hydrates the aggregate to the stored `2`. Inserts (`$model->exists === false`) skip the guard and go through `save()`.
 
 ## Exceptions
 

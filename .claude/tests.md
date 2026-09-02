@@ -59,7 +59,7 @@ describe('Uuid', function (): void {
 - **Entity** — invariant violations throw from the constructor, `updateEntity()` bumps version and `updatedAt`, unchanged input produces an empty dirty collection, non-promoted properties are *not* applied
 - **Aggregate** — an event is recorded on state change, `uncommittedEvents()` returns clones, `markEventsAsCommitted()` empties the buffer, clone/serialise drops it
 - **Mapper** — round trip entity → model → entity preserves identity, version and timestamps
-- **Repository** — needs a database (see below)
+- **Repository** — DB-backed; build the schema per test (see below). Cover insert/update/version bump, the persist gate skipping a clean aggregate, optimistic-locking rejection, the `syncDependencies()` hook running before dispatch, and after-commit event dispatch
 
 ## Running
 
@@ -70,10 +70,17 @@ vendor/bin/pest --filter="Uuid"
 composer test-coverage   # writes storage/coverage, untracked and not gitignored
 ```
 
-## Two structural gaps
+## Database-backed tests
 
-**No database.** There is no `database/` directory, and the migration loader in `TestCase::getEnvironmentSetUp()` is commented out. Repository, mapper-round-trip and optimistic-locking tests are not possible until that scaffolding exists — adding it is an architecture decision, so propose it rather than building it.
+There is still no `database/` directory and no migration loader, but DB-backed suites no longer need one: they build their schema per test on the in-memory `testing` connection. `RepositoryTest` is the reference — its `beforeEach()` does `Schema::dropIfExists()` + `Schema::create()` for the fixture tables and registers the mappers, so each test starts from a known schema with no shared state.
 
-**No arch tests.** `pestphp/pest-plugin-arch` is installed with zero `arch()` tests, while the structural rules Mago used to enforce are unenforced. That plugin is the obvious home for them.
+`Entity`, `Aggregate`, `EntityMapper`, `Repository` and `DomainEventPublisher` now have their own suites; the old "the advertised core is untested" caveat no longer holds. Still reason from the code, but check the relevant suite rather than assuming a building block is unexercised.
 
-Coverage today: 20 files, 17 of them Infrastructure filters. `Entity`, `Aggregate`, `Repository`, `EntityMapper`, `EntityMapperResolver`, optimistic locking and event dispatch have no tests at all. A green suite is not evidence that these work.
+### Testing the save-path seams
+
+- **`syncDependencies()` ordering.** Subclass the base `Repository` in a fixture that overrides the hook and records when it fires, register a real listener that records when the event fires, and assert the hook ran first. See `SyncingAggregateTestRepository` and `RepositoryTest`'s `syncDependencies() hook` group.
+- **After-commit dispatch.** Use a *real* dispatcher — **not** `Event::fake()`, which swaps the dispatcher and bypasses `DB::afterCommit()` — and drive it inside a `DB::transaction()`: assert the event has not dispatched *inside* the transaction and *has* after it commits, and assert a thrown exception (rollback) drops it. See `DomainEventPublisherTest`'s `transaction-aware dispatch` group.
+
+## No arch tests
+
+`pestphp/pest-plugin-arch` is installed with zero `arch()` tests, while the structural rules Mago used to enforce are unenforced. That plugin is the obvious home for them.
