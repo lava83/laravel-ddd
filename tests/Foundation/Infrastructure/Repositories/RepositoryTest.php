@@ -21,6 +21,7 @@ use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Mappers\AggregateTestMapper;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Mappers\CounterTestMapper;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Repositories\AggregateTestRepository;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Repositories\CounterTestRepository;
+use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Repositories\SyncingAggregateTestRepository;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Repositories\UnboundAggregateTestRepository;
 
 /**
@@ -236,6 +237,37 @@ describe('domain events', function (): void {
 
         Event::assertNotDispatched(AggregateTestRenamed::class);
         Event::assertNotDispatched(AggregateTestCreated::class);
+    });
+});
+
+describe('syncDependencies() hook', function (): void {
+    it('runs the hook during saveEntity, before domain events dispatch', function (): void {
+        $repository = new SyncingAggregateTestRepository;
+
+        // Real dispatch (no Event::fake) so the listener actually fires and
+        // we can observe ordering relative to the hook.
+        Event::listen(
+            AggregateTestCreated::class,
+            function () use ($repository): void {
+                $repository->log[] = 'event';
+            },
+        );
+
+        $repository->save(AggregateTestSubject::create('Fresh'));
+
+        // Option A's seam: dependencies are synced first, only then are events published.
+        expect($repository->log)->toBe(['synced', 'event']);
+    });
+
+    it('hands the hook the already-persisted model', function (): void {
+        $repository = new SyncingAggregateTestRepository;
+        $aggregate = AggregateTestSubject::create('Fresh');
+
+        $repository->save($aggregate);
+
+        expect($repository->syncedModel)->not->toBeNull()
+            ->and($repository->syncedModel->exists)->toBeTrue()
+            ->and($repository->syncedModel->getKey())->toBe($aggregate->id()->value());
     });
 });
 

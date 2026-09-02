@@ -67,6 +67,9 @@ abstract class Repository
             $this->persistDirtyEntity($aggregate, $model);
         }
 
+        $this->syncDependencies($aggregate, $model);
+        $this->dispatchUncommittedEvents($aggregate);
+
         return $model;
     }
 
@@ -175,11 +178,24 @@ abstract class Repository
 
     /**
      * @param  TAggregate  $aggregate
+     * @return TModel
+     *
+     * @throws BindingResolutionException
+     * @throws CircularDependencyException
+     * @throws EntityClassNotAvailable
+     */
+    protected function makeModel(Aggregate $aggregate): Model
+    {
+        return $this->entityMapper()->toModel($aggregate);
+    }
+
+    /**
+     * @param  TAggregate  $aggregate
      * @param  TModel  $model
      *
      * @throws ReflectionException
      */
-    private function persistDirtyEntity(
+    protected function persistDirtyEntity(
         Aggregate $aggregate,
         Model $model,
     ): void {
@@ -192,19 +208,11 @@ abstract class Repository
         }
 
         $this->syncEntityFromModel($aggregate, $model);
-        $this->dispatchUncommittedEvents($aggregate);
     }
 
     /**
      * @param  TAggregate  $aggregate
-     * @return TModel
-     *
-     * @throws BindingResolutionException
-     * @throws CircularDependencyException
-     * @throws EntityClassNotAvailable
+     * @param  TModel  $model
      */
-    protected function makeModel(Aggregate $aggregate): Model
-    {
-        return $this->entityMapper()->toModel($aggregate);
-    }
+    protected function syncDependencies(Aggregate $aggregate, Model $model): void {}
 }

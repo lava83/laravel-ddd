@@ -6,6 +6,7 @@ namespace Lava83\LaravelDdd\Infrastructure\Services;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Lava83\LaravelDdd\Domain\Contracts\DomainEvent;
 
 final readonly class DomainEventPublisher
@@ -24,6 +25,6 @@ final readonly class DomainEventPublisher
 
     public function publishEvent(DomainEvent $event): void
     {
-        $this->dispatcher->dispatch($event);
+        DB::afterCommit(fn (): ?array => $this->dispatcher->dispatch($event));
     }
 }

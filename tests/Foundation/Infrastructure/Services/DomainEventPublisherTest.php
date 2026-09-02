@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Events\Dispatcher;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Lava83\LaravelDdd\Domain\Contracts\DomainEvent;
 use Lava83\LaravelDdd\Infrastructure\Services\DomainEventPublisher;
@@ -131,6 +132,53 @@ describe('DomainEventPublisher', function (): void {
             );
 
             Event::assertDispatched(AggregateTestCreated::class);
+        });
+    });
+
+    // Option C2: publishEvent() defers each dispatch through DB::afterCommit(),
+    // so the timing is bound to the surrounding transaction rather than the call.
+    describe('transaction-aware dispatch (afterCommit)', function (): void {
+        it('holds the dispatch until the surrounding transaction commits', function (): void {
+            [$dispatcher, $received] = recordingDispatcher();
+            $event = new AggregateTestCreated(EntityTestId::generate());
+            $publisher = new DomainEventPublisher($dispatcher);
+
+            DB::transaction(function () use ($publisher, $event, $received): void {
+                $publisher->publishEvent($event);
+
+                // Still inside the transaction: the deferred callback has not run yet.
+                expect($received)->toBeEmpty();
+            });
+
+            // Commit flushed the after-commit callback.
+            expect($received->all())->toBe([$event]);
+        });
+
+        it('drops the dispatch when the surrounding transaction rolls back', function (): void {
+            [$dispatcher, $received] = recordingDispatcher();
+            $event = new AggregateTestRenamed(EntityTestId::generate());
+            $publisher = new DomainEventPublisher($dispatcher);
+
+            try {
+                DB::transaction(function () use ($publisher, $event): void {
+                    $publisher->publishEvent($event);
+
+                    throw new RuntimeException('force rollback');
+                });
+            } catch (RuntimeException) {
+                // expected — the write and its events are rolled back together
+            }
+
+            expect($received)->toBeEmpty();
+        });
+
+        it('dispatches immediately when no transaction is open', function (): void {
+            [$dispatcher, $received] = recordingDispatcher();
+            $event = new AggregateTestCreated(EntityTestId::generate());
+
+            (new DomainEventPublisher($dispatcher))->publishEvent($event);
+
+            expect($received->all())->toBe([$event]);
         });
     });
 });
