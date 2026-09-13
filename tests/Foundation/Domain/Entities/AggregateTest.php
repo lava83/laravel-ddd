@@ -369,7 +369,7 @@ describe('owned child entities (entity-relationship edge cases)', function (): v
             ->and($aggregate->hasUncommittedEvents())->toBeFalse();
     });
 
-    it('detects a child-collection change only when its cardinality changes', function (): void {
+    it('detects an added child', function (): void {
         $member = new EntityTestSubject(EntityTestId::generate(), 'One');
         $aggregate = new AggregateTestSubject(EntityTestId::generate(), 'Stack', collect([$member]));
 
@@ -380,19 +380,33 @@ describe('owned child entities (entity-relationship edge cases)', function (): v
             ->and($aggregate->countEventsOfType('test.aggregate.members_synced'))->toBe(1);
     });
 
-    it('cannot see a same-cardinality member swap, because a Collection is compared by its JSON cast', function (): void {
+    it('detects a member swap of the same cardinality', function (): void {
         $aggregate = new AggregateTestSubject(
             EntityTestId::generate(),
             'Stack',
             collect([new EntityTestSubject(EntityTestId::generate(), 'One')]),
         );
 
-        // A different member, same count. These children expose no public/JSON
-        // state, so both collections stringify to `[{}]` and hasChanged() (the
-        // Stringable branch) sees no difference.
+        // A different member, same count. These children expose no public state
+        // at all — the collection is compared element by element, on the child's
+        // own promoted properties, not on anything it happens to serialize to.
         $aggregate->syncMembers(collect([new EntityTestSubject(EntityTestId::generate(), 'Replacement')]));
 
-        expect($aggregate->version())->toBe(1)
+        expect($aggregate->members()->first()->name())->toBe('Replacement')
+            ->and($aggregate->version())->toBe(2)
+            ->and($aggregate->countEventsOfType('test.aggregate.members_synced'))->toBe(1);
+    });
+
+    it('keeps the reconstituted children when the replacement carries the same state', function (): void {
+        $persisted = new EntityTestSubject(EntityTestId::generate(), 'One');
+        $aggregate = new AggregateTestSubject(EntityTestId::generate(), 'Stack', collect([$persisted]));
+
+        // What a form submission looks like: the whole collection rebuilt, the
+        // children fresh instances with fresh identities but unchanged state.
+        $aggregate->syncMembers(collect([new EntityTestSubject(EntityTestId::generate(), 'One')]));
+
+        expect($aggregate->members()->first())->toBe($persisted)
+            ->and($aggregate->version())->toBe(1)
             ->and($aggregate->hasUncommittedEvents())->toBeFalse();
     });
 
@@ -406,8 +420,8 @@ describe('owned child entities (entity-relationship edge cases)', function (): v
         $aggregate->members()->push(new EntityTestSubject(EntityTestId::generate(), 'Two'));
         $aggregate->syncMembers($aggregate->members());
 
-        // The push landed, but current and new are the same instance, so the
-        // JSON casts match and no change is detected.
+        // The push landed, but current and new are one and the same object, so
+        // there is no earlier state left to compare it against.
         expect($aggregate->members())->toHaveCount(2)
             ->and($aggregate->version())->toBe(1)
             ->and($aggregate->hasUncommittedEvents())->toBeFalse();

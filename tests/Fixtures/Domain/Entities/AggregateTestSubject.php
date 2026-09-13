@@ -174,8 +174,8 @@ final class AggregateTestSubject extends Aggregate
 
     /**
      * Routes the whole child collection through the change-tracking helper — the
-     * trap the AssignmentStack pattern avoids. Collection is Stringable, so
-     * Entity::hasChanged() compares the two collections by their JSON cast.
+     * trap the AssignmentStack pattern avoids. Entity::hasChanged() compares the
+     * two collections element by element, children by their state.
      *
      * @param  Collection<int, EntityTestSubject>  $members
      *

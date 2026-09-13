@@ -269,6 +269,105 @@ describe('hasChanged type semantics', function (): void {
     });
 });
 
+describe('hasChanged collection semantics', function (): void {
+    it('ignores a distinct collection instance holding equal values', function (): void {
+        $entity = new RichEntity(EntityTestId::generate(), members: collect(['one', 'two']));
+
+        expect($entity->changeMembers(collect(['one', 'two']))->toArray())->toBe([])
+            ->and($entity->version())->toBe(1);
+    });
+
+    it('detects a changed element', function (): void {
+        $entity = new RichEntity(EntityTestId::generate(), members: collect(['one', 'two']));
+
+        expect($entity->changeMembers(collect(['one', 'three']))->isNotEmpty())->toBeTrue()
+            ->and($entity->members()->all())->toBe(['one', 'three']);
+    });
+
+    it('detects an added and a removed element', function (): void {
+        $entity = new RichEntity(EntityTestId::generate(), members: collect(['one']));
+
+        expect($entity->changeMembers(collect(['one', 'two']))->isNotEmpty())->toBeTrue()
+            ->and($entity->changeMembers(collect(['one']))->isNotEmpty())->toBeTrue()
+            ->and($entity->members()->all())->toBe(['one']);
+    });
+
+    it('treats reordered elements as a change, because keys are part of the comparison', function (): void {
+        $entity = new RichEntity(EntityTestId::generate(), members: collect(['one', 'two']));
+
+        expect($entity->changeMembers(collect(['two', 'one']))->isNotEmpty())->toBeTrue();
+    });
+
+    it('detects a gap in the keys left behind by reject()', function (): void {
+        $entity = new RichEntity(EntityTestId::generate(), members: collect(['one', 'two']));
+
+        $withoutFirst = $entity->members()->reject(fn (string $member): bool => $member === 'one');
+
+        expect($withoutFirst->keys()->all())->toBe([1])
+            ->and($entity->changeMembers($withoutFirst)->isNotEmpty())->toBeTrue();
+    });
+
+    it('compares elements by the same type rules as any other property', function (): void {
+        $moment = CarbonImmutable::now();
+        $entity = new RichEntity(EntityTestId::generate(), members: collect([
+            EntityTestStatus::Active,
+            $moment,
+            collect(['nested']),
+        ]));
+
+        $equal = collect([EntityTestStatus::Active, $moment->setTimezone($moment->getTimezone()), collect(['nested'])]);
+        $nestedDiffers = collect([EntityTestStatus::Active, $moment, collect(['other'])]);
+
+        expect($entity->changeMembers($equal)->toArray())->toBe([])
+            ->and($entity->changeMembers($nestedDiffers)->isNotEmpty())->toBeTrue();
+    });
+
+    it('compares entity elements by their state, not by their identity', function (): void {
+        $entity = new RichEntity(EntityTestId::generate(), members: collect([
+            new EntityTestSubject(EntityTestId::generate(), 'Child'),
+        ]));
+
+        // A child rebuilt from input carries a fresh identity but the same
+        // state - nothing worth recording as a change.
+        $sameState = collect([new EntityTestSubject(EntityTestId::generate(), 'Child')]);
+        $otherState = collect([new EntityTestSubject(EntityTestId::generate(), 'Renamed')]);
+
+        expect($entity->changeMembers($sameState)->toArray())->toBe([])
+            ->and($entity->changeMembers($otherState)->isNotEmpty())->toBeTrue();
+    });
+
+    it('detects a state change on an element that kept its identity', function (): void {
+        $childId = EntityTestId::generate();
+        $entity = new RichEntity(EntityTestId::generate(), members: collect([
+            new EntityTestSubject($childId, 'Child'),
+        ]));
+
+        $renamed = collect([new EntityTestSubject(EntityTestId::fromString($childId->value()), 'Renamed')]);
+
+        expect($entity->changeMembers($renamed)->isNotEmpty())->toBeTrue();
+    });
+
+    it('treats an element of another entity class as a change', function (): void {
+        $entity = new RichEntity(EntityTestId::generate(), members: collect([
+            new EntityTestSubject(EntityTestId::generate(), 'Child'),
+        ]));
+
+        expect($entity->changeMembers(collect([new BodyPropertyEntity(EntityTestId::generate())]))->isNotEmpty())
+            ->toBeTrue();
+    });
+
+    it('cannot see an in-place mutation re-submitted as the same instance', function (): void {
+        $entity = new RichEntity(EntityTestId::generate(), members: collect(['one']));
+
+        $entity->members()->push('two');
+
+        // Current and new are one and the same object, so there is no earlier
+        // state left to compare against. Hand over a new collection instead.
+        expect($entity->changeMembers($entity->members())->toArray())->toBe([])
+            ->and($entity->members())->toHaveCount(2);
+    });
+});
+
 describe('serialization and hydration', function (): void {
     it('serializes the base state to an array', function (): void {
         $id = EntityTestId::generate();

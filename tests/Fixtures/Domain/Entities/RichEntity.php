@@ -11,18 +11,23 @@ use Lava83\LaravelDdd\Infrastructure\Models\Model;
 
 /**
  * Entity carrying differently-typed promoted properties to drive every branch
- * of Entity::hasChanged(): CarbonImmutable, BackedEnum, Stringable, Entity.
+ * of Entity::hasChanged(): CarbonImmutable, BackedEnum, Stringable, Entity,
+ * Collection.
  *
  * @extends Entity<EntityTestModel, EntityTestId>
  */
 final class RichEntity extends Entity
 {
+    /**
+     * @param  Collection<int, mixed>  $members
+     */
     public function __construct(
         private readonly EntityTestId $id,
         protected EntityTestStatus $status = EntityTestStatus::Active,
         protected CarbonImmutable $moment = new CarbonImmutable,
         protected ?EntityTestId $label = null,
         protected ?EntityTestSubject $related = null,
+        protected Collection $members = new Collection,
     ) {
         parent::__construct();
     }
@@ -72,5 +77,22 @@ final class RichEntity extends Entity
     public function changeRelated(EntityTestSubject $related): Collection
     {
         return $this->updateEntity(['related' => $related]);
+    }
+
+    /**
+     * @return Collection<int, mixed>
+     */
+    public function members(): Collection
+    {
+        return $this->members;
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $members
+     * @return Collection<string, mixed>
+     */
+    public function changeMembers(Collection $members): Collection
+    {
+        return $this->updateEntity(['members' => $members]);
     }
 }

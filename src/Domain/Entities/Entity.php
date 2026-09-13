@@ -20,6 +20,8 @@ use Lava83\LaravelDdd\Infrastructure\Models\Model;
 use LogicException;
 use ReflectionClass;
 use ReflectionException;
+use ReflectionMethod;
+use ReflectionParameter;
 use Stringable;
 
 /**
@@ -34,6 +36,13 @@ use Stringable;
 abstract class Entity implements Stringable
 {
     private const int DEFAULT_VERSION = 1;
+
+    /**
+     * Promoted properties owned by the base class: bookkeeping, never domain state.
+     *
+     * @var list<string>
+     */
+    private const array NON_DOMAIN_PROPERTIES = ['version', 'createdAt', 'updatedAt', 'domainEvents', 'persistedVersion'];
 
     /** @var Collection<string, EntityPropertyValue> */
     protected Collection $dirty;
@@ -361,6 +370,10 @@ abstract class Entity implements Stringable
 
     protected function hasChanged(mixed $current, mixed $new): bool
     {
+        if ($current instanceof Collection && $new instanceof Collection) {
+            return $this->collectionHasChanged($current, $new);
+        }
+
         if ($current instanceof CarbonImmutable && $new instanceof CarbonImmutable) {
             return $this->carbonHasChanged($current, $new);
         }
@@ -380,6 +393,114 @@ abstract class Entity implements Stringable
         return $current !== $new;
     }
 
+    /**
+     * Compares two collections element by element.
+     *
+     * A Collection is Stringable, so without this branch it would be compared by
+     * its JSON cast - and a child entity that exposes no public state encodes as
+     * `{}`, which hides every replacement of equal size. diffAssoc() is no
+     * better: array_diff_assoc() casts each element to string as well.
+     *
+     * Keys and their order are part of the comparison; the elements themselves
+     * go through the same type rules as any other property.
+     *
+     * @param  Collection<array-key, mixed>  $current
+     * @param  Collection<array-key, mixed>  $new
+     *
+     * @throws ReflectionException
+     */
+    private function collectionHasChanged(Collection $current, Collection $new): bool
+    {
+        if ($current->keys()->all() !== $new->keys()->all()) {
+            return true;
+        }
+
+        foreach ($current as $key => $currentElement) {
+            if ($this->elementHasChanged($currentElement, $new->get($key))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * An element of a collection is compared like any other value - except for
+     * an entity, which is compared by its state rather than by its identity.
+     *
+     * A collection of child entities is usually rebuilt as a whole from input,
+     * and children built that way carry no identity yet. Comparing them by
+     * identity would report every such collection as changed, apply the
+     * transient children over the reconstituted ones and leave the repository
+     * inserting rows that already exist. The trade-off: a replacement that
+     * changes nothing but the identity of a child is not a change.
+     *
+     * @throws ReflectionException
+     */
+    private function elementHasChanged(mixed $current, mixed $new): bool
+    {
+        if ($current instanceof self && $new instanceof self) {
+            return $this->entityStateHasChanged($current, $new);
+        }
+
+        return $this->hasChanged($current, $new);
+    }
+
+    /**
+     * @param  self<Model<self<*, *>>, Id>  $current
+     * @param  self<Model<self<*, *>>, Id>  $new
+     *
+     * @throws ReflectionException
+     */
+    private function entityStateHasChanged(self $current, self $new): bool
+    {
+        if ($current::class !== $new::class) {
+            return true;
+        }
+
+        $newState = $new->comparableState();
+
+        return $current->comparableState()
+            ->contains(fn (mixed $value, string $property): bool => $this->hasChanged($value, $newState->get($property)));
+    }
+
+    /**
+     * The entity's own domain state: every promoted property except the
+     * identity, which the base class compares separately.
+     *
+     * @return Collection<string, EntityPropertyValue>
+     *
+     * @throws ReflectionException
+     */
+    protected function comparableState(): Collection
+    {
+        return $this->promotedProperties()
+            ->reject(fn (string $property): bool => $property === 'id')
+            ->mapWithKeys(fn (string $property): array => [$property => $this->getPropertyValue($property)]);
+    }
+
+    /**
+     * The names of the promoted constructor properties that carry domain state.
+     *
+     * @return Collection<int, string>
+     *
+     * @throws ReflectionException
+     */
+    private function promotedProperties(): Collection
+    {
+        $constructor = $this->reflectionClass()->getConstructor();
+
+        if (! $constructor instanceof ReflectionMethod) {
+            return collect();
+        }
+
+        return collect($constructor->getParameters())
+            ->filter(fn (ReflectionParameter $parameter): bool => $parameter->isPromoted())
+            ->map(fn (ReflectionParameter $parameter): string => $parameter->getName())
+            ->reject(fn (string $property): bool => in_array($property, self::NON_DOMAIN_PROPERTIES, true))
+            ->values();
+    }
+
     protected function updateDirtyEntity(): void
     {
         throw new LogicException('updateDirtyEntity must be implemented in child classes to apply changes');
@@ -396,29 +517,7 @@ abstract class Entity implements Stringable
      */
     protected function applyChanges(Collection $changes, array $customSetters = []): void
     {
-        $excludedProperties = ['version', 'createdAt', 'updatedAt', 'domainEvents', 'persistedVersion'];
-
-        $reflectionClass = $this->reflectionClass();
-
-        $constructor = $reflectionClass->getConstructor();
-
-        if (! $constructor) {
-            return;
-        }
-
-        foreach ($constructor->getParameters() as $parameter) {
-            // Only process promoted properties
-            if (! $parameter->isPromoted()) {
-                continue;
-            }
-
-            $propertyName = $parameter->getName();
-
-            // Skip excluded properties
-            if (in_array($propertyName, $excludedProperties, true)) {
-                continue;
-            }
-
+        foreach ($this->promotedProperties() as $propertyName) {
             $changeKey = 'new_'.$propertyName;
 
             if (! $changes->has($changeKey)) {

@@ -144,7 +144,11 @@ State changes go through two **protected** helpers — they are internal machine
 
 **Gotcha:** `applyChanges()` reflects over the constructor and only writes **promoted** constructor properties. A property declared in the class body instead of the constructor signature is silently skipped, and `version`, `createdAt`, `updatedAt`, `domainEvents` are always excluded.
 
-Change tracking keys are prefixed: `collectChanges()` writes `old_{property}` and `new_{property}` into `dirty`. `hasChanged()` special-cases `CarbonImmutable` (timestamp *and* timezone), `Entity` (via `equals()`), `BackedEnum` (via `->value`) and `Stringable` (string cast), in that order.
+Change tracking keys are prefixed: `collectChanges()` writes `old_{property}` and `new_{property}` into `dirty`. `hasChanged()` special-cases `Collection` (element by element, see below), `CarbonImmutable` (timestamp *and* timezone), `Entity` (via `equals()`), `BackedEnum` (via `->value`) and `Stringable` (string cast), in that order.
+
+**A `Collection` property is compared by content.** Keys and their order count, and each element goes through the same type rules — with one exception: an **entity element is compared by its state, not by its identity**. A child collection is normally rebuilt as a whole from input (`update(name, scopes, description)`), and children built that way carry no identity yet; comparing them by identity would mark every such collection dirty, overwrite the reconstituted children with transient ones and leave the repository re-inserting rows that already exist. The trade-off is the mirror image: swapping a child for another one with identical state is not a change. The identity itself is excluded from the comparison via `comparableState()`, which a child entity may override.
+
+What still cannot be seen is an **in-place mutation handed back as the same instance** — `$entity->members()->push(...)` followed by `syncMembers($entity->members())` compares the collection with itself. Build a new collection instead.
 
 `hydrate(Model $model)` pulls `created_at`, `updated_at` and `version` back off the row. The base mapper does **not** call it — it has no `toEntity()` at all, so calling `hydrate()` is the consuming mapper's job by convention. `Repository::syncEntityFromModel()` calls it again after save.
 
