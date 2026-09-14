@@ -411,7 +411,11 @@ abstract class Entity implements Stringable
      */
     private function collectionHasChanged(Collection $current, Collection $new): bool
     {
-        if ($current->keys()->all() !== $new->keys()->all()) {
+        if ($current->count() !== $new->count()) {
+            return true;
+        }
+
+        if ($current->collect()->keys()->all() !== $new->collect()->keys()->all()) {
             return true;
         }
 
