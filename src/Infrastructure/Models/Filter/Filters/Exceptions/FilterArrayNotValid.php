@@ -24,9 +24,11 @@ class FilterArrayNotValid extends Exception
         return new self(sprintf('The filter target must be a string, got %s.', get_debug_type($target)));
     }
 
-    public static function valueTypeMismatch(FilterType $type, mixed $value): self
+    public static function valueTypeMismatch(FilterType|string $type, mixed $value): self
     {
-        return new self(sprintf('The value for filter type "%s" has an invalid type (%s).', $type->value, get_debug_type($value)));
+        $identifier = $type instanceof FilterType ? $type->value : $type;
+
+        return new self(sprintf('The value for filter type "%s" has an invalid type (%s).', $identifier, get_debug_type($value)));
     }
 
     private static function stringify(mixed $value): string

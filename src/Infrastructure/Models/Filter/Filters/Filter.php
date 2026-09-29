@@ -18,6 +18,11 @@ abstract class Filter implements FilterContract
         return $this->type;
     }
 
+    public function identifier(): string
+    {
+        return $this->type->value;
+    }
+
     /**
      * @return array{
      *     type: string,

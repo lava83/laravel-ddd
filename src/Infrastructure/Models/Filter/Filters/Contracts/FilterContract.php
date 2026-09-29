@@ -7,7 +7,7 @@ namespace Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Contracts;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Enums\FilterType;
 
-interface FilterContract
+interface FilterContract extends FilterDefinition
 {
     public function target(): string;
 

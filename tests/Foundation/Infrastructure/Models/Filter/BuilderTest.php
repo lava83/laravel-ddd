@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Enums\MergeStrategy;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Between;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\BetweenColumns;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Custom;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\CustomFilterNotValid;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterArrayNotValid;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterValueNotValid;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThan;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThanEqualTo;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\In;
@@ -653,6 +657,158 @@ describe('Builder merge', function () {
 
         expect($merged)->toBe([
             ['type' => '$eq', 'target' => 'tenant_id', 'value' => 'A'],
+        ]);
+    });
+});
+
+describe('Builder custom', function () {
+    it('serialises without a target', function () {
+        $builder = Builder::make()->custom('$branchScope', 42);
+
+        expect($builder)->toHaveCount(1)
+            ->and($builder->filters()->first())->toBeInstanceOf(Custom::class)
+            ->and($builder->toArray())->toBe([
+                ['type' => '$branchScope', 'value' => 42],
+            ]);
+    });
+
+    it('serialises with a target', function () {
+        $builder = Builder::make()->custom('$scope', 'x', 'branch');
+
+        expect($builder->toArray())->toBe([
+            ['type' => '$scope', 'target' => 'branch', 'value' => 'x'],
+        ]);
+    });
+
+    it('defaults the value to true', function () {
+        expect(Builder::make()->custom('$flag')->toArray())->toBe([
+            ['type' => '$flag', 'value' => true],
+        ]);
+    });
+
+    it('accepts nested arrays and collections of scalars', function () {
+        $builder = Builder::make()
+            ->custom('$a', [1, [2, 3]])
+            ->custom('$b', new Collection(['x', new Collection(['y'])]));
+
+        expect($builder->toArray())->toBe([
+            ['type' => '$a', 'value' => [1, [2, 3]]],
+            ['type' => '$b', 'value' => ['x', ['y']]],
+        ]);
+    });
+
+    it('keeps insertion order next to built-in filters', function () {
+        $builder = Builder::make()
+            ->eq('status', 'active')
+            ->custom('$branchScope', 42)
+            ->in('id', [1, 2]);
+
+        expect($builder)->toHaveCount(3)
+            ->and($builder->filters()->map->identifier()->all())->toBe(['$eq', '$branchScope', '$in'])
+            ->and($builder->toArray())->toBe([
+                ['type' => '$eq', 'target' => 'status', 'value' => 'active'],
+                ['type' => '$branchScope', 'value' => 42],
+                ['type' => '$in', 'target' => 'id', 'value' => [1, 2]],
+            ]);
+    });
+
+    it('rejects a type that collides with a built-in operator', function () {
+        Builder::make()->custom('$eq', 1);
+    })->throws(CustomFilterNotValid::class);
+
+    it('rejects a non-scalar value', function () {
+        Builder::make()->custom('$scope', null);
+    })->throws(FilterValueNotValid::class);
+});
+
+describe('Builder fromArray with custom types', function () {
+    beforeEach(function () {
+        config()->set('laravel-ddd.filters.custom_types', ['$branchScope']);
+    });
+
+    it('round trips a registered custom type without a target', function () {
+        $array = Builder::make()->eq('status', 'active')->custom('$branchScope', 42)->toArray();
+
+        expect(Builder::fromArray($array)->toArray())->toBe($array);
+    });
+
+    it('round trips a registered custom type with a target and array value', function () {
+        $array = Builder::make()->custom('$branchScope', [1, [2]], 'branch')->toArray();
+
+        expect(Builder::fromArray($array)->toArray())->toBe($array);
+    });
+
+    it('treats a null target as missing', function () {
+        $builder = Builder::fromArray([['type' => '$branchScope', 'target' => null, 'value' => 1]]);
+
+        expect($builder->toArray())->toBe([['type' => '$branchScope', 'value' => 1]]);
+    });
+
+    it('throws for an unregistered type', function () {
+        Builder::fromArray([['type' => '$other', 'value' => 1]]);
+    })->throws(FilterArrayNotValid::class, 'The filter type "$other" is not a known filter type.');
+
+    it('throws for every custom type when nothing is registered', function () {
+        config()->set('laravel-ddd.filters.custom_types', []);
+
+        Builder::fromArray([['type' => '$branchScope', 'value' => 1]]);
+    })->throws(FilterArrayNotValid::class);
+
+    it('throws when a custom entry has no value', function () {
+        Builder::fromArray([['type' => '$branchScope']]);
+    })->throws(FilterArrayNotValid::class, 'The filter array is missing the required "value" key.');
+
+    it('throws when a custom entry carries a non-string target', function () {
+        Builder::fromArray([['type' => '$branchScope', 'target' => 5, 'value' => 1]]);
+    })->throws(FilterArrayNotValid::class, 'The filter target must be a string, got int.');
+
+    it('throws when a custom value contains a non-scalar', function () {
+        Builder::fromArray([['type' => '$branchScope', 'value' => [1, null]]]);
+    })->throws(FilterArrayNotValid::class, 'The value for filter type "$branchScope" has an invalid type (array).');
+
+    it('still requires a target for built-in filters', function () {
+        Builder::fromArray([['type' => '$eq', 'value' => 1]]);
+    })->throws(FilterArrayNotValid::class, 'The filter array is missing the required "target" key.');
+});
+
+describe('Builder merge with custom filters', function () {
+    it('KeepExisting keeps a custom filter and appends the incoming one', function () {
+        $defaults = Builder::make()->custom('$branchScope', 1);
+        $incoming = Builder::make()->custom('$branchScope', 2);
+
+        expect($defaults->merge($incoming)->toArray())->toBe([
+            ['type' => '$branchScope', 'value' => 1],
+            ['type' => '$branchScope', 'value' => 2],
+        ]);
+    });
+
+    it('Override replaces a custom filter matching on type and null target', function () {
+        $defaults = Builder::make()->custom('$branchScope', 1)->eq('status', 'a');
+        $incoming = Builder::make()->custom('$branchScope', 2);
+
+        expect($defaults->merge($incoming, MergeStrategy::Override)->toArray())->toBe([
+            ['type' => '$eq', 'target' => 'status', 'value' => 'a'],
+            ['type' => '$branchScope', 'value' => 2],
+        ]);
+    });
+
+    it('Override keeps custom filters with a different target', function () {
+        $defaults = Builder::make()->custom('$scope', 1, 'a')->custom('$scope', 1);
+        $incoming = Builder::make()->custom('$scope', 2, 'a');
+
+        expect($defaults->merge($incoming, MergeStrategy::Override)->toArray())->toBe([
+            ['type' => '$scope', 'value' => 1],
+            ['type' => '$scope', 'target' => 'a', 'value' => 2],
+        ]);
+    });
+
+    it('Override keeps custom filters of a different type', function () {
+        $defaults = Builder::make()->custom('$one', 1);
+        $incoming = Builder::make()->custom('$two', 1);
+
+        expect($defaults->merge($incoming, MergeStrategy::Override)->toArray())->toBe([
+            ['type' => '$one', 'value' => 1],
+            ['type' => '$two', 'value' => 1],
         ]);
     });
 });

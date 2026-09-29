@@ -613,6 +613,77 @@ Builder::make()
     ->isNull('archived_at');
 ```
 
+### Custom filters
+
+Built-in operators cannot express every predicate — for example a tenant scope that is an OR over two columns, or that needs a subquery against another table or connection. Model such predicates as an `indexzer0/eloquent-filtering` **custom filter**: a virtual target implemented inside the model's infrastructure, addressed from the outside purely through the builder. This is the recommended way to express tenant/scope predicates that need cross-table or cross-connection subqueries.
+
+**1. Implement and register the `FilterMethod`.** The constructor parameter is named after the request key (`value`):
+
+```php
+use Illuminate\Database\Eloquent\Builder;
+use IndexZer0\EloquentFiltering\Filter\Contracts\FilterMethod;
+use IndexZer0\EloquentFiltering\Filter\Traits\FilterMethod\FilterContext\CustomFilter;
+
+final class BranchScopeFilter implements FilterMethod
+{
+    use CustomFilter;
+
+    public function __construct(private readonly int $value) {}
+
+    public static function type(): string
+    {
+        return '$branchScope';
+    }
+
+    public function apply(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $q) => $q
+            ->whereIn('b2b_user_id', fn ($sub) => $sub->select('id')->from('users')->where('branch_id', $this->value))
+            ->orWhereIn('b2c_user_id', fn ($sub) => $sub->select('id')->from('users')->where('branch_id', $this->value)));
+    }
+}
+```
+
+```php
+// config/eloquent-filtering.php
+'custom_filters' => [
+    BranchScopeFilter::class,
+],
+```
+
+**2. Allow it on the model.** `allowedFilters()` remains the authoritative gate: a model that does not list the type rejects it according to the `eloquent-filtering` `suppress` config.
+
+```php
+use IndexZer0\EloquentFiltering\Filter\Filterable\Filter;
+
+public function allowedFilters(): AllowedFilterList
+{
+    return Filter::only(Filter::custom('$branchScope'));
+}
+```
+
+**3. Build it.** `Builder::custom(string $type, mixed $value = true, ?string $target = null)` accepts a scalar, or a (nested) array/`Collection` of scalars. `target` is optional and only serialised when given:
+
+```php
+$filter = Builder::make()->custom('$branchScope', $branch->getKey());
+// [['type' => '$branchScope', 'value' => 42]]
+
+AccountModel::query()->filter($filter->toArray())->get();
+```
+
+A custom type may not reuse a built-in operator name (`CustomFilterNotValid`), and an invalid value throws `FilterValueNotValid`.
+
+**Reconstructing from a request.** `fromArray()` stays strict: an unknown type throws `FilterArrayNotValid` unless it is listed in the package config. Custom entries do not need a `target`; built-ins still do.
+
+```php
+// config/laravel-ddd.php
+'filters' => [
+    'custom_types' => ['$branchScope'],
+],
+```
+
+**Merging.** `MergeStrategy::KeepExisting` is unchanged. With `MergeStrategy::Override`, an incoming custom filter replaces existing ones with the same type string and target (no target equals no target).
+
 ## Development
 
 ```bash

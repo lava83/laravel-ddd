@@ -208,6 +208,25 @@ Updates go through `updateWithVersionGuard()`. It reads the base version from `$
 
 Because the guard keys off `persistedVersion()`, several in-memory mutations collapse into a single stored revision: two `updateAggregateRoot()` calls take the entity to in-memory version 3, but the store still moves `1 → 2` with no false conflict, and `syncEntityFromModel()` then re-hydrates the aggregate to the stored `2`. Inserts (`$model->exists === false`) skip the guard and go through `save()`.
 
+## Filter Builder
+
+`Models\Filter\Builder` is a fluent, AND-only builder that serialises to the array shape `Model::filter()` (`indexzer0/eloquent-filtering`) consumes. It holds `Filters\Contracts\FilterDefinition` items:
+
+- `FilterDefinition` — `identifier(): string`, `target(): ?string`, `value()`, `toArray()`. What `Builder` stores and what `merge()` compares.
+- `FilterContract extends FilterDefinition` — the built-in operators (`Filters\Filter` subclasses); adds `type(): FilterType`, and `target()` is a non-null `string`. `identifier()` is `type->value`.
+- `Filters\Custom` — an `eloquent-filtering` custom filter: free type string, optional target, value = scalar or (nested) array/`Collection` of scalars, validated in the constructor (`FilterValueNotValid`). `toArray()` omits `target` when null and turns Collections into arrays.
+
+Rules:
+
+- `Builder::custom($type, $value = true, $target = null)` rejects built-in operator names (`Exceptions\CustomFilterNotValid`). It does not consult the registry — only `fromArray()` does.
+- `fromArray()` accepts an unknown type only if it is in `config('laravel-ddd.filters.custom_types')` (default `[]`); otherwise `FilterArrayNotValid::unknownType`. Custom rows treat a missing/`null` `target` as absent; built-ins still require it. No auto-derivation from `eloquent-filtering.custom_filters` — types are registered twice on purpose, so a client cannot reach filters just because some model registered them. `allowedFilters()` stays the gate at apply time.
+- `merge(Override)` matches on `identifier()` + `target()` (`===`, so null equals null); `KeepExisting` is untouched.
+- Recommended use: tenant/scope predicates needing cross-table or cross-connection subqueries — implement a `FilterMethod`, register it in `eloquent-filtering.custom_filters`, allow it with `Filter::custom('$name')`, build it with `Builder::custom()`. Worked example in the README ("Custom filters").
+
+**Upgrade note (static typing only):** `Builder::filters()` now returns `Collection<int, FilterDefinition>` instead of `Collection<int, Filter>`, and `Builder::toArray()`'s shape makes `target` optional and `value` a nested-array-capable type. Code that calls `->type()` on items from `filters()` needs a `FilterContract` check/narrowing. No runtime change for built-in filters; their serialised output is byte-identical.
+
+Tests: `tests/Foundation/Infrastructure/Models/Filter/CustomFilterIntegrationTest.php` runs a real custom `FilterMethod` (`tests/Fixtures/Infrastructure/Filters/OwnedByFilter.php`) against the `testing` DB; `TestCase` registers `EloquentFilteringServiceProvider` for it.
+
 ## Exceptions
 
 | Namespace | Class |
@@ -215,6 +234,7 @@ Because the guard keys off `persistedVersion()`, several in-memory mutations col
 | `Infrastructure\Exceptions` | `CantSaveModel`, `CantDeleteModel`, `CantDeleteRelatedModel`, `ConcurrencyException` |
 | `Infrastructure\Mappers\Exceptions` | `NoMapperFoundForEntity` |
 | `Infrastructure\Models\Exceptions` | `EntityClassNotAvailable` |
+| `Infrastructure\Models\Filter\Filters\Exceptions` | `FilterArrayNotValid`, `FilterValueNotValid`, `CustomFilterNotValid` |
 | `Infrastructure\Repositories\Exceptions` | `EntityClassNotAvailable` |
 
 The two `EntityClassNotAvailable` classes are distinct — check the namespace when catching or asserting.

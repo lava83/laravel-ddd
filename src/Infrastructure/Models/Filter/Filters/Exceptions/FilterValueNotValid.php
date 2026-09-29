@@ -13,6 +13,8 @@ class FilterValueNotValid extends Exception
         if (is_array($value)) {
             $encoded = json_encode($value);
             $value = $encoded !== false ? $encoded : 'array';
+        } elseif ($value !== null && ! is_scalar($value)) {
+            $value = get_debug_type($value);
         }
 
         return new self("The filter value \"{$value}\" is not valid.");

@@ -9,10 +9,13 @@ use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Enums\MergeStrategy;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Between;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\BetweenColumns;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Contracts\FilterDefinition;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Custom;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Enums\FilterType;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Equal;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\CustomFilterNotValid;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterArrayNotValid;
-use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Filter;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\Exceptions\FilterValueNotValid;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThan;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\GreaterThanEqualTo;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\In;
@@ -30,7 +33,7 @@ use Lava83\LaravelDdd\Infrastructure\Models\Filter\Filters\NotLike;
 final readonly class Builder implements Countable
 {
     /**
-     * @param  Collection<int, Filter>  $filters
+     * @param  Collection<int, FilterDefinition>  $filters
      */
     public function __construct(
         private Collection $filters = new Collection,
@@ -48,7 +51,9 @@ final readonly class Builder implements Countable
      * {@see MergeStrategy::KeepExisting} appends the incoming filters and never
      * removes an existing one, so default (e.g. tenant-scoping) filters always
      * survive. {@see MergeStrategy::Override} lets an incoming filter replace
-     * existing filters that match on both target and operator (type).
+     * existing filters that match on both target and operator (type). Custom
+     * filters match on their type string and target, where a missing target
+     * equals a missing target.
      */
     public function merge(self $incoming, MergeStrategy $strategy = MergeStrategy::KeepExisting): self
     {
@@ -57,9 +62,9 @@ final readonly class Builder implements Countable
 
         if ($strategy === MergeStrategy::Override) {
             $existing = $existing->reject(
-                fn (Filter $filter): bool => $incomingFilters->contains(
-                    fn (Filter $candidate): bool => $candidate->target() === $filter->target()
-                        && $candidate->type() === $filter->type(),
+                fn (FilterDefinition $filter): bool => $incomingFilters->contains(
+                    fn (FilterDefinition $candidate): bool => $candidate->target() === $filter->target()
+                        && $candidate->identifier() === $filter->identifier(),
                 ),
             );
         }
@@ -69,6 +74,9 @@ final readonly class Builder implements Countable
 
     /**
      * Rebuild a Builder from the array shape produced by {@see self::toArray()}.
+     *
+     * Unknown types are rejected unless registered in
+     * `laravel-ddd.filters.custom_types`; the input may be client-controlled.
      *
      * @param  array<int, array<string, mixed>>  $filters
      *
@@ -80,6 +88,13 @@ final readonly class Builder implements Countable
 
         foreach ($filters as $row) {
             $type = self::resolveType($row);
+
+            if (is_string($type)) {
+                $builder->custom($type, self::customValue($type, self::resolveValue($row)), self::resolveOptionalTarget($row));
+
+                continue;
+            }
+
             $target = self::resolveTarget($row);
             $value = self::resolveValue($row);
 
@@ -113,7 +128,7 @@ final readonly class Builder implements Countable
      *
      * @throws FilterArrayNotValid
      */
-    private static function resolveType(array $row): FilterType
+    private static function resolveType(array $row): FilterType|string
     {
         if (! array_key_exists('type', $row)) {
             throw FilterArrayNotValid::missingKey('type');
@@ -125,7 +140,49 @@ final readonly class Builder implements Countable
             throw FilterArrayNotValid::unknownType($type);
         }
 
-        return FilterType::tryFrom($type) ?? throw FilterArrayNotValid::unknownType($type);
+        $builtIn = FilterType::tryFrom($type);
+
+        if ($builtIn !== null) {
+            return $builtIn;
+        }
+
+        return self::isRegisteredCustomType($type) ? $type : throw FilterArrayNotValid::unknownType($type);
+    }
+
+    private static function isRegisteredCustomType(string $type): bool
+    {
+        $registered = config('laravel-ddd.filters.custom_types', []);
+
+        return is_array($registered) && in_array($type, $registered, true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     *
+     * @throws FilterArrayNotValid
+     */
+    private static function resolveOptionalTarget(array $row): ?string
+    {
+        if (! array_key_exists('target', $row) || $row['target'] === null) {
+            return null;
+        }
+
+        return self::resolveTarget($row);
+    }
+
+    /**
+     * @return Collection<array-key, mixed>|array<array-key, mixed>|string|int|float|bool
+     *
+     * @throws FilterArrayNotValid
+     */
+    private static function customValue(string $type, mixed $value): Collection|array|string|int|float|bool
+    {
+        if (! Custom::isValidValue($value)) {
+            throw FilterArrayNotValid::valueTypeMismatch($type, $value);
+        }
+
+        /** @var Collection<array-key, mixed>|array<array-key, mixed>|string|int|float|bool $value */
+        return $value;
     }
 
     /**
@@ -377,7 +434,26 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @return Collection<int, Filter>
+     * Add an `indexzer0/eloquent-filtering` custom filter (`Filter::custom('$name')`).
+     *
+     * @param  mixed  $value  scalar, or a (nested) array/Collection of scalars
+     *
+     * @throws CustomFilterNotValid when the type collides with a built-in operator
+     * @throws FilterValueNotValid when the value is not a scalar or a (nested) array/Collection of scalars
+     */
+    public function custom(string $type, mixed $value = true, ?string $target = null): self
+    {
+        if (FilterType::tryFrom($type) !== null) {
+            throw CustomFilterNotValid::reservedType($type);
+        }
+
+        $this->filters->add(new Custom($type, $value, $target));
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, FilterDefinition>
      */
     public function filters(): Collection
     {
@@ -390,12 +466,12 @@ final readonly class Builder implements Countable
     }
 
     /**
-     * @return array<int, array{type: string, target: string, value: array<int, string|int|float>|string|int|float|bool}>
+     * @return array<int, array{type: string, target?: string, value: array<array-key, mixed>|string|int|float|bool}>
      */
     public function toArray(): array
     {
-        /** @var array<int, array{type: string, target: string, value: array<int, string|int|float>|string|int|float|bool}> $result */
-        $result = $this->filters->map(fn (Filter $filter): array => $filter->toArray())->toArray();
+        /** @var array<int, array{type: string, target?: string, value: array<array-key, mixed>|string|int|float|bool}> $result */
+        $result = $this->filters->map(fn (FilterDefinition $filter): array => $filter->toArray())->toArray();
 
         return $result;
     }
