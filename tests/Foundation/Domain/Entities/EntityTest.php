@@ -70,11 +70,98 @@ describe('construction and validation', function (): void {
             ->toThrow(ValidationException::class, 'Name is required');
     });
 
+    it('keys the constructor error by property', function (): void {
+        try {
+            new ValidatingEntity(EntityTestId::generate(), '   ');
+        } catch (ValidationException $exception) {
+            expect($exception->errors())->toBe(['name' => ['Name is required']]);
+
+            return;
+        }
+
+        $this->fail('Expected a ValidationException');
+    });
+
     it('constructs when the overridden invariant holds', function (): void {
         $entity = new ValidatingEntity(EntityTestId::generate(), 'Bob');
 
         expect($entity->isValid())->toBeTrue()
             ->and($entity->validate())->toBe([]);
+    });
+});
+
+describe('invariants on update', function (): void {
+    it('rejects an update that violates an invariant, keyed by property', function (): void {
+        $entity = new ValidatingEntity(EntityTestId::generate(), 'Bob');
+
+        try {
+            $entity->rename('   ');
+        } catch (ValidationException $exception) {
+            expect($exception->errors())->toBe(['name' => ['Name is required']])
+                ->and($exception->getMessage())->toBe('Name is required');
+
+            return;
+        }
+
+        $this->fail('Expected a ValidationException');
+    });
+
+    it('leaves the entity untouched when the update is rejected', function (): void {
+        $entity = new ValidatingEntity(EntityTestId::generate(), 'Bob');
+        $updatedAt = $entity->updatedAt();
+
+        try {
+            $entity->rename('   ');
+        } catch (ValidationException) {
+            // asserted below
+        }
+
+        expect($entity->name())->toBe('Bob')
+            ->and($entity->version())->toBe(1)
+            ->and($entity->updatedAt()->getTimestamp())->toBe($updatedAt->getTimestamp())
+            ->and($entity->isDirty())->toBeFalse()
+            ->and($entity->isValid())->toBeTrue();
+    });
+
+    it('rolls back every property of a rejected multi-property update', function (): void {
+        $entity = new ValidatingEntity(EntityTestId::generate(), 'Bob', 'first');
+
+        expect(fn () => $entity->relabel('   ', 'second'))->toThrow(ValidationException::class);
+
+        expect($entity->name())->toBe('Bob')
+            ->and($entity->label())->toBe('first')
+            ->and($entity->version())->toBe(1);
+    });
+
+    it('still applies a valid update', function (): void {
+        $entity = new ValidatingEntity(EntityTestId::generate(), 'Bob');
+
+        $entity->rename('Alice');
+
+        expect($entity->name())->toBe('Alice')
+            ->and($entity->version())->toBe(2)
+            ->and($entity->dirty()->toArray())->toBe(['old_name' => 'Bob', 'new_name' => 'Alice']);
+    });
+
+    it('accepts a repeated update after a rejected one', function (): void {
+        $entity = new ValidatingEntity(EntityTestId::generate(), 'Bob');
+
+        expect(fn () => $entity->rename(''))->toThrow(ValidationException::class);
+
+        $entity->rename('Alice');
+
+        expect($entity->name())->toBe('Alice')
+            ->and($entity->version())->toBe(2);
+    });
+
+    it('runs idFromPersistence through the validation gate without side effects', function (): void {
+        $entity = new ValidatingEntity(EntityTestId::generate(), 'Bob');
+        $id = $entity->id();
+
+        $entity->idFromPersistence(EntityTestId::fromString($id->value()));
+
+        expect($entity->version())->toBe(1)
+            ->and($entity->isValid())->toBeTrue();
     });
 });
 

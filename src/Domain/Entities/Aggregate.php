@@ -12,6 +12,7 @@ use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Contracts\AggregateRoot;
 use Lava83\LaravelDdd\Domain\Contracts\DomainEvent;
 use Lava83\LaravelDdd\Domain\Events\DomainEvent as DomainEventClass;
+use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 use Lava83\LaravelDdd\Infrastructure\Models\Model;
@@ -164,6 +165,7 @@ abstract class Aggregate extends Entity implements AggregateRoot
      * @param  DomainEvent|null  $event  Optional pre-created event instance
      *
      * @throws ReflectionException
+     * @throws ValidationException
      */
     protected function updateAggregateRoot(array $changes, ?string $eventClass = null, ?DomainEvent $event = null): void
     {

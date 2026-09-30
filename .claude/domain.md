@@ -64,7 +64,7 @@ final class Title extends ValueObject
 }
 ```
 
-Conventions: private constructor, static factories (`fromString()`, `fromArray()`, `generate()`), validation inside the factory or constructor, `ValidationException` on failure (code 422 by default; `ValidationException::fromArray(array $errors)` joins messages with spaces).
+Conventions: private constructor, static factories (`fromString()`, `fromArray()`, `generate()`), validation inside the factory or constructor, `ValidationException` on failure (code 422 by default). A plain `new ValidationException('…')` carries only a message; `ValidationException::fromArray(array<string, list<string>> $errors)` keeps the bag (`errors()`, keyed by property name) and joins all messages with spaces for `getMessage()`.
 
 Package VOs live in `ValueObjects/{Address,Business,Communication,Content,Data,Date,Identity}`. Reuse before adding.
 
@@ -94,7 +94,7 @@ public function __construct(
 )
 ```
 
-It validates immediately: if `validate(): array<string>` returns a non-empty array, the constructor throws `ValidationException::fromArray()`.
+It validates immediately: if `validate(): array<string, list<string>>` (messages keyed by property name, e.g. `['name' => ['Name is required']]`) returns a non-empty array, the constructor throws `ValidationException::fromArray()`. An override that returns a plain `list<string>` breaks the contract — the exception's `errors()` would carry integer keys.
 
 **The base `validate()` is effectively dead.** It checks `$this->id()->value() === '' || === '0'` with strict comparison against strings, but `Uuid::value()` returns a UUID string and `Integer::value()` returns `int` — neither branch can ever be true. Real invariants must come from a subclass override.
 
@@ -139,8 +139,8 @@ final class Article extends Aggregate
 
 State changes go through two **protected** helpers — they are internal machinery, not public API:
 
-- `protected Entity::updateEntity(array $changes): Collection` — diffs, applies, bumps version and `updatedAt`. Returns the dirty collection, or an empty one if nothing changed.
-- `protected Aggregate::updateAggregateRoot(array $changes, ?string $eventClass = null, ?DomainEvent $event = null): void` — same, plus records an event. Use this in aggregate roots.
+- `protected Entity::updateEntity(array $changes): Collection` — diffs, applies, then runs `validate()`; only if that passes does it bump version and `updatedAt`. A violated invariant rolls the `old_*` values back (through `applyChanges()`, so only promoted properties), clears `dirty` and throws `ValidationException` — the entity stays as it was. Returns the dirty collection, or an empty one if nothing changed. `idFromPersistence()` runs through the same gate.
+- `protected Aggregate::updateAggregateRoot(array $changes, ?string $eventClass = null, ?DomainEvent $event = null): void` — same, plus records an event. Use this in aggregate roots. A rejected change records no event. (The `$eventClass` guard still fires *after* the change was applied — a separate, known non-atomicity.)
 
 **Gotcha:** `applyChanges()` reflects over the constructor and only writes **promoted** constructor properties. A property declared in the class body instead of the constructor signature is silently skipped, and `version`, `createdAt`, `updatedAt`, `domainEvents` are always excluded.
 

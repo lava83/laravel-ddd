@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\AggregateTestModel;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\AggregateTestSubject;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\EntityTestId;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\EntityTestSubject;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\PrivateIdAggregate;
+use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\ValidatingAggregate;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\AggregateTestCreated;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\AggregateTestRenamed;
 
@@ -150,6 +152,32 @@ describe('updateAggregateRoot', function (): void {
         expect($aggregate->name())->toBe('New')
             ->and($aggregate->version())->toBe(2)
             ->and($aggregate->hasUncommittedEvents())->toBeFalse();
+    });
+});
+
+describe('updateAggregateRoot invariants', function (): void {
+    it('rejects an invalid change without recording an event or bumping the version', function (): void {
+        $aggregate = new ValidatingAggregate(EntityTestId::generate(), 'Old');
+
+        try {
+            $aggregate->rename('   ');
+        } catch (ValidationException $exception) {
+            expect($exception->errors())->toBe(['name' => ['Name is required']]);
+        }
+
+        expect($aggregate->name())->toBe('Old')
+            ->and($aggregate->version())->toBe(1)
+            ->and($aggregate->hasUncommittedEvents())->toBeFalse();
+    });
+
+    it('still records the event for a valid change', function (): void {
+        $aggregate = new ValidatingAggregate(EntityTestId::generate(), 'Old');
+
+        $aggregate->rename('New');
+
+        expect($aggregate->name())->toBe('New')
+            ->and($aggregate->version())->toBe(2)
+            ->and($aggregate->countEventsOfType('test.aggregate.renamed'))->toBe(1);
     });
 });
 

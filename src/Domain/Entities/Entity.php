@@ -56,8 +56,10 @@ abstract class Entity implements Stringable
         protected int $version = self::DEFAULT_VERSION,
         protected int $persistedVersion = self::DEFAULT_VERSION,
     ) {
-        if ($this->isValid() === false) {
-            throw ValidationException::fromArray($this->validate());
+        $errors = $this->validate();
+
+        if ($errors !== []) {
+            throw ValidationException::fromArray($errors);
         }
 
         $this->dirty = collect();
@@ -90,6 +92,7 @@ abstract class Entity implements Stringable
      * @param  TId  $id
      *
      * @throws ReflectionException
+     * @throws ValidationException
      */
     public function idFromPersistence(Id $id): void
     {
@@ -237,14 +240,14 @@ abstract class Entity implements Stringable
      * Validate entity state
      * Override in child classes for specific validation
      *
-     * @return array<string>
+     * @return array<string, list<string>> Messages keyed by property name
      */
     public function validate(): array
     {
         $errors = [];
 
         if ($this->id()->value() === '' || $this->id()->value() === '0') {
-            $errors[] = 'Entity must have an ID';
+            $errors['id'][] = 'Entity must have an ID';
         }
 
         return $errors;
@@ -329,6 +332,7 @@ abstract class Entity implements Stringable
      * @return Collection<string, EntityPropertyValue>
      *
      * @throws ReflectionException
+     * @throws ValidationException When the changed state violates an invariant; the entity is left untouched
      */
     protected function updateEntity(array $changes): Collection
     {
@@ -339,9 +343,33 @@ abstract class Entity implements Stringable
         }
 
         $this->applyChanges($changes);
+
+        $errors = $this->validate();
+
+        if ($errors !== []) {
+            $this->applyChanges($this->reverted($changes));
+            $this->resetDirty();
+
+            throw ValidationException::fromArray($errors);
+        }
+
         $this->touch();
 
         return $changes;
+    }
+
+    /**
+     * Turns the recorded diff around: every `old_{property}` becomes the
+     * `new_{property}` that applyChanges() writes back.
+     *
+     * @param  Collection<string, EntityPropertyValue>  $changes
+     * @return Collection<string, EntityPropertyValue>
+     */
+    private function reverted(Collection $changes): Collection
+    {
+        return $changes
+            ->filter(fn (mixed $value, string $key): bool => str_starts_with($key, 'old_'))
+            ->mapWithKeys(fn (mixed $value, string $key): array => ['new_'.substr($key, 4) => $value]);
     }
 
     /**

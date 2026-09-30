@@ -50,7 +50,7 @@ final class {{ aggregateName }} extends Aggregate
 
     // region validation
     /**
-     * @return array<string>
+     * @return array<string, list<string>>
      */
     public function validate(): array
     {
