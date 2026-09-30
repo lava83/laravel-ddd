@@ -9,18 +9,33 @@ use Throwable;
 
 class ValidationException extends Exception
 {
-    public function __construct(string $message = 'Validation failed', int $code = 422, ?Throwable $previous = null)
-    {
+    /**
+     * @param  array<string, list<string>>  $errors  Messages keyed by property name
+     */
+    public function __construct(
+        string $message = 'Validation failed',
+        int $code = 422,
+        ?Throwable $previous = null,
+        private readonly array $errors = [],
+    ) {
         parent::__construct($message, $code, $previous);
     }
 
     /**
-     * @param  array<string>  $errors
+     * @param  array<string, list<string>>  $errors  Messages keyed by property name
      */
     public static function fromArray(array $errors): self
     {
-        $message = implode(' ', $errors);
+        $message = implode(' ', array_merge(...array_values($errors)));
 
-        return new self($message);
+        return new self($message, errors: $errors);
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    public function errors(): array
+    {
+        return $this->errors;
     }
 }

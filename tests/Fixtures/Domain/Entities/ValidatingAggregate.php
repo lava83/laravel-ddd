@@ -4,21 +4,23 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities;
 
-use Illuminate\Support\Collection;
-use Lava83\LaravelDdd\Domain\Entities\Entity;
+use Lava83\LaravelDdd\Domain\Entities\Aggregate;
+use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Infrastructure\Models\Model;
+use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\AggregateTestRenamed;
+use ReflectionException;
 
 /**
- * Entity with a real invariant, to exercise the constructor validation gate.
+ * Aggregate with a real invariant, to exercise the validation gate of
+ * updateAggregateRoot().
  *
- * @extends Entity<EntityTestModel, EntityTestId>
+ * @extends Aggregate<AggregateTestModel, EntityTestId>
  */
-final class ValidatingEntity extends Entity
+final class ValidatingAggregate extends Aggregate
 {
     public function __construct(
-        private readonly EntityTestId $id,
+        protected readonly EntityTestId $id,
         protected string $name,
-        protected string $label = 'default',
     ) {
         parent::__construct();
     }
@@ -41,27 +43,13 @@ final class ValidatingEntity extends Entity
         return $this->name;
     }
 
-    public function label(): string
-    {
-        return $this->label;
-    }
-
     /**
-     * @return Collection<string, mixed>
+     * @throws ReflectionException
+     * @throws ValidationException
      */
-    public function rename(string $name): Collection
+    public function rename(string $name): void
     {
-        return $this->updateEntity(['name' => $name]);
-    }
-
-    /**
-     * Two properties in one call, to show a rejected update rolls back both.
-     *
-     * @return Collection<string, mixed>
-     */
-    public function relabel(string $name, string $label): Collection
-    {
-        return $this->updateEntity(['name' => $name, 'label' => $label]);
+        $this->updateAggregateRoot(['name' => $name], AggregateTestRenamed::class);
     }
 
     /**
