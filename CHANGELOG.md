@@ -2,6 +2,75 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.7.0 - 2026-09-30
+
+### ⚠️ Breaking changes
+
+#### `Entity::validate()` now returns an error bag keyed by property
+
+`validate()` no longer returns a flat `list<string>`. It returns `array<string, list<string>>`: messages keyed by the name of the property they belong to.
+
+```php
+// Before
+public function validate(): array
+{
+    return $this->scopes->isEmpty() ? ['Scopes must not be empty'] : [];
+}
+
+// After
+/**
+ * @return array<string, list<string>>
+ */
+public function validate(): array
+{
+    return $this->scopes->isEmpty() ? ['scopes' => ['Scopes must not be empty']] : [];
+}
+
+```
+`isValid()` is unchanged (`validate() === []`).
+
+**Migration:** update every `validate()` override in your entities and aggregates to return the keyed shape. PHP cannot enforce the array shape at runtime, so an override that still returns a plain list will not fail, but its messages end up under integer keys and are useless as field errors. PHPStan will flag it in your code once the return type is declared. The `make:aggregate` stub has been updated accordingly.
+
+#### `ValidationException` carries the error bag
+
+- New `ValidationException::errors(): array<string, list<string>>` returns the bag.
+- `ValidationException::fromArray()` now expects the keyed shape and keeps it. `getMessage()` still returns all messages joined with a space, so existing message assertions and `ErrorResource` output are unchanged.
+- An exception created directly (`new ValidationException('…')`, as the Value Objects do) has an empty bag: `errors() === []`.
+
+Turning the bag into a `422` with field errors is left to the application, e.g. in your exception handler:
+
+```php
+use Illuminate\Validation\ValidationException as LaravelValidationException;
+use Lava83\LaravelDdd\Domain\Exceptions\ValidationException as DomainValidationException;
+
+$exceptions->render(function (DomainValidationException $e) {
+    return $e->errors() === []
+        ? null
+        : throw LaravelValidationException::withMessages($e->errors());
+});
+
+```
+### 🐛 Behaviour changes
+
+#### Updates now enforce invariants and are atomic
+
+Previously only the constructor validated an entity, so an update could leave it in an invalid state without any error.
+
+`Entity::updateEntity()` now runs `validate()` after applying the changes:
+
+- If an invariant is violated, the `old_*` values are written back, `dirty()` is cleared and a `ValidationException` is thrown. Value, `version()` and `updatedAt()` stay exactly as they were.
+- `version` and `updatedAt` are only bumped after the check passes.
+- This applies to every aggregate automatically, including changes made through `updateAggregateRoot()`. A rejected change records **no** domain event.
+- `idFromPersistence()` goes through the same check. For an entity that was valid before, this has no effect.
+
+**Migration:** code that relied on invalid intermediate states being accepted (e.g. building up an entity through several partial updates) will now throw. Either validate only the final state, or apply the related changes in a single `updateEntity()` / `updateAggregateRoot()` call. Guards you added in the application layer to check invariants after an update (`ensureValid()` and similar) can be removed.
+
+#### Known limitation
+
+The `$eventClass` check in `updateAggregateRoot()` still runs after the change was applied. An invalid event class therefore throws a `LogicException` with the state already changed. This is unrelated to the validation above and unchanged.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.6.14...v0.7.0
+
 ## v0.6.14 - 2026-09-29
 
 **Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.6.13...v0.6.14
@@ -124,6 +193,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -157,6 +227,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -210,6 +281,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 
