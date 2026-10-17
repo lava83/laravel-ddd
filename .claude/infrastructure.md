@@ -208,6 +208,20 @@ Updates go through `updateWithVersionGuard()`. It reads the base version from `$
 
 Because the guard keys off `persistedVersion()`, several in-memory mutations collapse into a single stored revision: two `updateAggregateRoot()` calls take the entity to in-memory version 3, but the store still moves `1 → 2` with no false conflict, and `syncEntityFromModel()` then re-hydrates the aggregate to the stored `2`. Inserts (`$model->exists === false`) skip the guard and go through `save()`.
 
+## API-backed repositories
+
+`Repositories\ApiRepository` is the base for aggregates stored behind an HTTP API. Opt-in: no provider binding, no config file; the host builds `Api\ApiClient`.
+
+- **Reads:** `fetchOne($id)` / `fetchAll($query)` call `GET {resource()}[/id]` and wrap each `data` payload through `makeRemoteModel()` in a `Models\RemoteModel`. A 404 becomes `ModelNotFoundException` naming `$modelClass`. A response without a `data` array throws `ApiException` (loud, never "no results").
+- **Writes:** `persistCommands($aggregate)` — `commands()` maps `DomainEvent::class => Closure(Aggregate, DomainEvent): Response`. All uncommitted events must be mapped, else `UnmappedDomainEvent` is thrown **before the first call**. Calls run in recording order, the last response is `hydrate()`d back into the aggregate, then `dispatchUncommittedEvents()` runs. **Not atomic**: a failing call leaves earlier calls done and the events on the aggregate.
+- Only `entityMapper()` and `dispatchUncommittedEvents()` of the base `Repository` are used; `saveEntity`, `makeModel` and the version guard assume a table. The API owns versioning, so there is no `ConcurrencyException` here.
+- Event dispatch is not deferred to a transaction commit unless the host opens one; with no transaction it runs immediately.
+- Register a mapper for the aggregate as usual (`entity_mapper_resolver()->registerMapper(...)`); `RemoteModel::toEntity()` goes through it, so set `$entityClassName` on the model.
+
+`Api\ApiClient` is the one door to the API: `get/post/patch/delete`, authentication through `Api\Auth\ApiAuthenticator`, status → `Api\Exceptions\*` mapping, GET-only retries (`ApiClientConfig::$readAttempts` is the *total* number of attempts), one repeat after a 401 only for a `RefreshableAuthenticator`. `ClientCredentialsAuthenticator` caches the token as a string under a key derived from base URL and client id.
+
+Tests: `tests/Foundation/Infrastructure/{Api,Repositories/ApiRepositoryTest.php,Models/RemoteModelTest.php}`, fixtures `tests/Fixtures/Infrastructure/Api`.
+
 ## Read queries and cursor pagination
 
 Lists are served as read models (CQRS), not entities. Paginate the Eloquent query with `cursorPaginate()` and map the page with `Pagination\ReadModelCursorPaginator::fromPage()`:
