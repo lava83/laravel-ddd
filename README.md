@@ -624,6 +624,34 @@ $page = ReadModelCursorPaginator::fromPage(
 
 The result is a regular `Illuminate\Pagination\CursorPaginator`, so `Resource::collection($page)` produces `data`, `links` and `meta` as usual. The ordering must be unique (use the primary key).
 
+### Reading a paginated list from an API
+
+`ReadModelCursorPaginator` serves the producing side: it starts from an Eloquent query. The consuming side has no query and no model, only the `data` and `meta` of an API answer and cursor tokens it must not interpret. For that, `Infrastructure\Pagination\ApiCursorPageMapper` reads the answer of a Laravel-style cursor page and returns a `RelayedCursorPaginator`, which hands the tokens on unchanged:
+
+```php
+use Lava83\LaravelDdd\Infrastructure\Pagination\ApiCursorPageMapper;
+
+$pages = new ApiCursorPageMapper; // parameter names are configurable: per_page, cursor, filter
+
+$response = $api->get('v1/accounts', $pages->query(
+    filter: ['status' => 'active'],
+    perPage: 50,
+    cursor: $request->query('cursor'),
+));
+
+return $pages->fromResponse(
+    $response,
+    path: '/accounts', // your own endpoint, so the links never point at the API
+    mapItem: fn (array $payload) => AccountReadModel::fromArray($payload),
+);
+```
+
+`Resource::collection($page)` then produces `data`, `links` and `meta` as usual. Nothing is derived from the items, so the read models need no sort column.
+
+The mapper fails loudly with an `ApiException` if the answer is not a cursor page: no `data` list, no `meta`, no integer `meta.per_page`, no `meta.next_cursor` / `meta.prev_cursor` key, or a token that is not a Laravel cursor. A missing `meta` must never read as "last page, no results". An empty cursor string counts as no cursor.
+
+The mapper expects the shape a Laravel resource collection produces. For an API with another shape (other keys, other token format), write a small mapper of your own and build a `RelayedCursorPaginator` from the tokens: the paginator knows no token format.
+
 ## Filtering
 
 The base `Model` ships with a filtering layer built on [`indexzer0/eloquent-filtering`](https://github.com/IndexZer0/eloquent-filtering). `Infrastructure\Models\Filter\Builder` composes a set of filters fluently and serialises them — via `toArray()` — to the operator-array shape the model's `filter()` query scope consumes.

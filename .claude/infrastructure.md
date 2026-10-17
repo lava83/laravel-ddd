@@ -249,6 +249,19 @@ Do **not** use `->through(...)` for this. Laravel reads `next_cursor` / `prev_cu
 
 Tests: `tests/Foundation/Infrastructure/Pagination/ReadModelCursorPaginatorTest.php`, fixtures `CursorTest*`.
 
+### Consuming a cursor page from an API
+
+`ReadModelCursorPaginator` is the producing side (Eloquent query in). The consuming side (an API answer in, no query, no model) is `Pagination\RelayedCursorPaginator` plus `Pagination\ApiCursorPageMapper`. Both are additive and bound by nothing.
+
+- `RelayedCursor extends Cursor` holds the token as received and returns it from `encode()`. `Cursor::encode()` rebuilds the token from decoded parameters, which is not guaranteed to give the same string back. The parameters stay empty, so `parameter()` throws; the direction comes from the position (`next()`, `previous()`). `fromEncoded()` is overridden to throw, because the inherited one would call the private constructor.
+- `RelayedCursorPaginator extends CursorPaginator`. The constructor takes `(items, perPage, ?nextCursor, ?prevCursor, options, ?Cursor)`. `nextCursor()` / `previousCursor()` return the relayed tokens and derive nothing from the items. `hasMorePages()` and `onFirstPage()` are answered from the tokens (the parent derives them from the current cursor, and `hasMorePages()` is always true for a "previous" cursor). `setItems()` neither trims nor reverses. The paginator does **not** validate tokens: it knows no format.
+- `ApiCursorPageMapper` knows the Laravel shape (`data`, `meta.per_page`, `meta.next_cursor`, `meta.prev_cursor`) and is strict: anything else throws `ApiException`, a token must decode via `Cursor::fromEncoded()`, a missing cursor key is an error (null and `''` are "no cursor"). `query()` builds the request query and leaves unset values out. Parameter names default to `per_page`, `cursor`, `filter` and are constructor arguments; `cursor` also names the cursor in the generated links.
+- `fromResponse()` takes the application's own `$path` for the links and calls `withQueryString()`, so API URLs never leak into the response and the request query stays in the links. `links.first` / `links.last` are `null`, as for any cursor paginator.
+- Why no `ApiRepository::fetchPage()`: the repository returns `RemoteModel`s for aggregates, a paginated list is read-model territory and also needed without a repository.
+- Another API shape means another small mapper that feeds `RelayedCursorPaginator`; no option for foreign token formats exists on purpose.
+
+Tests: `tests/Foundation/Infrastructure/Pagination/RelayedCursorPaginatorTest.php` and `ApiCursorPageMapperTest.php` (the latter includes a round trip through `ReadModelCursorPaginator`).
+
 ## Filter Builder
 
 `Models\Filter\Builder` is a fluent, AND-only builder that serialises to the array shape `Model::filter()` (`indexzer0/eloquent-filtering`) consumes. It holds `Filters\Contracts\FilterDefinition` items:
