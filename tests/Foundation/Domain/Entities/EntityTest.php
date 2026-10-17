@@ -507,6 +507,38 @@ describe('serialization and hydration', function (): void {
             ->and($entity->updatedAt()->getTimestamp())->toBe($updatedAt->getTimestamp());
     });
 
+    it('keeps version and created_at the model does not carry, and stays clean', function (): void {
+        $id = EntityTestId::generate();
+        $model = (new EntityTestModel)->newFromBuilder([
+            'id' => $id->value(),
+            'name' => 'Partial',
+        ]);
+
+        $entity = new EntityTestSubject($id, 'Fresh');
+        $createdAt = $entity->createdAt();
+        $entity->hydrate($model);
+
+        expect($entity->createdAt())->toBe($createdAt)
+            ->and($entity->version())->toBe(1)
+            ->and($entity->persistedVersion())->toBe(1)
+            ->and($entity->isDirty())->toBeFalse();
+    });
+
+    it('takes persistedVersion from the model, the base of the optimistic lock', function (): void {
+        $id = EntityTestId::generate();
+        $model = (new EntityTestModel)->newFromBuilder([
+            'id' => $id->value(),
+            'name' => 'Persisted',
+            'version' => 5,
+        ]);
+
+        $entity = new EntityTestSubject($id, 'Fresh');
+        $entity->hydrate($model);
+
+        expect($entity->version())->toBe(5)
+            ->and($entity->persistedVersion())->toBe(5);
+    });
+
     it('reconstitutes an entity from model state', function (): void {
         $id = EntityTestId::generate();
         $createdAt = CarbonImmutable::now()->subDays(5);

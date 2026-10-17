@@ -546,6 +546,69 @@ php artisan vendor:publish --tag=ddd-config
 
 Beyond the slice above, the package provides an `AggregateRoot` contract with domain-event recording: events collected through `updateAggregateRoot($changes, $eventClass)` are dispatched automatically via Laravel's event system once the surrounding transaction commits — deferred with `DB::afterCommit()` — then cleared from the aggregate. Every aggregate carries a `version` for optimistic locking and raises a `ConcurrencyException` on conflicting writes. You also get a growing catalogue of ready-made value objects — `Uuid`, `Email`, `Phonenumber`, `Money`, `Link`, `Json`, `GeoAddress` and more — plus a fluent Eloquent filtering layer on the base `Model` (see [Filtering](#filtering)).
 
+## API-backed aggregates
+
+Aggregates that live behind an HTTP API instead of a table use `Infrastructure\Repositories\ApiRepository`. It is opt-in: the package binds nothing, so pure database users never see it.
+
+Reading wraps the `data` payload of `GET {resource}/{id}` in a `RemoteModel` (an attribute bag that refuses `save()`, `delete()` and queries). Writing is **command-based, not diff-based**: every recorded domain event is translated to the API call that realises it. Events without a call throw `UnmappedDomainEvent` before the first request. The calls run in recording order and are **not atomic** — if one fails, the earlier ones have already happened and the events stay on the aggregate. Events are published only after the last call succeeded.
+
+```php
+final class ApiArticleRepository extends ApiRepository implements ArticleRepository
+{
+    protected ?string $entityClassName = Article::class;
+
+    protected string $modelClass = ArticleModel::class; // extends RemoteModel
+
+    public function findOrFail(ArticleId $id): Article
+    {
+        /** @var Article */
+        return $this->fetchOne($id->value())->toEntity();
+    }
+
+    public function save(Article $article): void
+    {
+        $this->persistCommands($article);
+    }
+
+    protected function resource(): string
+    {
+        return 'v1/articles';
+    }
+
+    protected function makeRemoteModel(array $payload): RemoteModel
+    {
+        return ArticleModel::fromAttributes($payload);
+    }
+
+    protected function commands(): array
+    {
+        return [
+            ArticleCreated::class => fn (Article $a): Response => $this->api->post($this->resource(), [...]),
+            ArticleRenamed::class => fn (Article $a): Response => $this->api->patch(
+                "{$this->resource()}/{$a->id()->value()}/title",
+                ['title' => (string) $a->title()],
+            ),
+        ];
+    }
+}
+```
+
+The `ApiClient` is built by the host in its own service provider:
+
+```php
+$config = new ApiClientConfig(baseUrl: 'https://api.example.com', timeout: 30);
+
+$this->app->singleton(ApiClient::class, fn () => new ApiClient(
+    $config,
+    new ClientCredentialsAuthenticator($config, clientId: '…', clientSecret: '…', tokenPath: 'v1/oauth/token'),
+));
+```
+
+- Authentication is an `ApiAuthenticator` (`authorize(PendingRequest)`): `ClientCredentialsAuthenticator` (token cached as a plain string) or `StaticBearerAuthenticator`. Implement the interface for API keys or basic auth. An authenticator that also implements `RefreshableAuthenticator` gets one repeat after a 401; fixed credentials get none.
+- Only GETs are retried (connection errors and 5xx, `ApiClientConfig::$readAttempts` total attempts). Writes never are — there are no idempotency keys.
+- Failures surface as `Infrastructure\Api\Exceptions\ApiException` subclasses (`Unauthorized`, `Forbidden`, `NotFound`, `ValidationFailed`, `Unavailable`); callers never see Laravel's `RequestException`. A 404 in `fetchOne()` becomes a `ModelNotFoundException`.
+- Several APIs: build one `ApiClient` (or a thin subclass to type-hint it) per API.
+
 ## Cursor pagination for read models
 
 List endpoints that return read models should paginate with `Infrastructure\Pagination\ReadModelCursorPaginator`. Laravel reads the cursor values from the page items under the ORDER BY column name, so mapping a page with `through()` breaks as soon as the sort column (`account_id`) is not a property of the read model (`id`). `ReadModelCursorPaginator` keeps the source model of every read model and reads the cursor from there:
