@@ -208,6 +208,33 @@ Updates go through `updateWithVersionGuard()`. It reads the base version from `$
 
 Because the guard keys off `persistedVersion()`, several in-memory mutations collapse into a single stored revision: two `updateAggregateRoot()` calls take the entity to in-memory version 3, but the store still moves `1 → 2` with no false conflict, and `syncEntityFromModel()` then re-hydrates the aggregate to the stored `2`. Inserts (`$model->exists === false`) skip the guard and go through `save()`.
 
+## Read queries and cursor pagination
+
+Lists are served as read models (CQRS), not entities. Paginate the Eloquent query with `cursorPaginate()` and map the page with `Pagination\ReadModelCursorPaginator::fromPage()`:
+
+```php
+use Lava83\LaravelDdd\Infrastructure\Pagination\ReadModelCursorPaginator;
+
+return ReadModelCursorPaginator::fromPage(
+    $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
+    fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
+);
+```
+
+Do **not** use `->through(...)` for this. Laravel reads `next_cursor` / `prev_cursor` from the page items under the ORDER BY column name. After `through()` the items are read models, so any sort column that is not also a read model property (`account_id` vs. `id`) throws `ErrorException: Undefined property`. A SELECT alias does not help, the cursor `WHERE` clause cannot use one.
+
+`ReadModelCursorPaginator` extends `Illuminate\Pagination\CursorPaginator` (return types and Scramble keep working) and remembers each read model's source model in a `WeakMap`, so the cursor values come from there. The domain stays free of persistence knowledge.
+
+- Generics: `@template TModel of Model`, `@template TReadModel of object`.
+- The factory is called `fromPage`, **not** `map`: a static `map()` would shadow the paginator's `__call` forwarding to the collection, and Laravel calls `$paginator->map()` itself when serialising resource collections.
+- `hasMore` is copied from the source page, not derived from `hasMorePages()` (which is always `true` for a "previous" cursor and would yield a wrong `prev_cursor` on the first page).
+- `fromPage()` calls `withQueryString()` and keeps the query of the source page. Query parameters therefore stay in `links`.
+- Lookup is by object identity. `filter()`, `reject()` and reordering the collection keep working, and `JsonResource` wrappers are unwrapped. If you *replace* the read models (e.g. `transform()` into new objects), the item itself is used as fallback, which fails again if it lacks the sort column. Cursor values are only read from the first and last item of the page.
+- No resource class is needed: `XResource::collection($page)` yields `data`, `links` and `meta` (`path`, `per_page`, `next_cursor`, `prev_cursor`). Application must not depend on this class (Deptrac: `Application` does not see `Infrastructure`).
+- Ordering must be unique and stable (primary key). A cursor that does not match the ordering throws `UnexpectedValueException` (Laravel behaviour, unchanged).
+
+Tests: `tests/Foundation/Infrastructure/Pagination/ReadModelCursorPaginatorTest.php`, fixtures `CursorTest*`.
+
 ## Filter Builder
 
 `Models\Filter\Builder` is a fluent, AND-only builder that serialises to the array shape `Model::filter()` (`indexzer0/eloquent-filtering`) consumes. It holds `Filters\Contracts\FilterDefinition` items:

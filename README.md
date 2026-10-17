@@ -546,6 +546,21 @@ php artisan vendor:publish --tag=ddd-config
 
 Beyond the slice above, the package provides an `AggregateRoot` contract with domain-event recording: events collected through `updateAggregateRoot($changes, $eventClass)` are dispatched automatically via Laravel's event system once the surrounding transaction commits — deferred with `DB::afterCommit()` — then cleared from the aggregate. Every aggregate carries a `version` for optimistic locking and raises a `ConcurrencyException` on conflicting writes. You also get a growing catalogue of ready-made value objects — `Uuid`, `Email`, `Phonenumber`, `Money`, `Link`, `Json`, `GeoAddress` and more — plus a fluent Eloquent filtering layer on the base `Model` (see [Filtering](#filtering)).
 
+## Cursor pagination for read models
+
+List endpoints that return read models should paginate with `Infrastructure\Pagination\ReadModelCursorPaginator`. Laravel reads the cursor values from the page items under the ORDER BY column name, so mapping a page with `through()` breaks as soon as the sort column (`account_id`) is not a property of the read model (`id`). `ReadModelCursorPaginator` keeps the source model of every read model and reads the cursor from there:
+
+```php
+use Lava83\LaravelDdd\Infrastructure\Pagination\ReadModelCursorPaginator;
+
+$page = ReadModelCursorPaginator::fromPage(
+    AccountModel::query()->orderBy('account_id')->cursorPaginate(200),
+    fn (AccountModel $model) => AccountReadModel::fromModel($model),
+);
+```
+
+The result is a regular `Illuminate\Pagination\CursorPaginator`, so `Resource::collection($page)` produces `data`, `links` and `meta` as usual. The ordering must be unique (use the primary key).
+
 ## Filtering
 
 The base `Model` ships with a filtering layer built on [`indexzer0/eloquent-filtering`](https://github.com/IndexZer0/eloquent-filtering). `Infrastructure\Models\Filter\Builder` composes a set of filters fluently and serialises them — via `toArray()` — to the operator-array shape the model's `filter()` query scope consumes.
