@@ -154,11 +154,13 @@ abstract class Entity implements Stringable
             $this->idFromPersistence($this->id()::fromString((string) $model->getKey()));
         }
 
-        if ($model->hasAttribute('created_at')) {
-            /**
-             * @var Carbon $createdAtOnModel
-             */
-            $createdAtOnModel = $model->getAttribute('created_at');
+        // A value check, not hasAttribute(): the base model casts these columns, so
+        // Eloquent reports them as present even when the source never carried them
+        // (an API payload, a partial select). Absent values leave the entity as is.
+        /** @var Carbon|null $createdAtOnModel */
+        $createdAtOnModel = $model->getAttribute('created_at');
+
+        if ($createdAtOnModel !== null) {
             $this->createdAt = $createdAtOnModel->toImmutable();
         }
 
@@ -172,10 +174,11 @@ abstract class Entity implements Stringable
                 : null;
         }
 
-        if ($model->hasAttribute('version')) {
-            $versionOnModel = (int) $model->getAttribute('version');
-            $this->version = $versionOnModel;
-            $this->persistedVersion = $versionOnModel;
+        $versionOnModel = $model->getAttribute('version');
+
+        if ($versionOnModel !== null) {
+            $this->version = (int) $versionOnModel;
+            $this->persistedVersion = (int) $versionOnModel;
         }
     }
 
