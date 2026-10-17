@@ -2,6 +2,63 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.8.0 - 2026-10-17
+
+This release adds cursor pagination for read models and opt-in support for aggregates that live behind an HTTP API, and fixes `Entity::hydrate()` for models that do not carry every attribute. It is additive; existing database-backed code needs no changes.
+
+### Added
+
+#### Cursor pagination for read models
+
+New `Infrastructure\Pagination\ReadModelCursorPaginator`, a `CursorPaginator` subclass for pages whose items are read models.
+
+Laravel reads `next_cursor` / `prev_cursor` from the page items under the ORDER BY column name. After mapping a page to read models with `through()`, this fails with `Undefined property` as soon as the sort column (`account_id`) is not a property of the read model (`id`). A SELECT alias does not help, because the cursor `WHERE` clause cannot use one.
+
+```php
+use Lava83\LaravelDdd\Infrastructure\Pagination\ReadModelCursorPaginator;
+
+return ReadModelCursorPaginator::fromPage(
+    $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
+    fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
+);
+
+```
+- **Source tracking:** each read model keeps its source model, and the cursor values are read from there. The domain stays free of persistence knowledge.
+- **Compatible:** still an `Illuminate\Pagination\CursorPaginator`, so return types and Scramble keep working.
+- **Robust:** works with `filter()` / reordering of the collection and with `JsonResource` wrappers.
+- **Unchanged Laravel behaviour:** query parameters stay in `links`; a cursor that does not match the ordering still throws `UnexpectedValueException`.
+- **Naming:** the factory is called `fromPage`, not `map`. A static `map()` would shadow the paginator's collection forwarding, which Laravel uses when serialising resource collections.
+
+#### API-backed aggregates (opt-in)
+
+Aggregates that live behind an HTTP API instead of a table. Nothing is bound by the package, so pure database users do not notice it.
+
+- **`ApiRepository`:** reads wrap `data` payloads in a `RemoteModel`. Writes are command-based, not diff-based: `commands()` maps each `DomainEvent` to the API call that realises it. All events must be mapped, otherwise `UnmappedDomainEvent` is thrown **before the first call**. Calls run in recording order, the aggregate is hydrated from the last response, and events are published afterwards. The calls are **not atomic**: if one fails, earlier calls have already happened and the events stay on the aggregate.
+- **`RemoteModel`:** attribute bag for `fromState()` / `hydrate()`; `save()`, `delete()` and `newQuery()` throw a `LogicException`.
+- **`ApiClient` with `ApiClientConfig`:** `get/post/patch/delete`, timeouts, and a status to `ApiException` hierarchy (`Unauthorized`, `Forbidden`, `NotFound`, `ValidationFailed`, `Unavailable`). Only GETs are retried (connection errors and 5xx); writes never are, there are no idempotency keys.
+- **Authentication via `ApiAuthenticator`:** `ClientCredentialsAuthenticator` (token cached as a plain string, no `cache.serializable_classes` entry needed) and `StaticBearerAuthenticator`. An authenticator that also implements `RefreshableAuthenticator` gets one repeat after a 401; fixed credentials get none.
+- **Loud failures:** responses without a `data` payload and token responses without an `access_token` throw instead of reading as "no results".
+
+The host builds the `ApiClient` in its own service provider, so several APIs can live side by side. See "API-backed aggregates" in the README.
+
+### Fixed
+
+- **`Entity::hydrate()`** no longer crashes on models that do not carry `created_at`, and no longer casts a missing `version` to `0`. The base `Model` casts these columns, so `hasAttribute()` reported them as present even when the source never carried them (an API payload, a partial select). Absent values now leave the entity untouched. `persistedVersion` still comes from the model, so optimistic locking via `updateWithVersionGuard()` is unaffected.
+
+### Upgrade notes
+
+- **`Entity::hydrate()`:** a model that carries no `version` used to yield `persistedVersion() === 0` (and a guaranteed `ConcurrencyException` on update). It now keeps the entity default of `1`. Models loaded from a table with a `version` column are unaffected. If you select columns partially, include `version` before saving.
+- **Paginating read models:** replace `->through(...)` on a cursor-paginated page with `ReadModelCursorPaginator::fromPage($page, $mapper)`. If you already have a local copy of this class (e.g. with a static `map()`), switch to the package class and rename the call to `fromPage()`. The return type stays `Illuminate\Pagination\CursorPaginator`.
+- **Migrating a project-local API layer to the package:**
+  - Replace the local `ApiRepository`, `RemoteModel`, `UnmappedDomainEvent`, HTTP exceptions and token DTO with the package classes (`Infrastructure\Repositories\ApiRepository`, `Infrastructure\Models\RemoteModel`, `Infrastructure\Api\Exceptions\*`).
+  - Build the client from `ApiClientConfig` plus an authenticator and alias it as `Lava83\LaravelDdd\Infrastructure\Api\ApiClient`, otherwise the container cannot resolve the repositories (`ApiRepository` type-hints `ApiClient`). A thin subclass of `ApiClient` is fine for the project's own type hints.
+  - Pass the token endpoint as `tokenPath` to `ClientCredentialsAuthenticator` (default `oauth/token`).
+  - **Do not reuse an old cache key** that still holds a serialized token DTO: the package caches the access token as a plain string and would fail on the stale entry. Leave `cacheKey` unset (the default is derived from base URL and client id) or flush the old key on deploy. The `cache.serializable_classes` entry for the DTO can go.
+  - Update `catch` blocks to the new exception classes (`NotFound`, `Forbidden`, `Unauthorized`, `ValidationFailed`, `Unavailable`, base `ApiException`), and any tests that assert on exception messages: they now read `API …` instead of a vendor-specific prefix.
+  
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.7.0...v0.8.0
+
 ## v0.7.0 - 2026-09-30
 
 ### ⚠️ Breaking changes
@@ -26,6 +83,7 @@ public function validate(): array
     return $this->scopes->isEmpty() ? ['scopes' => ['Scopes must not be empty']] : [];
 }
 
+
 ```
 `isValid()` is unchanged (`validate() === []`).
 
@@ -48,6 +106,7 @@ $exceptions->render(function (DomainValidationException $e) {
         ? null
         : throw LaravelValidationException::withMessages($e->errors());
 });
+
 
 ```
 ### 🐛 Behaviour changes
@@ -194,6 +253,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -227,6 +287,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -281,6 +342,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 
