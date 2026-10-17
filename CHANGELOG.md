@@ -2,6 +2,48 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v0.8.1 - 2026-10-17
+
+This release adds the consuming side of cursor pagination: reading a paginated list from an API and serving it on as a regular cursor page. It is additive; existing code needs no changes.
+
+### Added
+
+#### Cursor pages read from an API
+
+`ReadModelCursorPaginator` serves the producing side, starting from an Eloquent query. An application that reads a list through `ApiClient` has no query and no model, only `data`, `meta` and cursor tokens it must not interpret. Rebuilding the other API's ordering and token format would break as soon as that API changes its sort. The cursors are therefore handed on unchanged.
+
+```php
+use Lava83\LaravelDdd\Infrastructure\Pagination\ApiCursorPageMapper;
+
+$pages = new ApiCursorPageMapper;
+
+$response = $api->get('v1/accounts', $pages->query(
+    filter: ['status' => 'active'],
+    perPage: 50,
+    cursor: $request->query('cursor'),
+));
+
+return $pages->fromResponse(
+    $response,
+    path: '/accounts',
+    mapItem: fn (array $payload) => AccountReadModel::fromArray($payload),
+);
+
+```
+- **`RelayedCursorPaginator`:** a `CursorPaginator` subclass built from items, page size and the `next` / `prev` tokens of the neighbouring pages. Nothing is derived from the items, so read models need no sort column. `Resource::collection($page)` produces `data`, `links` and `meta` as usual, with your own URLs.
+- **`RelayedCursor`:** keeps the token exactly as received. Laravel's `Cursor::encode()` rebuilds a token from decoded parameters, which is not guaranteed to give the same string back.
+- **`ApiCursorPageMapper`:** reads `data` and `meta.{per_page,next_cursor,prev_cursor}` from an `Illuminate\Http\Client\Response` and builds the request query (`per_page`, `cursor`, `filter`, names configurable, unset values left out).
+- **Loud failures:** an answer without `data`, `meta`, an integer `meta.per_page` or the two cursor keys, or with a token that is not a Laravel cursor, throws `ApiException`. A broken answer never reads as "last page, no results". An empty cursor string counts as no cursor.
+- **Own links:** the page links use the path you pass in, so URLs of the API never leak into your responses. The request query stays in the links.
+
+The mapper expects the shape a Laravel resource collection produces. An API with another shape needs a small mapper of its own that feeds `RelayedCursorPaginator`, which knows no token format.
+
+### Upgrade notes
+
+No action required. Nothing is bound in the container, and `ReadModelCursorPaginator` is unchanged. Applications that built a page value object for API lists themselves can replace it with `ApiCursorPageMapper` and return `Resource::collection($page)` directly.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.8.0...v0.8.1
+
 ## v0.8.0 - 2026-10-17
 
 This release adds cursor pagination for read models and opt-in support for aggregates that live behind an HTTP API, and fixes `Entity::hydrate()` for models that do not carry every attribute. It is additive; existing database-backed code needs no changes.
@@ -21,6 +63,7 @@ return ReadModelCursorPaginator::fromPage(
     $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
     fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
 );
+
 
 ```
 - **Source tracking:** each read model keeps its source model, and the cursor values are read from there. The domain stays free of persistence knowledge.
@@ -84,6 +127,7 @@ public function validate(): array
 }
 
 
+
 ```
 `isValid()` is unchanged (`validate() === []`).
 
@@ -106,6 +150,7 @@ $exceptions->render(function (DomainValidationException $e) {
         ? null
         : throw LaravelValidationException::withMessages($e->errors());
 });
+
 
 
 ```
@@ -254,6 +299,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -287,6 +333,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -342,6 +389,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 
