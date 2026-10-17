@@ -126,10 +126,9 @@ There is no `database/` directory, and the migration loader in `TestCase::getEnv
 
 ## Commits & PRs
 
-- Conventional Commits: `type(scope): description`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. PR titles are checked by CodeRabbit in warning mode — advisory, not a blocking CI gate.
+- Conventional Commits: `type(scope): description`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
 - Phased, isolated commits: pure style changes separate from logic and type fixes. Never mix a Pint run into a feature commit.
 - CI on PHP 8.4 / Laravel 13: `run-qm.yml` (Pint `--test`, PHPStan, Deptrac; push + PR), `run-tests.yml` (Pest; **push only — tests do not run on pull requests**), `update-changelog.yml` (on release).
-- CodeRabbit auto-reviews PRs (`chill` profile, request-changes workflow) with per-layer instructions from `.coderabbit.yaml`.
 - `CHANGELOG.md` is generated on release — do not edit it by hand.
 - `composer.lock` is gitignored, and CI runs `composer update`. Dependency resolution is never reproducible; suspect a fresh upstream release before blaming the diff for a CI-only failure.
 
