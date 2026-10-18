@@ -163,9 +163,9 @@ final class Article extends Aggregate
     /**
      * Rebuild the aggregate from its persisted state.
      *
-     * @deprecated Prefer the mapper for hydration. The base Entity still
-     *             declares this as an abstract hook, so it is implemented
-     *             here for completeness.
+     * This is the hook the mapper calls to hydrate the aggregate. It is
+     * the one place where the Domain touches an Eloquent model; the
+     * `InfraModel` layer in `deptrac.yaml` permits exactly that.
      */
     public static function fromState(Model $state): static
     {
