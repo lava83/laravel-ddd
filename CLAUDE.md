@@ -128,7 +128,7 @@ There is no `database/` directory, and the migration loader in `TestCase::getEnv
 
 - Conventional Commits: `type(scope): description`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
 - Phased, isolated commits: pure style changes separate from logic and type fixes. Never mix a Pint run into a feature commit.
-- CI on PHP 8.4 / Laravel 13: `run-qm.yml` (Pint `--test`, PHPStan, Deptrac; push + PR), `run-tests.yml` (Pest; **push only — tests do not run on pull requests**), `update-changelog.yml` (on release).
+- CI on PHP 8.4 / Laravel 13: `run-qa.yml` (Pint `--test`, PHPStan, Deptrac, Pest; push + PR), `update-changelog.yml` (on release).
 - `CHANGELOG.md` is generated on release — do not edit it by hand.
 - `composer.lock` is gitignored, and CI runs `composer update`. Dependency resolution is never reproducible; suspect a fresh upstream release before blaming the diff for a CI-only failure.
 
@@ -139,7 +139,6 @@ There is no `database/` directory, and the migration loader in `TestCase::getEnv
 - **Domain events now dispatch on every save with uncommitted events, and after the transaction commits.** `saveEntity()` calls `dispatchUncommittedEvents()` unconditionally (the old dirty-gated drop is gone), and `DomainEventPublisher` defers each dispatch via `DB::afterCommit()` — so a rollback drops the events and listeners run post-commit. The seam for persisting dependent rows *before* dispatch is the protected `syncDependencies()` hook. See `.claude/infrastructure.md`.
 - `pestphp/pest-plugin-arch` has a single `arch()` rule so far (no mutable `Carbon` in the Domain, `tests/Foundation/ArchitectureTest.php`). That is the tool for the structural rules still left unenforced.
 - Existing purity violations in the Domain that Deptrac cannot see: `Illuminate\Support\Facades\Validator` in `Email.php`, `Illuminate\Support\Fluent` in `Json.php`. Known, not yet decided — do not "fix" them unasked.
-- `run-qm.yml` is internally named `run-qa` and its `paths:` filters reference a nonexistent `.github/workflows/run-qa.yml`, so edits to that workflow do not retrigger it.
 - Renovate and Dependabot are both active on `composer`, with overlapping scope.
 
 ## Don't
