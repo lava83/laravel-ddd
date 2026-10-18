@@ -217,10 +217,39 @@ describe('timestamps and version accessors', function (): void {
             ->and($entity->updatedAt()->getTimestamp())->toBe($updatedAt->getTimestamp());
     });
 
-    it('falls back to now when updatedAt is null', function (): void {
-        $entity = new EntityTestSubject(EntityTestId::generate(), 'Alice');
+    describe('when the entity was never updated', function (): void {
+        it('falls back to createdAt', function (): void {
+            $createdAt = CarbonImmutable::now()->subDays(3);
 
-        expect($entity->updatedAt()->getTimestamp())->toBe(CarbonImmutable::now()->getTimestamp());
+            $entity = reconstituteSubject(['created_at' => $createdAt, 'updated_at' => null]);
+
+            expect($entity->updatedAt()->getTimestamp())->toBe($createdAt->getTimestamp());
+        });
+
+        it('returns the same value on every call, however much time passes', function (): void {
+            $entity = new EntityTestSubject(EntityTestId::generate(), 'Alice');
+
+            $first = $entity->updatedAt();
+
+            $this->travel(5)->minutes();
+
+            expect($entity->updatedAt()->getTimestamp())->toBe($first->getTimestamp())
+                ->and($entity->updatedAt()->getTimestamp())->toBe($entity->createdAt()->getTimestamp());
+        });
+
+        it('keeps reporting a null updated_at for persistence', function (): void {
+            $entity = new EntityTestSubject(EntityTestId::generate(), 'Alice');
+
+            expect($entity->toArray()['updated_at'])->toBeNull();
+        });
+
+        it('mirrors createdAt in the auditing metadata', function (): void {
+            $entity = new EntityTestSubject(EntityTestId::generate(), 'Alice');
+
+            $this->travel(5)->minutes();
+
+            expect($entity->metadata()['updated_at'])->toBe($entity->metadata()['created_at']);
+        });
     });
 
     it('computes age helpers against frozen time', function (): void {
