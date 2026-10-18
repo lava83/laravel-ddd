@@ -66,7 +66,7 @@ Run `composer qa` before proposing anything as done. If a gate fails, report the
 
 Two deliberate exceptions:
 
-- **`InfraModel`** is `Infrastructure\Models\Model` hoisted into its own layer, so the Domain may touch it (legacy `Entity::fromState()`). Deprecated — do not add new usages.
+- **`InfraModel`** is `Infrastructure\Models\Model` hoisted into its own layer, so the Domain may touch it (`Entity::fromState()`). A permanent, stable exception: `fromState()` is the abstract hydration hook every entity implements. The Domain may touch this one class and nothing else from Infrastructure.
 - **`AllowedPrimitives`** lists the vendor classes the Domain is meant to use: `Illuminate\Support\Collection`, `Illuminate\Support\Stringable`, `Illuminate\Validation\Rule`, `Illuminate\Database\RecordsNotFoundException`, `Carbon\CarbonImmutable`, `Carbon\CarbonInterface`, `Ramsey\Uuid\*`, `libphonenumber\*`.
 
 **`AllowedPrimitives` documents intent; it does not enforce it.** Deptrac ignores dependencies on classes belonging to no layer, so the Domain can import any other vendor class and any global helper (`collect()`, `now()`, `validator()`, `entity_mapper_resolver()`) with a green run. Purity in the Domain is a review job, not a CI job. Extending the list is an architecture decision — propose it, don't do it.

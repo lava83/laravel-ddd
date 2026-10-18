@@ -41,6 +41,8 @@ parameters:
               value: '#^Lava83\\LaravelDdd\\LaravelDdd(ServiceProvider)?$#'
 
     # --- The single Infrastructure class the Domain is allowed to touch ---
+    # Permanent exception: Entity::fromState(Model) is the hydration hook every
+    # entity implements. Do not add further classes to this layer.
     -   name: InfraModel
         collectors:
           -   type: classNameRegex
