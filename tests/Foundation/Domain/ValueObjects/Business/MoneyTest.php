@@ -36,3 +36,101 @@ describe('string representation', function (): void {
         }
     });
 });
+
+describe('construction', function (): void {
+    it('keeps amount and currency', function (): void {
+        $money = new Money(12.5, 'EUR');
+
+        expect($money->amount())->toBe(12.5)
+            ->and($money->currency())->toBe('EUR');
+    });
+
+    it('accepts zero', function (): void {
+        expect((new Money(0, 'USD'))->amount())->toBe(0.0);
+    });
+
+    it('accepts every supported currency', function (string $currency): void {
+        expect((new Money(1, $currency))->currency())->toBe($currency);
+    })->with(['USD', 'EUR', 'GBP']);
+
+    it('rejects a negative amount', function (): void {
+        expect(fn () => new Money(-0.01, 'EUR'))
+            ->toThrow(InvalidArgumentException::class, 'Amount cannot be negative');
+    });
+
+    it('rejects an unsupported currency', function (): void {
+        expect(fn () => new Money(1, 'CHF'))
+            ->toThrow(InvalidArgumentException::class, 'Unsupported currency');
+    });
+
+    it('treats the currency code as case sensitive', function (): void {
+        expect(fn () => new Money(1, 'eur'))
+            ->toThrow(InvalidArgumentException::class, 'Unsupported currency');
+    });
+
+    it('rejects a negative amount of cents in the factories', function (): void {
+        expect(fn () => Money::euros(-1))
+            ->toThrow(InvalidArgumentException::class, 'Amount cannot be negative');
+    });
+});
+
+describe('factories', function (): void {
+    it('reads the argument as cents', function (): void {
+        expect(Money::euros(1250)->amount())->toBe(12.5)
+            ->and(Money::dollars(5)->amount())->toBe(0.05)
+            ->and(Money::pounds(100)->amount())->toBe(1.0);
+    });
+
+    it('sets the currency', function (): void {
+        expect(Money::euros(1)->currency())->toBe('EUR')
+            ->and(Money::dollars(1)->currency())->toBe('USD')
+            ->and(Money::pounds(1)->currency())->toBe('GBP');
+    });
+});
+
+describe('symbols', function (): void {
+    it('maps each currency to its symbol', function (): void {
+        expect((new Money(1, 'EUR'))->currencySymbol())->toBe('€')
+            ->and((new Money(1, 'USD'))->currencySymbol())->toBe('$')
+            ->and((new Money(1, 'GBP'))->currencySymbol())->toBe('£');
+    });
+});
+
+describe('serialisation', function (): void {
+    it('exposes amount, currency and symbol as an array', function (): void {
+        expect((new Money(12.5, 'EUR'))->toArray())->toBe([
+            'amount' => 12.5,
+            'currency' => 'EUR',
+            'symbol' => '€',
+        ]);
+    });
+
+    it('serialises to the same array as json', function (): void {
+        $money = new Money(12.5, 'EUR');
+
+        expect($money->jsonSerialize())->toBe($money->toArray())
+            ->and(json_encode($money, JSON_UNESCAPED_UNICODE))->toBe('{"amount":12.5,"currency":"EUR","symbol":"€"}');
+    });
+});
+
+describe('equality', function (): void {
+    it('is equal when amount and currency match', function (): void {
+        expect((new Money(12.5, 'EUR'))->isEqual(new Money(12.5, 'EUR')))->toBeTrue();
+    });
+
+    it('is not equal when the amount differs', function (): void {
+        expect((new Money(12.5, 'EUR'))->isEqual(new Money(12.6, 'EUR')))->toBeFalse();
+    });
+
+    it('is not equal when the currency differs', function (): void {
+        expect((new Money(12.5, 'EUR'))->isEqual(new Money(12.5, 'USD')))->toBeFalse();
+    });
+});
+
+// Known defect found while characterising Money. It describes the behaviour we
+// want, not the one we have; turn it into a real test when it is fixed.
+describe('known defects', function (): void {
+    it('treats amounts that only differ by float noise as equal', function (): void {
+        expect((new Money(0.1 + 0.2, 'EUR'))->isEqual(new Money(0.3, 'EUR')))->toBeTrue();
+    })->todo('isEqual() compares floats with ===, so 0.1 + 0.2 is not equal to 0.3');
+});

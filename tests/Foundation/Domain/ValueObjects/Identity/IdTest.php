@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Lava83\LaravelDdd\Tests\Fixtures\Domain\ValueObjects\Identity\OtherPlainTestId;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\ValueObjects\Identity\PlainTestId;
 use Ramsey\Uuid\Uuid as RamseyUuid;
 use Ramsey\Uuid\UuidInterface;
@@ -42,4 +43,12 @@ describe('Id', function (): void {
     it('compares by string cast, so an int equals its numeric string', function (): void {
         expect(PlainTestId::fromValue(5)->equals(PlainTestId::fromValue('5')))->toBeTrue();
     });
+});
+
+// Known defect. It describes the behaviour we want, not the one we have; turn it
+// into a real test when Id::equals() takes the class into account.
+describe('known defects', function (): void {
+    it('is not equal to an identity of another type that wraps the same value', function (): void {
+        expect(PlainTestId::fromValue(1)->equals(OtherPlainTestId::fromValue(1)))->toBeFalse();
+    })->todo('Id::equals() compares only the stringified value, so PlainTestId(1) equals OtherPlainTestId(1)');
 });
