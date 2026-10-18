@@ -125,7 +125,7 @@ abstract class Entity implements Stringable
 
     public function updatedAt(): CarbonImmutable
     {
-        return $this->updatedAt ?? CarbonImmutable::now();
+        return $this->updatedAt ?? $this->createdAt;
     }
 
     /**
