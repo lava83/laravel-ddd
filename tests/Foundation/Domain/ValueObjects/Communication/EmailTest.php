@@ -136,6 +136,47 @@ describe('provider lists', function (): void {
     })->with(['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com', 'me.com', 'mac.com']);
 });
 
+describe('role based addresses', function (): void {
+    it('recognises a role', function (string $local): void {
+        expect(Email::fromString($local.'@example.com')->isRoleBased())->toBeTrue();
+    })->with([
+        'info' => 'info',
+        'support' => 'support',
+        'admin' => 'admin',
+        'postmaster' => 'postmaster',
+        'donotreply' => 'donotreply',
+        'with a dot' => 'hr.team',
+        'with a hyphen' => 'info-berlin',
+        'with an underscore' => 'sales_eu',
+        'with a tag' => 'info+news',
+        'with a digit' => 'support2',
+        'two letter role' => 'it',
+        'two letter role with a dot' => 'it.support',
+    ]);
+
+    it('does not take a name that only starts like a role for one', function (string $local): void {
+        expect(Email::fromString($local.'@example.com')->isRoleBased())->toBeFalse();
+    })->with([
+        'anna' => 'anna',
+        'italy' => 'italy',
+        'infoanna' => 'infoanna',
+        'hrabal' => 'hrabal',
+        'itsme' => 'itsme',
+        'helpful' => 'helpful',
+        'techno' => 'techno',
+        'billingsley' => 'billingsley',
+    ]);
+
+    it('does not take a role in the middle of the local part for one', function (): void {
+        expect(Email::fromString('anna.info@example.com')->isRoleBased())->toBeFalse();
+    });
+
+    it('does not lower the score of a name that only starts like a role', function (): void {
+        expect(Email::fromString('italy@firma.de')->hRScore())->toBe(100)
+            ->and(Email::fromString('info@firma.de')->hRScore())->toBe(70);
+    });
+});
+
 describe('derived values', function (): void {
     it('hides the local part but keeps its first and last character', function (string $local, string $expected): void {
         expect(Email::fromString($local.'@example.com')->obfuscate()->toString())->toBe($expected);

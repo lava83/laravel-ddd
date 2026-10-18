@@ -261,7 +261,12 @@ class Email extends ValueObject
             'donotreply',
         ];
 
-        return $this->localPart->startsWith($roleBasedPrefixes);
+        // A role stands on its own or is followed by anything but a letter
+        // (info.team, info-berlin, info+news, support2), so a name that merely
+        // starts like a role (italy, hrabal) is not taken for one.
+        $roles = implode('|', array_map(preg_quote(...), $roleBasedPrefixes));
+
+        return preg_match('/^(?:'.$roles.')(?!\p{L})/u', $this->localPart->toString()) === 1;
     }
 
     /**
