@@ -172,9 +172,9 @@ class Email extends ValueObject
 
     public function isValidForNotifications(): bool
     {
-        $blockedPrefixes = ['noreply', 'no-reply', 'donotreply', 'bounce'];
+        $blockedPrefixes = ['noreply', 'no-reply', 'donotreply', 'bounce', 'bounces'];
 
-        return ! $this->localPart->startsWith($blockedPrefixes);
+        return ! $this->localPartStartsWithWord($blockedPrefixes);
     }
 
     public function domainAge(): ?int
@@ -261,12 +261,7 @@ class Email extends ValueObject
             'donotreply',
         ];
 
-        // A role stands on its own or is followed by anything but a letter
-        // (info.team, info-berlin, info+news, support2), so a name that merely
-        // starts like a role (italy, hrabal) is not taken for one.
-        $roles = implode('|', array_map(preg_quote(...), $roleBasedPrefixes));
-
-        return preg_match('/^(?:'.$roles.')(?!\p{L})/u', $this->localPart->toString()) === 1;
+        return $this->localPartStartsWithWord($roleBasedPrefixes);
     }
 
     /**
@@ -297,6 +292,21 @@ class Email extends ValueObject
         }
 
         return max(0, min(100, $score));
+    }
+
+    /**
+     * Whether the local part starts with one of the words, standing on its own or
+     * followed by anything but a letter (info.team, info-berlin, info+news,
+     * support2). A name that merely starts like a word (italy, bouncer) does not
+     * match.
+     *
+     * @param  list<string>  $words
+     */
+    private function localPartStartsWithWord(array $words): bool
+    {
+        $alternatives = implode('|', array_map(preg_quote(...), $words));
+
+        return preg_match('/^(?:'.$alternatives.')(?!\p{L})/u', $this->localPart->toString()) === 1;
     }
 
     private function validate(Stringable $email): void

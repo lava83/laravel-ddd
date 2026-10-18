@@ -177,6 +177,29 @@ describe('role based addresses', function (): void {
     });
 });
 
+describe('notifications', function (): void {
+    it('is not valid for a sender that does not read', function (string $local): void {
+        expect(Email::fromString($local.'@example.com')->isValidForNotifications())->toBeFalse();
+    })->with([
+        'donotreply' => 'donotreply',
+        'bounce' => 'bounce',
+        'bounces' => 'bounces',
+        'with a hyphen' => 'bounce-1',
+        'with a dot' => 'bounce.handler',
+        'with a tag' => 'bounce+42',
+        'with a digit' => 'bounce2',
+    ]);
+
+    it('does not take a name that only starts like such a sender for one', function (string $local): void {
+        expect(Email::fromString($local.'@example.com')->isValidForNotifications())->toBeTrue();
+    })->with([
+        'anna' => 'anna',
+        'bouncer' => 'bouncer',
+        'bounced' => 'bounced',
+        'bounceback' => 'bounceback',
+    ]);
+});
+
 describe('derived values', function (): void {
     it('hides the local part but keeps its first and last character', function (string $local, string $expected): void {
         expect(Email::fromString($local.'@example.com')->obfuscate()->toString())->toBe($expected);
