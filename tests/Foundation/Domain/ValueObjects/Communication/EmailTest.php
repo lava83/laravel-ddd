@@ -120,6 +120,22 @@ describe('providers', function (): void {
     });
 });
 
+describe('provider lists', function (): void {
+    it('treats every german provider as personal', function (string $domain): void {
+        $email = Email::fromString('a@'.$domain);
+
+        expect($email->isGermanProvider())->toBeTrue()
+            ->and($email->isCompanyEmail())->toBeFalse();
+    })->with(['web.de', 'gmx.de', 'gmx.net', 't-online.de', 'freenet.de', 'arcor.de', '1und1.de', 'posteo.de', 'mailbox.org']);
+
+    it('treats the international providers as personal and not as german', function (string $domain): void {
+        $email = Email::fromString('a@'.$domain);
+
+        expect($email->isCompanyEmail())->toBeFalse()
+            ->and($email->isGermanProvider())->toBeFalse();
+    })->with(['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com', 'me.com', 'mac.com']);
+});
+
 describe('derived values', function (): void {
     it('hides the local part but keeps its first and last character', function (string $local, string $expected): void {
         expect(Email::fromString($local.'@example.com')->obfuscate()->toString())->toBe($expected);
