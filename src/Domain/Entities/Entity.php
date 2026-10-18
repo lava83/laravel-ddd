@@ -6,10 +6,10 @@ namespace Lava83\LaravelDdd\Domain\Entities;
 
 use BackedEnum;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use DateTimeInterface;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Container\CircularDependencyException;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
@@ -157,7 +157,7 @@ abstract class Entity implements Stringable
         // A value check, not hasAttribute(): the base model casts these columns, so
         // Eloquent reports them as present even when the source never carried them
         // (an API payload, a partial select). Absent values leave the entity as is.
-        /** @var Carbon|null $createdAtOnModel */
+        /** @var ?CarbonInterface $createdAtOnModel */
         $createdAtOnModel = $model->getAttribute('created_at');
 
         if ($createdAtOnModel !== null) {
@@ -166,7 +166,7 @@ abstract class Entity implements Stringable
 
         if ($model->hasAttribute('updated_at')) {
             /**
-             * @var Carbon $updatedAtOnModel
+             * @var ?CarbonInterface $updatedAtOnModel
              */
             $updatedAtOnModel = $model->getAttribute('updated_at');
             $this->updatedAt = filled($updatedAtOnModel)
