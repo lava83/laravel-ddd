@@ -29,7 +29,7 @@ class Money extends ValueObject
 
     public function __toString(): string
     {
-        return sprintf('%d %s', $this->amount, $this->currencySymbol());
+        return sprintf('%.2F %s', $this->amount, $this->currencySymbol());
     }
 
     public static function euros(int $amount): static
