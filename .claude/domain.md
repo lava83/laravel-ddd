@@ -7,7 +7,7 @@ The heart of the architecture. Read this before reviewing or scaffolding anythin
 - No Eloquent, no HTTP, no database concerns. The one exception is `Entity::fromState(Model $state)` — treated as deprecated by policy (there is no `@deprecated` annotation in the source), so do not add new usages.
 - Deptrac allows `Domain → AllowedPrimitives, InfraModel` only, but it cannot see classes outside its layers or any global helper. So `collect()`, `str()`, `now()`, `validator()` and arbitrary vendor imports pass a green run. Purity here is enforced in review, not by CI.
 - Everything is immutable: `readonly` on all Value Object properties, `readonly` on entity identity, `readonly class` for Domain Events. No setters — a "change" returns a new instance.
-- `CarbonImmutable`, never `Illuminate\Support\Carbon`. (`Entity.php` itself still violates this — known, don't fix unasked.)
+- `CarbonImmutable`, never `Illuminate\Support\Carbon`.
 - `declare(strict_types=1);` everywhere. Every property, parameter and return value typed.
 
 ## Value Objects

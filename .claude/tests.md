@@ -81,6 +81,6 @@ There is still no `database/` directory and no migration loader, but DB-backed s
 - **`syncDependencies()` ordering.** Subclass the base `Repository` in a fixture that overrides the hook and records when it fires, register a real listener that records when the event fires, and assert the hook ran first. See `SyncingAggregateTestRepository` and `RepositoryTest`'s `syncDependencies() hook` group.
 - **After-commit dispatch.** Use a *real* dispatcher — **not** `Event::fake()`, which swaps the dispatcher and bypasses `DB::afterCommit()` — and drive it inside a `DB::transaction()`: assert the event has not dispatched *inside* the transaction and *has* after it commits, and assert a thrown exception (rollback) drops it. See `DomainEventPublisherTest`'s `transaction-aware dispatch` group.
 
-## No arch tests
+## Arch tests
 
-`pestphp/pest-plugin-arch` is installed with zero `arch()` tests, while the structural rules Mago used to enforce are unenforced. That plugin is the obvious home for them.
+`pestphp/pest-plugin-arch` is in use, but only for one rule so far: `tests/Foundation/ArchitectureTest.php` forbids `Illuminate\Support\Carbon` and `Carbon\Carbon` anywhere in `Lava83\LaravelDdd\Domain`. The other structural rules Mago used to enforce (`final readonly` controllers, enum-only namespaces, `readonly` on Value Objects) are still unenforced. That plugin is the obvious home for them.
