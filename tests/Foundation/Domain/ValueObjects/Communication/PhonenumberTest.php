@@ -96,15 +96,12 @@ describe('representation', function (): void {
     });
 });
 
-// Known defects found while characterising Phonenumber. They describe the
-// behaviour we want, not the one we have; turn each into a real test when it is
-// fixed.
-describe('known defects', function (): void {
+describe('country codes', function (): void {
     it('normalises a north american number', function (): void {
         expect((new Phonenumber('+1 650 253 0000'))->value()->toString())->toBe('+16502530000');
-    })->todo('returns +1650)253-0000 with local area code (650)');
+    });
 
     it('rejects a country code it does not know with a ValidationException', function (): void {
         expect(fn () => new Phonenumber('+81 3 1234 5678'))->toThrow(ValidationException::class);
-    })->todo('a valid number passes validation, then CountryAreaCode::from() throws a ValueError');
+    });
 });
