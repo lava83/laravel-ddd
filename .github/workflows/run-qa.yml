@@ -48,7 +48,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo
-          coverage: none
+          coverage: ${{ matrix.php == '8.4' && 'pcov' || 'none' }}
 
       - name: Setup problem matchers
         run: |
@@ -70,4 +70,9 @@ jobs:
         run: vendor/bin/deptrac analyse --formatter=json --no-progress
 
       - name: Tests (Pest)
+        if: matrix.php != '8.4'
         run: vendor/bin/pest --ci
+
+      - name: Tests with coverage gate (Pest, min 90 %)
+        if: matrix.php == '8.4'
+        run: vendor/bin/pest --ci --coverage --min=90
