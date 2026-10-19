@@ -15,13 +15,19 @@ abstract readonly class DomainEvent implements DomainEventContract
     private CarbonImmutable $occurredOn;
 
     /**
+     * @var Collection<string, mixed>
+     */
+    private Collection $eventData;
+
+    /**
      * @param  Collection<string, mixed>  $eventData
      */
     final public function __construct(
         private readonly Id $aggregateId,
-        private readonly Collection $eventData = new Collection,
+        Collection $eventData = new Collection,
         private readonly int $eventVersion = 1,
     ) {
+        $this->eventData = new Collection($eventData->all());
         $this->occurredOn = CarbonImmutable::now();
     }
 
@@ -40,7 +46,7 @@ abstract readonly class DomainEvent implements DomainEventContract
      */
     public function eventData(): Collection
     {
-        return $this->eventData;
+        return new Collection($this->eventData->all());
     }
 
     public function eventVersion(): int
