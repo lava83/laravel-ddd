@@ -30,3 +30,5 @@ testbench.yaml
 /docs
 /coverage
 .deptrac.cache
+
+scratches/*
