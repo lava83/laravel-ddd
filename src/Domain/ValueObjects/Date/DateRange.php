@@ -24,7 +24,7 @@ class DateRange extends ValueObject
         $this->startDate = CarbonImmutable::instance($startDate);
         $this->endDate = CarbonImmutable::instance($endDate);
 
-        $this->validate();
+        parent::__construct();
     }
 
     public function __toString(): string
@@ -390,14 +390,18 @@ class DateRange extends ValueObject
         );
     }
 
-    private function validate(): void
+    protected function validate(): array
     {
+        $errors = [];
+
         if ($this->startDate->isAfter($this->endDate)) {
-            throw new ValidationException('Start date cannot be after end date');
+            $errors['startDate'][] = 'Start date cannot be after end date';
         }
 
         if ($this->startDate->diffInYears($this->endDate) > 10) {
-            throw new ValidationException('Date range cannot exceed 10 years');
+            $errors['endDate'][] = 'Date range cannot exceed 10 years';
         }
+
+        return $errors;
     }
 }

@@ -12,7 +12,9 @@ The heart of the architecture. Read this before reviewing or scaffolding anythin
 
 ## Value Objects
 
-`ValueObject` is `abstract class ValueObject implements JsonSerializable, Stringable`. It implements nothing itself, but the two interfaces make `jsonSerialize()` and `__toString()` **mandatory** — omit either and you get a fatal error. Everything else below (`value()`, `equals()`, the static factories) is convention. Follow it anyway.
+`ValueObject` is `abstract class ValueObject implements JsonSerializable, Stringable`. The two interfaces make `jsonSerialize()` and `__toString()` **mandatory** — omit either and you get a fatal error. So does `abstract protected function validate(): array`, which the base constructor calls: a non-empty result (messages keyed by property name, like `Entity::validate()`) throws `ValidationException::fromArray()`. Everything else below (`value()`, `equals()`, the static factories) is convention. Follow it anyway.
+
+**Every concrete constructor must call `parent::__construct()`**, after assigning the properties `validate()` reads and before deriving anything from them. Forgetting it silently skips validation; `ArchitectureTest` checks the package VOs for it (and that `validate()` is not public), your own VOs are on you.
 
 ```php
 <?php
@@ -26,20 +28,17 @@ use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
 final class Title extends ValueObject
 {
-    private function __construct(private readonly string $value) {}
+    private function __construct(private readonly string $value)
+    {
+        parent::__construct();
+    }
 
     /**
      * @throws ValidationException
      */
     public static function fromString(string $value): self
     {
-        $value = trim($value);
-
-        if ($value === '' || mb_strlen($value) > 255) {
-            throw new ValidationException('Title must be between 1 and 255 characters.');
-        }
-
-        return new self($value);
+        return new self(trim($value));
     }
 
     public function value(): string
@@ -61,16 +60,25 @@ final class Title extends ValueObject
     {
         return $this->value;
     }
+
+    protected function validate(): array
+    {
+        if ($this->value === '' || mb_strlen($this->value) > 255) {
+            return ['value' => ['Title must be between 1 and 255 characters.']];
+        }
+
+        return [];
+    }
 }
 ```
 
-Conventions: private constructor, static factories (`fromString()`, `fromArray()`, `generate()`), validation inside the factory or constructor, `ValidationException` on failure (code 422 by default). A plain `new ValidationException('…')` carries only a message; `ValidationException::fromArray(array<string, list<string>> $errors)` keeps the bag (`errors()`, keyed by property name) and joins all messages with spaces for `getMessage()`.
+Conventions: private constructor, static factories (`fromString()`, `fromArray()`, `generate()`), validation in `validate()` (never in the factory), `ValidationException` on failure (code 422 by default). A plain `new ValidationException('…')` carries only a message; `ValidationException::fromArray(array<string, list<string>> $errors)` keeps the bag (`errors()`, keyed by property name) and joins all messages with spaces for `getMessage()`.
 
 Package VOs live in `ValueObjects/{Address,Business,Communication,Content,Data,Date,Identity}`. Reuse before adding.
 
 ## Identities
 
-`Id` is the identity base: `final protected __construct(int|string|UuidInterface $value)`, plus `static fromValue()`, `static fromString()`, `equals(Id $other)`, `value()`. The constructor is `final protected` — subclasses cannot add constructor parameters.
+`Id` is the identity base: `final protected __construct(int|string|UuidInterface $value)`, plus `static fromValue()`, `static fromString()`, `equals(Id $other)`, `value()`. The constructor is `final protected` — subclasses cannot add constructor parameters. Id rules go into `protected validate(): array`, which reads `$this->value` (`Integer` and `MongoObjectId` do this); the old hook `validate($value): void` is gone.
 
 Concrete identity types are one-liners:
 

@@ -22,7 +22,9 @@ class GeoAddress extends ValueObject
         private readonly ?string $precision,
         private readonly CarbonImmutable $createdAt,
         private readonly CarbonImmutable $updatedAt,
-    ) {}
+    ) {
+        parent::__construct();
+    }
 
     /**
      * @param array{
@@ -155,5 +157,10 @@ class GeoAddress extends ValueObject
             'created_at' => $this->createdAt->toIso8601String(),
             'updated_at' => $this->updatedAt->toIso8601String(),
         ];
+    }
+
+    protected function validate(): array
+    {
+        return [];
     }
 }

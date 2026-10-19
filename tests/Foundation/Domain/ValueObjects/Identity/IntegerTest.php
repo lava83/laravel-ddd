@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\ValueObjects\Identity\IntegerTestId;
 use Ramsey\Uuid\Uuid as RamseyUuid;
 
@@ -25,22 +26,22 @@ describe('Integer', function (): void {
 
         it('rejects a non-integer value', function (): void {
             expect(fn () => IntegerTestId::fromValue('5'))
-                ->toThrow(InvalidArgumentException::class, 'Integer ID can be only integer');
+                ->toThrow(ValidationException::class, 'Integer ID can be only integer');
         });
 
         it('rejects an empty value', function (): void {
             expect(fn () => IntegerTestId::fromValue(''))
-                ->toThrow(InvalidArgumentException::class, 'Integer ID cannot be empty');
+                ->toThrow(ValidationException::class, 'Integer ID cannot be empty');
         });
 
         it('rejects a uuid value', function (): void {
             expect(fn () => IntegerTestId::fromValue(RamseyUuid::uuid4()))
-                ->toThrow(InvalidArgumentException::class, 'Integer ID can be only integer');
+                ->toThrow(ValidationException::class, 'Integer ID can be only integer');
         });
 
         it('rejects a non-integer routed through the inherited fromString', function (): void {
             expect(fn () => IntegerTestId::fromString('abc'))
-                ->toThrow(InvalidArgumentException::class, 'Integer ID can be only integer');
+                ->toThrow(ValidationException::class, 'Integer ID can be only integer');
         });
     });
 

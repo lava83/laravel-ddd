@@ -23,7 +23,7 @@ class Json extends ValueObject
     private function __construct(
         private readonly string $value,
     ) {
-        $this->validate($value);
+        parent::__construct();
 
         /**
          * @var array<string, mixed> $jsonDecodedValue
@@ -231,14 +231,16 @@ class Json extends ValueObject
     /**
      * @throws ValidationException
      */
-    private function validate(string $value): void
+    protected function validate(): array
     {
-        if (trim($value) === '') {
-            throw new ValidationException('JSON string cannot be empty');
+        if (trim($this->value) === '') {
+            return ['value' => ['JSON string cannot be empty']];
         }
 
-        if (! json_validate($value)) {
-            throw new ValidationException('Invalid JSON: '.json_last_error_msg());
+        if (! json_validate($this->value)) {
+            return ['value' => ['Invalid JSON: '.json_last_error_msg()]];
         }
+
+        return [];
     }
 }

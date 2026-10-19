@@ -55,10 +55,10 @@ class Email extends ValueObject
      */
     final public function __construct(string $email)
     {
-        $email = str($email);
+        $this->value = str($email)->lower()->trim();
 
-        $this->validate($email);
-        $this->value = $email->lower()->trim();
+        parent::__construct();
+
         $this->parseEmailParts();
     }
 
@@ -309,12 +309,10 @@ class Email extends ValueObject
         return preg_match('/^(?:'.$alternatives.')(?!\p{L})/u', $this->localPart->toString()) === 1;
     }
 
-    private function validate(Stringable $email): void
+    protected function validate(): array
     {
-        $email = $email->trim();
-
-        $validator = Validator::make(['email' => $email], [
-            'email' => [
+        $validator = Validator::make(['value' => $this->value], [
+            'value' => [
                 'required',
                 'email:rfc',
                 fn (string $attribute, string $value, Closure $fail) => $this->validateBusiness(str($value), $fail),
@@ -322,8 +320,10 @@ class Email extends ValueObject
         ]);
 
         if ($validator->fails()) {
-            throw new ValidationException('Invalid email format provided');
+            return ['value' => ['Invalid email format provided']];
         }
+
+        return [];
     }
 
     private function validateBusiness(Stringable $email, Closure $fail): void

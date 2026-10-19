@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Lava83\LaravelDdd\Domain\ValueObjects\Content;
 
 use Illuminate\Support\Stringable;
-use Illuminate\Validation\Rule;
 use Lava83\LaravelDdd\Domain\ValueObjects\Content\Enums\ColorEnum;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
@@ -15,9 +14,9 @@ class Color extends ValueObject
 
     final public function __construct(string $color)
     {
-        $color = str($color)->lower()->trim();
-        $this->validate($color);
-        $this->value = $color;
+        $this->value = str($color)->lower()->trim();
+
+        parent::__construct();
     }
 
     public function __toString(): string
@@ -40,15 +39,12 @@ class Color extends ValueObject
         return (string) $this->value;
     }
 
-    private function validate(Stringable $color): void
+    protected function validate(): array
     {
-        validator()
-            ->make(['color' => $color], [
-                'color' => [
-                    'required',
-                    Rule::enum(ColorEnum::class),
-                ],
-            ])
-            ->validate();
+        if (ColorEnum::tryFrom((string) $this->value) === null) {
+            return ['value' => ['Unsupported color: '.$this->value]];
+        }
+
+        return [];
     }
 }

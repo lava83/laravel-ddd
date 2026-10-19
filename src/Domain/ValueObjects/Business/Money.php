@@ -4,27 +4,17 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Domain\ValueObjects\Business;
 
-use InvalidArgumentException;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
 class Money extends ValueObject
 {
-    private readonly float $amount;
+    private const SYMBOLS = ['USD' => '$', 'EUR' => '€', 'GBP' => '£'];
 
-    private readonly string $currency;
-
-    final public function __construct(float $amount, string $currency)
-    {
-        if ($amount < 0) {
-            throw new InvalidArgumentException('Amount cannot be negative');
-        }
-
-        if (! in_array($currency, ['USD', 'EUR', 'GBP'], true)) {
-            throw new InvalidArgumentException('Unsupported currency');
-        }
-
-        $this->amount = $amount;
-        $this->currency = $currency;
+    final public function __construct(
+        private readonly float $amount,
+        private readonly string $currency,
+    ) {
+        parent::__construct();
     }
 
     public function __toString(): string
@@ -59,11 +49,7 @@ class Money extends ValueObject
 
     public function currencySymbol(): string
     {
-        return match ($this->currency) {
-            'USD' => '$',
-            'EUR' => '€',
-            'GBP' => '£',
-        };
+        return self::SYMBOLS[$this->currency];
     }
 
     /**
@@ -89,5 +75,20 @@ class Money extends ValueObject
     public function isEqual(Money $other): bool
     {
         return $this->amount === $other->amount && $this->currency === $other->currency;
+    }
+
+    protected function validate(): array
+    {
+        $errors = [];
+
+        if ($this->amount < 0) {
+            $errors['amount'][] = 'Amount cannot be negative';
+        }
+
+        if (! array_key_exists($this->currency, self::SYMBOLS)) {
+            $errors['currency'][] = 'Unsupported currency';
+        }
+
+        return $errors;
     }
 }
