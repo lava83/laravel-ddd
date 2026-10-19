@@ -74,18 +74,16 @@ describe('representation', function (): void {
     });
 });
 
-// Known defects found while characterising Link. They describe the behaviour we
-// want, not the one we have; turn each into a real test when it is fixed.
-describe('known defects', function (): void {
+describe('url parts', function (): void {
     it('accepts a url without a path', function (): void {
         expect(Link::fromString('https://example.com')->host()->toString())->toBe('example.com');
-    })->todo('throws ErrorException: Undefined array key "path"');
+    });
 
     it('keeps the port of the url', function (): void {
         expect(Link::fromString('https://example.com:8080/a')->value()->toString())->toBe('https://example.com:8080/a');
-    })->todo('port is dropped silently, https://example.com/a is returned');
+    });
 
     it('keeps the userinfo of the url', function (): void {
         expect(Link::fromString('https://user:pw@example.com/a')->value()->toString())->toBe('https://user:pw@example.com/a');
-    })->todo('userinfo is dropped silently');
+    });
 });

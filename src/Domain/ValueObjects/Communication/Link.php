@@ -85,12 +85,14 @@ class Link extends ValueObject
 
         $this->scheme = str($parts['scheme']);
         $this->host = str($parts['host']);
-        $this->path = str($parts['path']);
+        $this->path = str($parts['path'] ?? '');
         $this->query = str($parts['query'] ?? '');
 
+        $userinfo = isset($parts['user']) ? $parts['user'].(isset($parts['pass']) ? ':'.$parts['pass'] : '').'@' : '';
+        $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+
         $this->value = $this->scheme
-            ->append('://')
-            ->append((string) $this->host)
+            ->append('://', $userinfo, (string) $this->host, $port)
             ->append((string) $this->path);
 
         if ($this->query->isNotEmpty()) {
