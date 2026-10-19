@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Illuminate\Validation\ValidationException;
+use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Domain\ValueObjects\Content\Color;
 use Lava83\LaravelDdd\Domain\ValueObjects\Content\Enums\ColorEnum;
 
@@ -21,9 +21,6 @@ describe('construction', function (): void {
     });
 });
 
-// These pin the exception type as it is today: the Laravel validator throws its
-// own ValidationException, not the Domain one. Adjust when validation moves
-// into ValueObject::validate().
 describe('rejection', function (): void {
     it('rejects a colour that is not in the enum', function (): void {
         expect(fn () => Color::fromString('chartreuse'))

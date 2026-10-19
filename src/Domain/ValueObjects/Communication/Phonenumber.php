@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Domain\ValueObjects\Communication;
 
-use Closure;
 use Illuminate\Support\Stringable;
 use Lava83\LaravelDdd\Domain\Enums\Communication\CountryAreaCode;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
@@ -25,11 +24,11 @@ class Phonenumber extends ValueObject
 
     public function __construct(string $number)
     {
-        $number = str($number);
+        $this->value = str($number);
 
-        $this->validate($number);
+        parent::__construct();
 
-        $this->parseNumberParts($number);
+        $this->parseNumberParts($this->value);
     }
 
     public function __toString(): string
@@ -102,29 +101,15 @@ class Phonenumber extends ValueObject
         );
     }
 
-    private function validate(Stringable $number): void
-    {
-        $number = $number->trim();
-
-        $validator = validator(['number' => $number], [
-            'number' => [
-                'required',
-                fn (string $attribute, string $value, Closure $fail) => $this->validatePhoneNumber($value, $fail),
-            ],
-        ]);
-
-        if ($validator->fails()) {
-            throw new ValidationException('Invalid phone number format provided');
-        }
-    }
-
-    private function validatePhoneNumber(string $value, Closure $fail): void
+    protected function validate(): array
     {
         try {
-            $this->numberProto($value);
-        } catch (NumberParseException $numberParseException) {
-            $fail('Failed to parse phone number: '.$numberParseException->getMessage());
+            $this->numberProto($this->value->trim()->toString());
+        } catch (ValidationException $validationException) {
+            return ['value' => [$validationException->getMessage()]];
         }
+
+        return [];
     }
 
     private function numberProto(string $value): LibphonenumberPhoneNumber

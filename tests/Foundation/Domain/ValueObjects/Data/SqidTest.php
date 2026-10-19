@@ -20,6 +20,13 @@ describe('fromInts', function (): void {
             ->toThrow(ValidationException::class, 'Sqid requires at least one integer');
     });
 
+    it('rejects a value that is not an integer even when it bypasses the factory', function (): void {
+        $reflection = new ReflectionClass(Sqid::class);
+
+        expect(fn () => $reflection->getConstructor()?->invoke($reflection->newInstanceWithoutConstructor(), [1, 'a', 2.5]))
+            ->toThrow(ValidationException::class, 'Sqid only supports integers, got: string Sqid only supports integers, got: float');
+    });
+
     it('rejects a negative integer and names it', function (): void {
         expect(fn () => Sqid::fromInts(1, -5))
             ->toThrow(ValidationException::class, 'Sqid only supports non-negative integers, got: -5');

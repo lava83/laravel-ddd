@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Domain\ValueObjects\Identity;
 
-use InvalidArgumentException;
 use Ramsey\Uuid\UuidInterface;
 
 abstract class Integer extends Id
@@ -39,14 +38,16 @@ abstract class Integer extends Id
         return (int) $this->value;
     }
 
-    protected function validate(int|string|UuidInterface $value): void
+    protected function validate(): array
     {
-        if (blank($value)) {
-            throw new InvalidArgumentException('Integer ID cannot be empty');
+        if (blank($this->value)) {
+            return ['value' => ['Integer ID cannot be empty']];
         }
 
-        if (! is_int($value)) {
-            throw new InvalidArgumentException('Integer ID can be only integer');
+        if (! is_int($this->value)) {
+            return ['value' => ['Integer ID can be only integer']];
         }
+
+        return [];
     }
 }

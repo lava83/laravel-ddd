@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Domain\ValueObjects\Business\Money;
 
 describe('string representation', function (): void {
@@ -55,22 +56,22 @@ describe('construction', function (): void {
 
     it('rejects a negative amount', function (): void {
         expect(fn () => new Money(-0.01, 'EUR'))
-            ->toThrow(InvalidArgumentException::class, 'Amount cannot be negative');
+            ->toThrow(ValidationException::class, 'Amount cannot be negative');
     });
 
     it('rejects an unsupported currency', function (): void {
         expect(fn () => new Money(1, 'CHF'))
-            ->toThrow(InvalidArgumentException::class, 'Unsupported currency');
+            ->toThrow(ValidationException::class, 'Unsupported currency');
     });
 
     it('treats the currency code as case sensitive', function (): void {
         expect(fn () => new Money(1, 'eur'))
-            ->toThrow(InvalidArgumentException::class, 'Unsupported currency');
+            ->toThrow(ValidationException::class, 'Unsupported currency');
     });
 
     it('rejects a negative amount of cents in the factories', function (): void {
         expect(fn () => Money::euros(-1))
-            ->toThrow(InvalidArgumentException::class, 'Amount cannot be negative');
+            ->toThrow(ValidationException::class, 'Amount cannot be negative');
     });
 });
 

@@ -12,7 +12,7 @@ abstract class Id extends ValueObject
     final protected function __construct(
         protected readonly int|string|UuidInterface $value,
     ) {
-        $this->validate($value);
+        parent::__construct();
     }
 
     public static function fromValue(int|string|UuidInterface $value): self
@@ -35,5 +35,8 @@ abstract class Id extends ValueObject
         return $this->value;
     }
 
-    protected function validate(string|int|UuidInterface $value): void {}
+    protected function validate(): array
+    {
+        return [];
+    }
 }

@@ -25,7 +25,10 @@ class Link extends ValueObject
      */
     final public function __construct(string $link)
     {
-        $this->validate($link);
+        $this->value = str($link);
+
+        parent::__construct();
+
         $this->extractParts($link);
     }
 
@@ -95,14 +98,16 @@ class Link extends ValueObject
         }
     }
 
-    private function validate(string $url): void
+    protected function validate(): array
     {
-        $validator = validator(['url' => $url], [
-            'url' => ['required', 'url'],
+        $validator = validator(['value' => (string) $this->value], [
+            'value' => ['required', 'url'],
         ]);
 
         if ($validator->fails()) {
-            throw new ValidationException('Invalid URL format provided');
+            return ['value' => ['Invalid URL format provided']];
         }
+
+        return [];
     }
 }

@@ -15,23 +15,15 @@ final class Sqid extends ValueObject
      */
     private function __construct(
         private readonly array $ids,
-    ) {}
+    ) {
+        parent::__construct();
+    }
 
     /**
      * @throws ValidationException
      */
     public static function fromInts(int ...$ids): self
     {
-        if ($ids === []) {
-            throw new ValidationException('Sqid requires at least one integer');
-        }
-
-        foreach ($ids as $id) {
-            if ($id < 0) {
-                throw new ValidationException('Sqid only supports non-negative integers, got: '.$id);
-            }
-        }
-
         return new self(array_values($ids));
     }
 
@@ -91,5 +83,30 @@ final class Sqid extends ValueObject
     public function jsonSerialize(): string
     {
         return $this->value();
+    }
+
+    protected function validate(): array
+    {
+        if ($this->ids === []) {
+            return ['ids' => ['Sqid requires at least one integer']];
+        }
+
+        $errors = [];
+
+        foreach ($this->ids as $id) {
+            // sqid_decode() is untyped and fromSqid() only asserts array<int> by annotation.
+            // @phpstan-ignore function.alreadyNarrowedType
+            if (! is_int($id)) {
+                $errors['ids'][] = 'Sqid only supports integers, got: '.get_debug_type($id);
+
+                continue;
+            }
+
+            if ($id < 0) {
+                $errors['ids'][] = 'Sqid only supports non-negative integers, got: '.$id;
+            }
+        }
+
+        return $errors;
     }
 }

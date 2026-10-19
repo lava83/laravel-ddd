@@ -11,7 +11,9 @@ final class PolymorphicReference extends ValueObject
     private function __construct(
         private readonly string $alias,
         private readonly Id $id,
-    ) {}
+    ) {
+        parent::__construct();
+    }
 
     public static function of(string $alias, Id $id): self
     {
@@ -48,5 +50,10 @@ final class PolymorphicReference extends ValueObject
             'type' => $this->alias,
             'id' => $this->id->jsonSerialize(),
         ];
+    }
+
+    protected function validate(): array
+    {
+        return [];
     }
 }
