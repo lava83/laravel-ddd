@@ -12,6 +12,38 @@ use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
 class Email extends ValueObject
 {
+    /**
+     * Personal mail providers outside Germany. Every German provider counts as
+     * personal as well, see isCompanyEmail().
+     *
+     * @var list<string>
+     */
+    private const array INTERNATIONAL_PERSONAL_PROVIDERS = [
+        'gmail.com',
+        'yahoo.com',
+        'hotmail.com',
+        'outlook.com',
+        'aol.com',
+        'icloud.com',
+        'me.com',
+        'mac.com',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const array GERMAN_PROVIDERS = [
+        'web.de',
+        'gmx.de',
+        'gmx.net',
+        't-online.de',
+        'freenet.de',
+        'arcor.de',
+        '1und1.de',
+        'posteo.de',
+        'mailbox.org',
+    ];
+
     private readonly Stringable $value;
 
     private Stringable $localPart;
@@ -95,42 +127,14 @@ class Email extends ValueObject
 
     public function isCompanyEmail(): bool
     {
-        // Common personal email providers
-        $personalProviders = [
-            'gmail.com',
-            'yahoo.com',
-            'hotmail.com',
-            'outlook.com',
-            'web.de',
-            'gmx.de',
-            'gmx.net',
-            't-online.de',
-            'freenet.de',
-            'arcor.de',
-            'aol.com',
-            'icloud.com',
-            'me.com',
-            'mac.com',
-        ];
+        $personalProviders = [...self::INTERNATIONAL_PERSONAL_PROVIDERS, ...self::GERMAN_PROVIDERS];
 
         return in_array((string) $this->domainWithoutSubdomain(), $personalProviders, true) === false;
     }
 
     public function isGermanProvider(): bool
     {
-        $germanProviders = [
-            'web.de',
-            'gmx.de',
-            'gmx.net',
-            't-online.de',
-            'freenet.de',
-            'arcor.de',
-            '1und1.de',
-            'posteo.de',
-            'mailbox.org',
-        ];
-
-        return in_array((string) $this->domainWithoutSubdomain(), $germanProviders, true);
+        return in_array((string) $this->domainWithoutSubdomain(), self::GERMAN_PROVIDERS, true);
     }
 
     public function obfuscate(): Stringable
@@ -168,9 +172,9 @@ class Email extends ValueObject
 
     public function isValidForNotifications(): bool
     {
-        $blockedPrefixes = ['noreply', 'no-reply', 'donotreply', 'bounce'];
+        $blockedPrefixes = ['noreply', 'no-reply', 'donotreply', 'bounce', 'bounces'];
 
-        return ! $this->localPart->startsWith($blockedPrefixes);
+        return ! $this->localPartStartsWithWord($blockedPrefixes);
     }
 
     public function domainAge(): ?int
@@ -257,7 +261,7 @@ class Email extends ValueObject
             'donotreply',
         ];
 
-        return $this->localPart->startsWith($roleBasedPrefixes);
+        return $this->localPartStartsWithWord($roleBasedPrefixes);
     }
 
     /**
@@ -288,6 +292,21 @@ class Email extends ValueObject
         }
 
         return max(0, min(100, $score));
+    }
+
+    /**
+     * Whether the local part starts with one of the words, standing on its own or
+     * followed by anything but a letter (info.team, info-berlin, info+news,
+     * support2). A name that merely starts like a word (italy, bouncer) does not
+     * match.
+     *
+     * @param  list<string>  $words
+     */
+    private function localPartStartsWithWord(array $words): bool
+    {
+        $alternatives = implode('|', array_map(preg_quote(...), $words));
+
+        return preg_match('/^(?:'.$alternatives.')(?!\p{L})/u', $this->localPart->toString()) === 1;
     }
 
     protected function validate(): array
