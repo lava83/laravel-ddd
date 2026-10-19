@@ -128,10 +128,8 @@ describe('equality', function (): void {
     });
 });
 
-// Known defect found while characterising Money. It describes the behaviour we
-// want, not the one we have; turn it into a real test when it is fixed.
-describe('known defects', function (): void {
+describe('rounding', function (): void {
     it('treats amounts that only differ by float noise as equal', function (): void {
         expect((new Money(0.1 + 0.2, 'EUR'))->isEqual(new Money(0.3, 'EUR')))->toBeTrue();
-    })->todo('isEqual() compares floats with ===, so 0.1 + 0.2 is not equal to 0.3');
+    });
 });

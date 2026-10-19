@@ -74,7 +74,8 @@ class Money extends ValueObject
 
     public function isEqual(Money $other): bool
     {
-        return $this->amount === $other->amount && $this->currency === $other->currency;
+        return $this->currency === $other->currency
+            && (int) round($this->amount * 100) === (int) round($other->amount * 100);
     }
 
     protected function validate(): array
