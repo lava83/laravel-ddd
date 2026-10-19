@@ -27,7 +27,8 @@ abstract class Id extends ValueObject
 
     public function equals(Id $other): bool
     {
-        return (string) $this->value === (string) $other->value;
+        return $this::class === $other::class
+            && (string) $this->value === (string) $other->value;
     }
 
     public function value(): int|string|UuidInterface
