@@ -29,12 +29,14 @@ use ReflectionException;
  *
  * @extends Entity<TModel, TId>
  *
+ * @implements AggregateRoot<TId>
+ *
  * @phpstan-type EntityPropertyValue null|bool|string|int|float|array<array-key, mixed>|BackedEnum|Collection<array-key, mixed>|ValueObject|Entity<*,*>|CarbonImmutable
  */
 abstract class Aggregate extends Entity implements AggregateRoot
 {
     /**
-     * @param  Collection<int, DomainEvent>  $domainEvents
+     * @param  Collection<int, DomainEvent<TId>>  $domainEvents
      */
     public function __construct(
         private Collection $domainEvents = new Collection,
@@ -74,6 +76,8 @@ abstract class Aggregate extends Entity implements AggregateRoot
 
     /**
      * Domain Events Management
+     *
+     * @param  DomainEvent<TId>  $event
      */
     public function recordEvent(DomainEvent $event): void
     {
@@ -81,7 +85,7 @@ abstract class Aggregate extends Entity implements AggregateRoot
     }
 
     /**
-     * @return Collection<int, DomainEvent>
+     * @return Collection<int, DomainEvent<TId>>
      */
     public function uncommittedEvents(): Collection
     {
@@ -129,6 +133,9 @@ abstract class Aggregate extends Entity implements AggregateRoot
         ]);
     }
 
+    /**
+     * @return DomainEvent<TId>|null
+     */
     public function eventByType(string $eventName): ?DomainEvent
     {
         return $this->domainEvents->first(fn (DomainEvent $event): bool => $event->eventName() === $eventName) ?? null;
@@ -140,7 +147,7 @@ abstract class Aggregate extends Entity implements AggregateRoot
     public function clearEventsOfType(string $eventName): void
     {
         /**
-         * @var Collection<int, DomainEvent> $filteredDomainEvents
+         * @var Collection<int, DomainEvent<TId>> $filteredDomainEvents
          */
         $filteredDomainEvents = $this->domainEvents->filter(
             fn (DomainEvent $event): bool => $event->eventName() !== $eventName,
@@ -161,8 +168,8 @@ abstract class Aggregate extends Entity implements AggregateRoot
      * Helper method for aggregate roots to update and record change event
      *
      * @param  array<string, EntityPropertyValue>  $changes  Key-value pairs of changes made to the aggregate
-     * @param  class-string<DomainEventClass>|null  $eventClass  Optional event class to instantiate
-     * @param  DomainEvent|null  $event  Optional pre-created event instance
+     * @param  class-string<DomainEventClass<TId>>|null  $eventClass  Optional event class to instantiate
+     * @param  DomainEvent<TId>|null  $event  Optional pre-created event instance
      *
      * @throws ReflectionException
      * @throws ValidationException

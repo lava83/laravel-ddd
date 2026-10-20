@@ -162,7 +162,7 @@ What still cannot be seen is an **in-place mutation handed back as the same inst
 
 ## Domain Events
 
-`DomainEvent` is an `abstract readonly class` with a **`final` constructor**: `(Id $aggregateId, Collection $eventData = new Collection, int $eventVersion = 1)`. Concrete events therefore add no constructor parameters and override only `eventName()` — the single interface member the base leaves unimplemented:
+`DomainEvent` is an `abstract readonly class` with a **`final` constructor**: `(Id $aggregateId, Collection|array $eventData = new Collection, int $eventVersion = 1)`. The payload is copied into a fresh `Collection` on the way in and `eventData()` hands out a copy, so neither the caller nor a reader can change the event. The class is generic over the identity (`@template-covariant TId of Id`); concrete events name it with `@extends DomainEvent<ArticleId>`, so `aggregateId()` is typed. Concrete events add no constructor parameters and override only `eventName()` — the single interface member the base leaves unimplemented:
 
 ```php
 <?php
@@ -171,6 +171,9 @@ declare(strict_types=1);
 
 namespace App\Domain\Blog\Events;
 
+/**
+ * @extends DomainEvent<ArticleId>
+ */
 final readonly class ArticleRenamed extends DomainEvent
 {
     public function eventName(): string
