@@ -2,6 +2,109 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v1.0.0 - 2026-10-20
+
+First stable release. From here on the package follows semantic versioning: breaking changes only in a new major version. The domain layer was tightened on the way, so **this release contains breaking changes for value objects, identities and domain events**; the upgrade notes below list every one of them.
+
+`Entity::fromState()` and the `Infrastructure\Models\Model` it receives are a permanent, stable exception to the layering rules and will not be removed.
+
+### Changed
+
+#### Every value object validates itself
+
+`ValueObject` now works like `Entity`: its constructor calls the abstract, protected `validate(): array` and throws a `ValidationException` (built with `ValidationException::fromArray()`) when it returns errors. The errors are keyed by property name.
+
+```php
+final class Title extends ValueObject
+{
+    private function __construct(private readonly string $value)
+    {
+        parent::__construct();
+    }
+
+    public static function fromString(string $value): self
+    {
+        return new self(trim($value));
+    }
+
+    protected function validate(): array
+    {
+        if ($this->value === '' || mb_strlen($this->value) > 255) {
+            return ['value' => ['Title must be between 1 and 255 characters.']];
+        }
+
+        return [];
+    }
+}
+
+```
+All 13 built-in value objects use it. An architecture test checks that every concrete value object of the package calls `parent::__construct()` and keeps `validate()` out of its public API.
+
+#### Immutable timestamps in `Entity`
+
+`Entity` no longer touches Laravel's mutable `Carbon`; timestamps are `CarbonImmutable` and the architecture test forbids `Carbon` in the domain. `updatedAt()` returns `createdAt()` until the entity is updated for the first time.
+
+#### Typed domain events
+
+`DomainEvent`, `AggregateRoot` and `Aggregate` carry a `TId` template, so `aggregateId()` is typed. The `DomainEvent` payload may be a `Collection` or an array and is copied into a new `Collection` on the way in and out, so neither the caller nor a reader can change an event. `updateEntity()` and `updateAggregateRoot()` accept `Collection|array` for `$changes` as well.
+
+### Fixed
+
+- **`Id::equals()`** compares the class before the value: `AccountId(1)` no longer equals `B2cUserId(1)`.
+- **`Money`:** `__toString()` keeps the decimals (`12.50 €`, was `12 €`), `isEqual()` compares cents instead of floats (`0.1 + 0.2` equals `0.3`).
+- **`Email`:**
+  - `isCompanyEmail()` and `isGermanProvider()` agree on the providers (`posteo.de`, `mailbox.org` are personal).
+  - `isRoleBased()` and `isValidForNotifications()` match whole words (`info.team`, `info-berlin` and `support2` match, `italy` and `bouncer` do not); `bounces` is blocked as well.
+  - The blocked domain list is no longer case sensitive.
+  - `domainWithoutSubdomain()` knows two-label public suffixes (`example.co.uk`, `example.com.au`, from a curated list, not the full public suffix list).
+  - `yahoo.co.uk` and `hotmail.co.uk` count as personal providers.
+  
+- **`DateRange`:** `singleDay()` no longer mutates its argument, `fromString()` reports why a range is rejected, `businessDays()` and `businessDates()` count the last day, `isBusinessWeek()` is only true for Monday to Friday of one week.
+- **`Link`:** a URL without a path is accepted, port and userinfo stay in the value.
+- **`Phonenumber`:** the value is E.164 (US: `+16502530000`), country codes outside `CountryAreaCode` throw a `ValidationException` instead of a `ValueError`.
+- **`Json`:** `remove()` removes the key (it was a no-op), scalars and `null` are rejected with a `ValidationException`, empty objects stay `{}` through `set()`, `merge()`, `remove()` and `snakeCaseKeys()`, `fromArray([])` is `{}`.
+
+Integers beyond the float range (about 2^53) lose precision in `Json`; PHP's `json_decode()` cannot avoid that.
+
+### Upgrade notes
+
+**Own value objects** (this affects every one of them):
+
+- Implement `protected function validate(): array` (messages keyed by property name, `[]` when valid).
+- Call `parent::__construct()` in the constructor, after assigning the properties `validate()` reads and before deriving anything from them. Forgetting it silently skips validation.
+
+**Identities:**
+
+- The `Id` hook `validate($value): void` is replaced by `validate(): array`, which reads `$this->value`.
+- `Id::equals()` is `false` for an identity of another class, even with the same value.
+- `MongoObjectId::equals()` takes an `Id`; anything else raises a `TypeError`.
+
+**Exceptions and error keys:**
+
+- `Color` (was Laravel's `ValidationException`), `Money` and `Integer` (were `InvalidArgumentException`) throw the domain `ValidationException`.
+- Error keys are property names: `value` (`Email`, `Color`, `Link`, `Phonenumber`, `Json`, `Id`), `amount` and `currency` (`Money`), `startDate` and `endDate` (`DateRange`), `ids` (`Sqid`).
+
+**Domain events:**
+
+- Subclasses of `DomainEvent` need `@extends DomainEvent<TheId>`, custom `AggregateRoot` implementations `@implements AggregateRoot<TheId>`. With PHPStan level 6 or higher the missing generics are reported otherwise. Runtime behaviour does not change.
+
+**Behaviour changes to check in your code:**
+
+- `Money::__toString()` returns `12.50 €`; `isEqual()` treats amounts that differ by less than half a cent as equal.
+- `DateRange::businessDays()` and `businessDates()` include the last day, so counts can grow by one. `isBusinessWeek()` is only true for five days, so `previousPeriod()` and `nextPeriod()` of a longer Monday to Friday range now shift by its length.
+- `Phonenumber::value()` is E.164; `localAreaCode` and `number` hold digits only. Unsupported country codes throw.
+- `Link::value()` contains port and userinfo.
+- `Json::jsonSerialize()` returns `mixed` (the document as `json_decode()` reads it); `json_encode()` output is unchanged except that empty objects stay `{}`. `toArray()` and `data()` still return plain arrays.
+- `Email`: addresses on the blocked domain list are rejected whatever their case, and the provider and role heuristics changed as described above.
+
+### Internal
+
+- CI runs the tests in the QA workflow on PHP 8.4 and 8.5 and fails below 90 % coverage on PHP 8.4 (currently 95.7 %).
+- The test suite grew from 482 to 866 tests, covering every building block of the package.
+- `composer.json`: the description says Laravel 13, `minimum-stability: dev` is gone, the autoload entry for the missing `database/factories/` is removed.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v0.8.1...v1.0.0
+
 ## v0.8.1 - 2026-10-17
 
 This release adds the consuming side of cursor pagination: reading a paginated list from an API and serving it on as a regular cursor page. It is additive; existing code needs no changes.
@@ -28,6 +131,7 @@ return $pages->fromResponse(
     path: '/accounts',
     mapItem: fn (array $payload) => AccountReadModel::fromArray($payload),
 );
+
 
 ```
 - **`RelayedCursorPaginator`:** a `CursorPaginator` subclass built from items, page size and the `next` / `prev` tokens of the neighbouring pages. Nothing is derived from the items, so read models need no sort column. `Resource::collection($page)` produces `data`, `links` and `meta` as usual, with your own URLs.
@@ -63,6 +167,7 @@ return ReadModelCursorPaginator::fromPage(
     $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
     fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
 );
+
 
 
 ```
@@ -128,6 +233,7 @@ public function validate(): array
 
 
 
+
 ```
 `isValid()` is unchanged (`validate() === []`).
 
@@ -150,6 +256,7 @@ $exceptions->render(function (DomainValidationException $e) {
         ? null
         : throw LaravelValidationException::withMessages($e->errors());
 });
+
 
 
 
@@ -300,6 +407,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -333,6 +441,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -389,6 +498,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 
