@@ -34,6 +34,13 @@ describe('construction', function (): void {
             ->and($event->eventVersion())->toBe(3);
     });
 
+    it('builds its payload from a plain array', function (): void {
+        $event = new AggregateTestCreated($this->id, ['name' => 'Anna']);
+
+        expect($event->eventData())->toBeInstanceOf(Collection::class)
+            ->and($event->eventData()->all())->toBe(['name' => 'Anna']);
+    });
+
     it('records when it occurred, at the time it was created', function (): void {
         $event = new AggregateTestCreated($this->id);
 
@@ -73,6 +80,16 @@ describe('toArray', function (): void {
 });
 
 describe('immutability', function (): void {
+    it('does not let a payload array change the event either', function (): void {
+        $payload = ['name' => 'Anna'];
+        $event = new AggregateTestCreated($this->id, $payload);
+
+        $payload['name'] = 'Ben';
+        $event->eventData()->put('extra', true);
+
+        expect($event->eventData()->all())->toBe(['name' => 'Anna']);
+    });
+
     it('does not let the payload change after the event was created', function (): void {
         $payload = new Collection(['name' => 'Anna']);
         $event = new AggregateTestCreated($this->id, $payload);

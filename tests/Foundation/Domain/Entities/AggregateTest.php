@@ -83,6 +83,20 @@ describe('event recording', function (): void {
 });
 
 describe('updateAggregateRoot', function (): void {
+    it('takes the changes as an array or as a collection', function (Closure $changes): void {
+        $aggregate = new AggregateTestSubject(EntityTestId::generate(), 'Old');
+
+        $aggregate->update($changes());
+
+        expect($aggregate->name())->toBe('New')
+            ->and($aggregate->version())->toBe(2)
+            ->and($aggregate->eventByType('test.aggregate.renamed')?->eventData()->all())
+            ->toBe(['old_name' => 'Old', 'new_name' => 'New']);
+    })->with([
+        'array' => [fn () => ['name' => 'New']],
+        'collection' => [fn () => new Collection(['name' => 'New'])],
+    ]);
+
     it('applies the change, bumps the version and records the auto-instantiated event', function (): void {
         $aggregate = new AggregateTestSubject(EntityTestId::generate(), 'Old');
 

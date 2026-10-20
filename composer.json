@@ -1,6 +1,6 @@
 {
     "name": "lava83/laravel-ddd",
-    "description": "A comprehensive toolkit providing foundational building blocks for implementing Domain-Driven Design (DDD) patterns in Laravel 12+ applications. This package offers battle-tested base classes, contracts, and infrastructure components to help you build scalable, maintainable domain-driven applications.",
+    "description": "A comprehensive toolkit providing foundational building blocks for implementing Domain-Driven Design (DDD) patterns in Laravel 13 applications. This package offers battle-tested base classes, contracts, and infrastructure components to help you build scalable, maintainable domain-driven applications.",
     "keywords": [
         "Lava83",
         "laravel",
@@ -36,8 +36,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Lava83\\LaravelDdd\\": "src/",
-            "Lava83\\LaravelDdd\\Database\\Factories\\": "database/factories/"
+            "Lava83\\LaravelDdd\\": "src/"
         },
         "files": [
             "src/helpers.php"
@@ -51,7 +50,7 @@
     "scripts": {
         "post-autoload-dump": "@composer run prepare",
         "prepare": "@php vendor/bin/testbench package:discover --ansi",
-        "analyse": "vendor/bin/phpstan analyse",
+        "analyse": "vendor/bin/phpstan analyse --memory-limit=1G",
         "deptrac": "vendor/bin/deptrac analyse",
         "format": "vendor/bin/pint",
         "format-check": "vendor/bin/pint --test",
@@ -83,7 +82,5 @@
                 "LaravelDdd": "Lava83\\LaravelDdd\\Facades\\LaravelDdd"
             }
         }
-    },
-    "minimum-stability": "dev",
-    "prefer-stable": true
+    }
 }

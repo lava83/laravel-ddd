@@ -122,6 +122,16 @@ final class AggregateTestSubject extends Aggregate
     }
 
     /**
+     * @param  Collection<string, mixed>|array<string, mixed>  $changes
+     *
+     * @throws ReflectionException
+     */
+    public function update(Collection|array $changes): void
+    {
+        $this->updateAggregateRoot($changes, AggregateTestRenamed::class);
+    }
+
+    /**
      * Same change, but neither an event class nor an event instance: state moves,
      * nothing is recorded.
      *

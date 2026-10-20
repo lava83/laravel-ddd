@@ -8,6 +8,7 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Lava83\LaravelDdd\Domain\Contracts\DomainEvent;
+use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 
 final readonly class DomainEventPublisher
 {
@@ -16,13 +17,16 @@ final readonly class DomainEventPublisher
     ) {}
 
     /**
-     * @param  Collection<int, DomainEvent>  $events
+     * @param  Collection<int, DomainEvent<Id>>  $events
      */
     public function publishEvents(Collection $events): void
     {
         $events->each(fn (DomainEvent $event) => $this->publishEvent($event));
     }
 
+    /**
+     * @param  DomainEvent<Id>  $event
+     */
     public function publishEvent(DomainEvent $event): void
     {
         DB::afterCommit(fn (): ?array => $this->dispatcher->dispatch($event));

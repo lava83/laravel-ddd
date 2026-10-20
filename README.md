@@ -3,8 +3,6 @@
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/lava83/laravel-ddd.svg)](https://packagist.org/packages/lava83/laravel-ddd)
 [![License](https://img.shields.io/packagist/l/lava83/laravel-ddd.svg)](LICENSE.md)
 
-> Work in progress. The public API may still change between releases.
-
 Foundational building blocks for Domain-Driven Design in Laravel. The package ships battle-tested base classes and contracts — Entities, Aggregates, Value Objects, Repositories, Entity ↔ Model Mappers and Domain Events — so your applications can focus on the domain instead of the plumbing.
 
 It enforces a strict layer separation (`Domain`, `Application`, `Infrastructure`) and gives you optimistic locking, automatic domain-event dispatching on save, and a set of ready-made value objects out of the box.
@@ -77,20 +75,17 @@ use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
 final class Title extends ValueObject
 {
-    private function __construct(private readonly string $value) {}
+    private function __construct(private readonly string $value)
+    {
+        parent::__construct();
+    }
 
     /**
      * @throws ValidationException
      */
     public static function fromString(string $value): self
     {
-        $value = trim($value);
-
-        if ($value === '' || mb_strlen($value) > 255) {
-            throw new ValidationException('Title must be between 1 and 255 characters.');
-        }
-
-        return new self($value);
+        return new self(trim($value));
     }
 
     public function value(): string
@@ -112,8 +107,19 @@ final class Title extends ValueObject
     {
         return $this->value;
     }
+
+    protected function validate(): array
+    {
+        if ($this->value === '' || mb_strlen($this->value) > 255) {
+            return ['value' => ['Title must be between 1 and 255 characters.']];
+        }
+
+        return [];
+    }
 }
 ```
+
+Every value object implements `validate()` (error messages keyed by property name, `[]` when valid) and calls `parent::__construct()` in its constructor, which throws a `ValidationException` carrying those errors.
 
 ### 2. Aggregate
 

@@ -10,6 +10,11 @@ use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Contracts\DomainEvent as DomainEventContract;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 
+/**
+ * @template-covariant TId of Id
+ *
+ * @implements DomainEventContract<TId>
+ */
 abstract readonly class DomainEvent implements DomainEventContract
 {
     private CarbonImmutable $occurredOn;
@@ -20,17 +25,21 @@ abstract readonly class DomainEvent implements DomainEventContract
     private Collection $eventData;
 
     /**
-     * @param  Collection<string, mixed>  $eventData
+     * @param  TId  $aggregateId
+     * @param  Collection<string, mixed>|array<string, mixed>  $eventData
      */
     final public function __construct(
         private readonly Id $aggregateId,
-        Collection $eventData = new Collection,
+        Collection|array $eventData = new Collection,
         private readonly int $eventVersion = 1,
     ) {
-        $this->eventData = new Collection($eventData->all());
+        $this->eventData = new Collection($eventData);
         $this->occurredOn = CarbonImmutable::now();
     }
 
+    /**
+     * @return TId
+     */
     public function aggregateId(): Id
     {
         return $this->aggregateId;

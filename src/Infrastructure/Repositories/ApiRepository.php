@@ -10,6 +10,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Contracts\DomainEvent;
 use Lava83\LaravelDdd\Domain\Entities\Aggregate;
+use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 use Lava83\LaravelDdd\Infrastructure\Api\ApiClient;
 use Lava83\LaravelDdd\Infrastructure\Api\Exceptions\ApiException;
 use Lava83\LaravelDdd\Infrastructure\Api\Exceptions\NotFound;
@@ -58,7 +59,7 @@ abstract class ApiRepository extends Repository
     /**
      * One API call per domain event the repository can persist.
      *
-     * @return array<class-string<DomainEvent>, Closure(TAggregate, DomainEvent): Response>
+     * @return array<class-string<DomainEvent<Id>>, Closure(TAggregate, DomainEvent<Id>): Response>
      */
     abstract protected function commands(): array;
 

@@ -8,10 +8,15 @@ use DateTimeImmutable;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 
+/**
+ * @template-covariant TId of Id
+ */
 interface DomainEvent
 {
     /**
      * Get the aggregate ID that triggered this event
+     *
+     * @return TId
      */
     public function aggregateId(): Id;
 
