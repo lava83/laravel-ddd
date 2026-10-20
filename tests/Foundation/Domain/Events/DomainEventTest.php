@@ -72,10 +72,7 @@ describe('toArray', function (): void {
     });
 });
 
-// Known defect found while characterising DomainEvent. It describes the
-// behaviour we want, not the one we have; turn it into a real test when it is
-// fixed.
-describe('known defects', function (): void {
+describe('immutability', function (): void {
     it('does not let the payload change after the event was created', function (): void {
         $payload = new Collection(['name' => 'Anna']);
         $event = new AggregateTestCreated($this->id, $payload);
@@ -84,5 +81,5 @@ describe('known defects', function (): void {
         $event->eventData()->put('extra', true);
 
         expect($event->eventData()->all())->toBe(['name' => 'Anna']);
-    })->todo('the event shares its Collection with the caller and hands it out, so both can change a "readonly" event');
+    });
 });

@@ -360,10 +360,7 @@ describe('representation', function (): void {
     });
 });
 
-// Known defects found while characterising DateRange. They describe the
-// behaviour we want, not the one we have; turn each into a real test when it is
-// fixed.
-describe('known defects', function (): void {
+describe('edge cases', function (): void {
     it('does not change a mutable date handed to singleDay', function (): void {
         $date = Carbon::parse('2026-03-18 10:30:00');
 
@@ -371,18 +368,18 @@ describe('known defects', function (): void {
 
         expect(spanOf($range))->toBe('2026-03-18 00:00:00 -> 2026-03-18 23:59:59')
             ->and($date->toDateTimeString())->toBe('2026-03-18 10:30:00');
-    })->todo('with a mutable Carbon, start and end are both 23:59:59 and the argument is changed');
+    });
 
     it('reports why fromString rejects a range', function (): void {
         expect(fn () => DateRange::fromString('2026-02-10', '2026-02-01'))
             ->toThrow(ValidationException::class, 'Start date cannot be after end date');
-    })->todo('catch (Exception) swallows the ValidationException and says "Invalid date format provided"');
+    });
 
     it('counts the last weekday when the end is earlier in the day than the start', function (): void {
         expect(rangeOf('2026-01-05 10:00', '2026-01-09 09:00')->businessDays())->toBe(5);
-    })->todo('businessDays() and businessDates() stop one day early, allDates() does not');
+    });
 
     it('is a business week only when it spans exactly one week', function (): void {
         expect(rangeOf('2026-01-05', '2026-01-30')->isBusinessWeek())->toBeFalse();
-    })->todo('any monday to friday counts, so previousPeriod() and nextPeriod() of four weeks overlap the original');
+    });
 });

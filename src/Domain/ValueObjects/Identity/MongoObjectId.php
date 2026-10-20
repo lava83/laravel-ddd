@@ -34,11 +34,6 @@ class MongoObjectId extends Id
         return $this->toString();
     }
 
-    public function equals(mixed $other): bool
-    {
-        return $other instanceof self && $this->value === $other->value;
-    }
-
     /**
      * @throws ValidationException
      */

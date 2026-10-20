@@ -108,6 +108,12 @@ describe('providers', function (): void {
             ->and(Email::fromString('a@web.de')->isCompanyEmail())->toBeFalse();
     });
 
+    it('treats a provider below a two label public suffix as personal', function (): void {
+        expect(Email::fromString('a@yahoo.co.uk')->isCompanyEmail())->toBeFalse()
+            ->and(Email::fromString('a@mail.hotmail.co.uk')->isCompanyEmail())->toBeFalse()
+            ->and(Email::fromString('a@firma.co.uk')->isCompanyEmail())->toBeTrue();
+    });
+
     it('treats any other domain as a company', function (): void {
         expect(Email::fromString('a@firma.de')->isCompanyEmail())->toBeTrue();
     });
@@ -249,10 +255,18 @@ describe('representation', function (): void {
     });
 });
 
-// Known defect found while characterising Email. It describes the behaviour we
-// want, not the one we have; turn it into a real test when it is fixed.
-describe('known defects', function (): void {
-    it('finds the registrable domain below a public suffix', function (): void {
-        expect(Email::fromString('a@mail.example.co.uk')->domainWithoutSubdomain()->toString())->toBe('example.co.uk');
-    })->todo('only the last two labels are kept, so the result is co.uk and every .co.uk address shares a main domain');
+describe('public suffixes', function (): void {
+    it('finds the registrable domain below a two label public suffix', function (string $address, string $expected): void {
+        expect(Email::fromString($address)->domainWithoutSubdomain()->toString())->toBe($expected);
+    })->with([
+        'co.uk' => ['a@mail.example.co.uk', 'example.co.uk'],
+        'co.uk without subdomain' => ['a@example.co.uk', 'example.co.uk'],
+        'com.au' => ['a@x.y.example.com.au', 'example.com.au'],
+        'the suffix itself' => ['a@co.uk', 'co.uk'],
+    ]);
+
+    it('does not treat every .co.uk address as the same main domain', function (): void {
+        expect(Email::fromString('a@one.co.uk')->isSameMainDomain(Email::fromString('b@two.co.uk')))->toBeFalse()
+            ->and(Email::fromString('a@mail.one.co.uk')->isSameMainDomain(Email::fromString('b@one.co.uk')))->toBeTrue();
+    });
 });

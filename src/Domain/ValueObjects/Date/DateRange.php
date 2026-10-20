@@ -6,7 +6,7 @@ namespace Lava83\LaravelDdd\Domain\ValueObjects\Date;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
-use Exception;
+use Carbon\Exceptions\InvalidFormatException;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 
@@ -43,10 +43,13 @@ class DateRange extends ValueObject
     public static function fromString(string $startDate, string $endDate): static
     {
         try {
-            return new static(CarbonImmutable::parse($startDate), CarbonImmutable::parse($endDate));
-        } catch (Exception) {
+            $start = CarbonImmutable::parse($startDate);
+            $end = CarbonImmutable::parse($endDate);
+        } catch (InvalidFormatException) {
             throw new ValidationException('Invalid date format provided');
         }
+
+        return new static($start, $end);
     }
 
     /**
@@ -68,6 +71,8 @@ class DateRange extends ValueObject
      */
     public static function singleDay(CarbonInterface $date): static
     {
+        $date = CarbonImmutable::instance($date);
+
         return new static($date->startOfDay(), $date->endOfDay());
     }
 
@@ -157,18 +162,7 @@ class DateRange extends ValueObject
 
     public function businessDays(): int
     {
-        $businessDays = 0;
-        $current = $this->startDate;
-
-        while ($current->lte($this->endDate)) {
-            if ($current->isWeekday()) {
-                $businessDays++;
-            }
-
-            $current = $current->addDay();
-        }
-
-        return $businessDays;
+        return count($this->businessDates());
     }
 
     public function contains(CarbonInterface $date): bool
@@ -313,9 +307,10 @@ class DateRange extends ValueObject
     public function businessDates(): array
     {
         $dates = [];
-        $current = $this->startDate;
+        $current = $this->startDate->startOfDay();
+        $end = $this->endDate->startOfDay();
 
-        while ($current->lte($this->endDate)) {
+        while ($current->lte($end)) {
             if ($current->isWeekday()) {
                 $dates[] = $current->toDateString();
             }
@@ -328,7 +323,8 @@ class DateRange extends ValueObject
 
     public function isBusinessWeek(): bool
     {
-        return $this->startDate->dayOfWeek === 1 && $this->endDate->dayOfWeek === 5;
+        return $this->startDate->dayOfWeek === CarbonInterface::MONDAY
+            && $this->startDate->startOfDay()->addDays(4)->isSameDay($this->endDate);
     }
 
     public function isFullMonth(): bool

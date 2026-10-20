@@ -10,6 +10,7 @@ use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
 use libphonenumber\NumberParseException;
 use libphonenumber\PhoneNumber as LibphonenumberPhoneNumber;
+use libphonenumber\PhoneNumberFormat;
 use libphonenumber\PhoneNumberUtil;
 
 class Phonenumber extends ValueObject
@@ -83,30 +84,25 @@ class Phonenumber extends ValueObject
 
         $this->countryAreaCode = CountryAreaCode::from((string) str('+')->append((string) $number->getCountryCode()));
 
-        $this->localAreaCode = str($this->phoneNumberUtil()->formatNationalNumberWithCarrierCode($number, null))
-            ->before(' ');
+        $national = $this->phoneNumberUtil()->formatNationalNumberWithCarrierCode($number, null);
 
-        $this->subscriberNumber = str($this->phoneNumberUtil()->formatNationalNumberWithCarrierCode($number, null))
-            ->after(' ')
-            ->replace(' ', '');
+        $this->localAreaCode = str(preg_replace('/[^\d]/', '', str($national)->before(' ')->toString()));
 
-        $this->value = $this->buildNormalizedNumber();
-    }
+        $this->subscriberNumber = str(preg_replace('/[^\d]/', '', str($national)->after(' ')->toString()));
 
-    private function buildNormalizedNumber(): Stringable
-    {
-        return str(
-            $this->countryAreaCode->value.$this->localAreaCode->substr(1)->toString()
-                .$this->subscriberNumber->toString(),
-        );
+        $this->value = str($this->phoneNumberUtil()->format($number, PhoneNumberFormat::E164));
     }
 
     protected function validate(): array
     {
         try {
-            $this->numberProto($this->value->trim()->toString());
+            $number = $this->numberProto($this->value->trim()->toString());
         } catch (ValidationException $validationException) {
             return ['value' => [$validationException->getMessage()]];
+        }
+
+        if (CountryAreaCode::tryFrom('+'.$number->getCountryCode()) === null) {
+            return ['value' => ['Unsupported country code: +'.$number->getCountryCode()]];
         }
 
         return [];

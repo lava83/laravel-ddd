@@ -18,18 +18,12 @@ describe('Json behavior', function () {
             'first_name' => 'John',
             'last_name' => 'Doe',
         ])
-            ->and($json->snakeCaseKeys()->jsonSerialize())->toEqual([
-                'first_name' => 'John',
-                'last_name' => 'Doe',
-            ])
+            ->and(json_encode($json->snakeCaseKeys()))->toBe('{"first_name":"John","last_name":"Doe"}')
             ->and($json->toArray())->toEqual([
                 'firstName' => 'John',
                 'lastName' => 'Doe',
             ])
-            ->and($json->jsonSerialize())->toEqual([
-                'firstName' => 'John',
-                'lastName' => 'Doe',
-            ]);
+            ->and(json_encode($json))->toBe('{"firstName":"John","lastName":"Doe"}');
     });
 });
 
@@ -180,37 +174,43 @@ describe('representation', function (): void {
     it('serialises to its decoded data', function (): void {
         $json = Json::fromString('{"a":1,"b":{"c":2}}');
 
-        expect($json->jsonSerialize())->toBe($json->toArray())
+        expect(json_encode($json))->toBe('{"a":1,"b":{"c":2}}')
             ->and(json_encode(['data' => $json]))->toBe('{"data":{"a":1,"b":{"c":2}}}');
     });
 });
 
-// Known defects found while characterising Json. They describe the behaviour we
-// want, not the one we have; turn each into a real test when it is fixed.
-describe('known defects', function (): void {
+// Integers beyond the float range (about 2^53) lose precision in json_decode(), so
+// they do not survive a change of the document. That is PHP, not something Json
+// can fix.
+describe('shape of the document', function (): void {
     it('removes a top level key', function (): void {
         expect(Json::fromString('{"a":1,"b":2}')->remove('a')->value())->toBe('{"b":2}');
-    })->todo('remove() returns the document unchanged: take(-1) yields the last key, not all but the last');
+    });
 
     it('removes a nested key by dotted path', function (): void {
         expect(Json::fromString('{"b":{"c":2,"d":3}}')->remove('b.c')->value())->toBe('{"b":{"d":3}}');
-    })->todo('same cause as above');
+    });
 
     it('rejects a json scalar with a ValidationException', function (string $input): void {
         expect(fn () => Json::fromString($input))->toThrow(ValidationException::class);
-    })->with(['string' => '"hello"', 'int' => '123', 'bool' => 'true'])
-        ->todo('a string or bool throws ErrorException, an int throws TypeError, null is accepted');
+    })->with(['string' => '"hello"', 'int' => '123', 'bool' => 'true', 'null' => 'null']);
 
     it('keeps an empty object an object', function (): void {
         expect(Json::fromString('{"a":{}}')->set('x', 1)->value())->toBe('{"a":{},"x":1}')
             ->and(json_encode(['x' => Json::empty()]))->toBe('{"x":{}}');
-    })->todo('decoding with assoc = true turns {} into [], so it is written back as []');
+    });
 
     it('treats an empty array and the empty object as the same document', function (): void {
         expect(Json::fromArray([])->equals(Json::empty()))->toBeTrue();
-    })->todo('fromArray([]) is [] while empty() is {}');
+    });
 
-    it('keeps an integer beyond the float range intact when the document changes', function (): void {
-        expect(Json::fromString('{"id":12345678901234567890}')->set('x', 1)->value())->toBe('{"id":12345678901234567890,"x":1}');
-    })->todo('the id becomes 1.2345678901234567e+19 on the way through json_decode and json_encode');
+    it('hands out plain arrays for an empty object and writes it back as an object', function (): void {
+        $json = Json::fromString('{"a":{},"b":[]}');
+
+        expect($json->toArray())->toBe(['a' => [], 'b' => []])
+            ->and($json->set('x', 1)->value())->toBe('{"a":{},"b":[],"x":1}')
+            ->and($json->remove('x')->value())->toBe('{"a":{},"b":[]}')
+            ->and($json->merge(Json::fromString('{"c":{}}'))->value())->toBe('{"a":{},"b":[],"c":{}}')
+            ->and(json_encode($json))->toBe('{"a":{},"b":[]}');
+    });
 });

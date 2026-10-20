@@ -22,6 +22,8 @@ class Email extends ValueObject
         'gmail.com',
         'yahoo.com',
         'hotmail.com',
+        'yahoo.co.uk',
+        'hotmail.co.uk',
         'outlook.com',
         'aol.com',
         'icloud.com',
@@ -42,6 +44,24 @@ class Email extends ValueObject
         '1und1.de',
         'posteo.de',
         'mailbox.org',
+    ];
+
+    /**
+     * Public suffixes with two labels, under which a domain is registered one
+     * label further down (example.co.uk). A curated list of the common ones, not
+     * the full public suffix list.
+     *
+     * @var list<string>
+     */
+    private const array TWO_LABEL_PUBLIC_SUFFIXES = [
+        'co.uk', 'org.uk', 'me.uk', 'ltd.uk', 'plc.uk', 'net.uk', 'sch.uk', 'ac.uk', 'gov.uk', 'nhs.uk', 'police.uk',
+        'com.au', 'net.au', 'org.au', 'edu.au', 'gov.au', 'asn.au', 'id.au',
+        'co.nz', 'net.nz', 'org.nz', 'govt.nz', 'ac.nz',
+        'co.jp', 'ne.jp', 'or.jp', 'ac.jp', 'go.jp',
+        'com.br', 'net.br', 'org.br', 'gov.br',
+        'co.in', 'net.in', 'org.in',
+        'co.za', 'org.za',
+        'co.kr', 'com.cn', 'com.tw', 'com.hk', 'com.sg', 'com.mx', 'com.ar', 'com.tr',
     ];
 
     private readonly Stringable $value;
@@ -101,8 +121,10 @@ class Email extends ValueObject
     public function domainWithoutSubdomain(): Stringable
     {
         $domainParts = $this->domain->explode('.');
+        $labels = $domainParts->slice(-2)->implode('.');
+        $keep = in_array($labels, self::TWO_LABEL_PUBLIC_SUFFIXES, true) ? 3 : 2;
 
-        return str($domainParts->slice(-2)->implode('.'));
+        return str($domainParts->slice(-$keep)->implode('.'));
     }
 
     public function topLevelDomain(): Stringable

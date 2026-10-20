@@ -9,6 +9,7 @@ use Illuminate\Support\Fluent;
 use JsonException;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Domain\ValueObjects\ValueObject;
+use stdClass;
 
 class Json extends ValueObject
 {
@@ -25,12 +26,10 @@ class Json extends ValueObject
     ) {
         parent::__construct();
 
-        /**
-         * @var array<string, mixed> $jsonDecodedValue
-         */
-        $jsonDecodedValue = json_decode($value, true);
+        /** @var array<string, mixed> $decoded */
+        $decoded = json_decode($value, true);
 
-        $this->data = fluent($jsonDecodedValue);
+        $this->data = fluent($decoded);
     }
 
     public function __toString(): string
@@ -56,7 +55,7 @@ class Json extends ValueObject
      */
     public static function fromArray(array $data): self
     {
-        $jsonString = json_encode($data, JSON_THROW_ON_ERROR);
+        $jsonString = $data === [] ? '{}' : json_encode($data, JSON_THROW_ON_ERROR);
 
         return new self($jsonString);
     }
@@ -116,10 +115,10 @@ class Json extends ValueObject
      */
     public function set(string $key, mixed $value): self
     {
-        $newData = fluent($this->data->toArray());
-        $newData->set($key, $value);
+        $tree = $this->tree();
+        data_set($tree, $key, $value);
 
-        return self::fromArray($newData->toArray());
+        return self::fromTree($tree);
     }
 
     /**
@@ -128,9 +127,7 @@ class Json extends ValueObject
      */
     public function merge(self $other): self
     {
-        $mergedData = $this->toCollection()->merge($other->toCollection());
-
-        return self::fromArray($mergedData->toArray());
+        return self::fromRoot(array_merge((array) $this->tree(), (array) $other->tree()));
     }
 
     /**
@@ -139,11 +136,10 @@ class Json extends ValueObject
      */
     public function remove(string $key): self
     {
-        $newData = $this->data->toArray();
+        $tree = $this->tree();
+        data_forget($tree, $key);
 
-        $this->removeNestedValue($newData, $key);
-
-        return self::fromArray($newData);
+        return self::fromTree($tree);
     }
 
     public function isEmpty(): bool
@@ -183,49 +179,45 @@ class Json extends ValueObject
      */
     public function snakeCaseKeys(): self
     {
-        return self::fromArray(
-            $this->data
-                ->collect()
-                ->mapWithKeys(
-                    /**
-                     * @return array<string, mixed>
-                     */
-                    fn (mixed $value, int|string $key) => [str((string) $key)->snake()->toString() => $value],
-                )
-                ->toArray(),
-        );
+        $snaked = [];
+
+        foreach ((array) $this->tree() as $key => $value) {
+            $snaked[str((string) $key)->snake()->toString()] = $value;
+        }
+
+        return self::fromRoot($snaked);
     }
 
     /**
-     * @return array<string, mixed>
+     * The document as json_decode() reads it without assoc: objects stay objects,
+     * so an empty object is written back as {} and not as [].
      */
-    public function jsonSerialize(): array
+    public function jsonSerialize(): mixed
     {
-        return $this->toArray();
+        return $this->tree();
     }
 
     /**
-     * @param  array<string, mixed>  $array
+     * The document with objects as stdClass, the only decoded form that keeps an
+     * empty object apart from an empty list. Changes are made on it and never
+     * leave this class, toArray() and data() hand out plain arrays.
      */
-    private function removeNestedValue(array &$array, string $key): void
+    private function tree(): mixed
     {
-        $keys = str($key)->explode('.');
-        $current = &$array;
+        return json_decode($this->value);
+    }
 
-        /**
-         * @var string $nestedKey
-         */
-        foreach ($keys->take(-1) as $nestedKey) {
-            if (! isset($current[$nestedKey]) || ! is_array($current[$nestedKey])) {
-                return;
-            }
+    /**
+     * @param  array<array-key, mixed>  $root
+     */
+    private static function fromRoot(array $root): self
+    {
+        return self::fromTree($root === [] || ! array_is_list($root) ? (object) $root : $root);
+    }
 
-            $current = &$current[$nestedKey];
-        }
-
-        if (is_string($keys->last())) {
-            unset($current[$keys->last()]);
-        }
+    private static function fromTree(mixed $tree): self
+    {
+        return new self(json_encode($tree, JSON_THROW_ON_ERROR));
     }
 
     /**
@@ -239,6 +231,10 @@ class Json extends ValueObject
 
         if (! json_validate($this->value)) {
             return ['value' => ['Invalid JSON: '.json_last_error_msg()]];
+        }
+
+        if (! is_object($decoded = json_decode($this->value)) && ! is_array($decoded)) {
+            return ['value' => ['JSON must be an object or an array']];
         }
 
         return [];
