@@ -73,4 +73,13 @@ final class EntityTestSubject extends Entity
     {
         return $this->updateEntity(['name' => $name]);
     }
+
+    /**
+     * @param  Collection<string, mixed>|array<string, mixed>  $changes
+     * @return Collection<string, mixed>
+     */
+    public function update(Collection|array $changes): Collection
+    {
+        return $this->updateEntity($changes);
+    }
 }

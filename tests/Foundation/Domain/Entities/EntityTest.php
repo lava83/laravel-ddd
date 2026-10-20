@@ -275,6 +275,19 @@ describe('timestamps and version accessors', function (): void {
 });
 
 describe('change tracking via updateEntity', function (): void {
+    it('takes the changes as an array or as a collection', function (Closure $changes): void {
+        $entity = new EntityTestSubject(EntityTestId::generate(), 'Old');
+
+        $diff = $entity->update($changes());
+
+        expect($entity->name())->toBe('New')
+            ->and($entity->version())->toBe(2)
+            ->and($diff->all())->toBe(['old_name' => 'Old', 'new_name' => 'New']);
+    })->with([
+        'array' => [fn () => ['name' => 'New']],
+        'collection' => [fn () => new Collection(['name' => 'New'])],
+    ]);
+
     it('applies a change, bumps the version and touches updatedAt', function (): void {
         $createdAt = CarbonImmutable::now()->subDays(2);
         $entity = reconstituteSubject([

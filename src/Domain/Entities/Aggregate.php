@@ -167,14 +167,14 @@ abstract class Aggregate extends Entity implements AggregateRoot
     /**
      * Helper method for aggregate roots to update and record change event
      *
-     * @param  array<string, EntityPropertyValue>  $changes  Key-value pairs of changes made to the aggregate
+     * @param  Collection<string, EntityPropertyValue>|array<string, EntityPropertyValue>  $changes  Key-value pairs of changes made to the aggregate
      * @param  class-string<DomainEventClass<TId>>|null  $eventClass  Optional event class to instantiate
      * @param  DomainEvent<TId>|null  $event  Optional pre-created event instance
      *
      * @throws ReflectionException
      * @throws ValidationException
      */
-    protected function updateAggregateRoot(array $changes, ?string $eventClass = null, ?DomainEvent $event = null): void
+    protected function updateAggregateRoot(Collection|array $changes, ?string $eventClass = null, ?DomainEvent $event = null): void
     {
         /**
          * @var Collection<string, EntityPropertyValue> $changesCollection

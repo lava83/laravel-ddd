@@ -331,15 +331,15 @@ abstract class Entity implements Stringable
     /**
      * Helper method for child entities to update themselves
      *
-     * @param  array{}|array<string, EntityPropertyValue>  $changes  Key-value pairs of changes made to the aggregate
+     * @param  Collection<string, EntityPropertyValue>|array{}|array<string, EntityPropertyValue>  $changes  Key-value pairs of changes made to the aggregate
      * @return Collection<string, EntityPropertyValue>
      *
      * @throws ReflectionException
      * @throws ValidationException When the changed state violates an invariant; the entity is left untouched
      */
-    protected function updateEntity(array $changes): Collection
+    protected function updateEntity(Collection|array $changes): Collection
     {
-        $changes = $this->collectChanges($changes);
+        $changes = $this->collectChanges($changes instanceof Collection ? $changes->all() : $changes);
 
         if ($changes->toArray() === []) {
             return $changes;
