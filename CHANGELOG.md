@@ -2,6 +2,40 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v1.1.0 - 2026-10-28
+
+This release fixes the id carried by domain events of integer-keyed aggregates and adds `DomainEvent::withAggregateId()`, which the fix is built on. It is backwards compatible; existing code needs no changes.
+
+### Fixed
+
+#### Domain events carry the persisted id of integer-keyed aggregates
+
+Events recorded before the first save of an aggregate with an `Integer` identity (typically a `…Created` event recorded in a `create()` factory, while `id()` is still `…Id::new()`) were dispatched with the placeholder id `0`. Only the aggregate itself received the key the database assigned, so a listener could not reference the created aggregate by its id (#46).
+
+`Aggregate::idFromPersistence()` now moves every buffered event recorded against the previous id onto the new one. Both save paths reach it through `hydrate()`, so `Repository::saveEntity()` and `ApiRepository::persistCommands()` are fixed alike.
+
+```php
+$counter = Counter::create('one');      // records CounterCreated with id 0
+$repository->save($counter);
+
+// Listeners now receive CounterCreated with aggregateId() === $counter->id(), e.g. 1
+
+```
+`Uuid` identities were not affected: their id is known before the event is recorded.
+
+### Added
+
+- **`DomainEvent::withAggregateId(Id $aggregateId): static`** returns a copy of the event for another identity of the same aggregate. Payload, name, version and `occurredOn` are kept.
+
+### Upgrade notes
+
+No action required.
+
+- A workaround that re-records the creation event with the real id after the insert (for example `clearEventsOfType()` plus `recordEvent()` in an `idFromPersistence()` override) is no longer needed and can be removed.
+- Events that implement the `Domain\Contracts\DomainEvent` interface without extending `Domain\Events\DomainEvent` have no `withAggregateId()` and still keep the old id. The interface gains the method in 2.0 (#47).
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v1.0.0...v1.1.0
+
 ## v1.0.0 - 2026-10-20
 
 First stable release. From here on the package follows semantic versioning: breaking changes only in a new major version. The domain layer was tightened on the way, so **this release contains breaking changes for value objects, identities and domain events**; the upgrade notes below list every one of them.
@@ -37,6 +71,7 @@ final class Title extends ValueObject
     }
 }
 
+
 ```
 All 13 built-in value objects use it. An architecture test checks that every concrete value object of the package calls `parent::__construct()` and keeps `validate()` out of its public API.
 
@@ -51,8 +86,11 @@ All 13 built-in value objects use it. An architecture test checks that every con
 ### Fixed
 
 - **`Id::equals()`** compares the class before the value: `AccountId(1)` no longer equals `B2cUserId(1)`.
+  
 - **`Money`:** `__toString()` keeps the decimals (`12.50 €`, was `12 €`), `isEqual()` compares cents instead of floats (`0.1 + 0.2` equals `0.3`).
+  
 - **`Email`:**
+  
   - `isCompanyEmail()` and `isGermanProvider()` agree on the providers (`posteo.de`, `mailbox.org` are personal).
   - `isRoleBased()` and `isValidForNotifications()` match whole words (`info.team`, `info-berlin` and `support2` match, `italy` and `bouncer` do not); `bounces` is blocked as well.
   - The blocked domain list is no longer case sensitive.
@@ -60,9 +98,13 @@ All 13 built-in value objects use it. An architecture test checks that every con
   - `yahoo.co.uk` and `hotmail.co.uk` count as personal providers.
   
 - **`DateRange`:** `singleDay()` no longer mutates its argument, `fromString()` reports why a range is rejected, `businessDays()` and `businessDates()` count the last day, `isBusinessWeek()` is only true for Monday to Friday of one week.
+  
 - **`Link`:** a URL without a path is accepted, port and userinfo stay in the value.
+  
 - **`Phonenumber`:** the value is E.164 (US: `+16502530000`), country codes outside `CountryAreaCode` throw a `ValidationException` instead of a `ValueError`.
+  
 - **`Json`:** `remove()` removes the key (it was a no-op), scalars and `null` are rejected with a `ValidationException`, empty objects stay `{}` through `set()`, `merge()`, `remove()` and `snakeCaseKeys()`, `fromArray([])` is `{}`.
+  
 
 Integers beyond the float range (about 2^53) lose precision in `Json`; PHP's `json_decode()` cannot avoid that.
 
@@ -133,6 +175,7 @@ return $pages->fromResponse(
 );
 
 
+
 ```
 - **`RelayedCursorPaginator`:** a `CursorPaginator` subclass built from items, page size and the `next` / `prev` tokens of the neighbouring pages. Nothing is derived from the items, so read models need no sort column. `Resource::collection($page)` produces `data`, `links` and `meta` as usual, with your own URLs.
 - **`RelayedCursor`:** keeps the token exactly as received. Laravel's `Cursor::encode()` rebuilds a token from decoded parameters, which is not guaranteed to give the same string back.
@@ -167,6 +210,7 @@ return ReadModelCursorPaginator::fromPage(
     $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
     fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
 );
+
 
 
 
@@ -234,6 +278,7 @@ public function validate(): array
 
 
 
+
 ```
 `isValid()` is unchanged (`validate() === []`).
 
@@ -256,6 +301,7 @@ $exceptions->render(function (DomainValidationException $e) {
         ? null
         : throw LaravelValidationException::withMessages($e->errors());
 });
+
 
 
 
@@ -408,6 +454,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -441,6 +488,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -498,6 +546,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 
