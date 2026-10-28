@@ -57,7 +57,7 @@ describe('Uuid', function (): void {
 
 - **Value Object** — construction from valid input, rejection of invalid input, `equals()`, string/JSON serialisation, immutability (the original is unchanged after a `with*()` call)
 - **Entity** — invariant violations throw from the constructor and from `updateEntity()` (error bag keyed by property, state/version/`dirty` rolled back), `updateEntity()` bumps version and `updatedAt`, unchanged input produces an empty dirty collection, non-promoted properties are *not* applied
-- **Aggregate** — an event is recorded on state change, `uncommittedEvents()` returns clones, `markEventsAsCommitted()` empties the buffer, clone/serialise drops it
+- **Aggregate** — an event is recorded on state change, `uncommittedEvents()` returns clones, `markEventsAsCommitted()` empties the buffer, clone/serialise drops it, `idFromPersistence()` rebinds buffered events recorded against the previous id
 - **Mapper** — round trip entity → model → entity preserves identity, version and timestamps
 - **Repository** — DB-backed; build the schema per test (see below). Cover insert/update/version bump, the persist gate skipping a clean aggregate, optimistic-locking rejection, the `syncDependencies()` hook running before dispatch, and after-commit event dispatch
 

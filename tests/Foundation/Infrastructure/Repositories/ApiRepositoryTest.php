@@ -13,11 +13,14 @@ use Lava83\LaravelDdd\Infrastructure\Api\Exceptions\ApiException;
 use Lava83\LaravelDdd\Infrastructure\Api\Exceptions\Unavailable;
 use Lava83\LaravelDdd\Infrastructure\Repositories\Exceptions\UnmappedDomainEvent;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\AggregateTestSubject;
+use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\CounterTestSubject;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\EntityTestId;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\EntityTestSubject;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\AggregateTestCreated;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\AggregateTestMemberAdded;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\AggregateTestRenamed;
+use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\CounterTestCreated;
+use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Api\ApiCounterTestRepository;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Api\ApiTestModel;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Api\ApiTestRepository;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Mappers\AggregateTestMapper;
@@ -28,10 +31,20 @@ beforeEach(function (): void {
 
 function apiRepository(): ApiTestRepository
 {
-    return new ApiTestRepository(new ApiClient(
+    return new ApiTestRepository(apiTestClient());
+}
+
+function apiCounterRepository(): ApiCounterTestRepository
+{
+    return new ApiCounterTestRepository(apiTestClient());
+}
+
+function apiTestClient(): ApiClient
+{
+    return new ApiClient(
         new ApiClientConfig('https://api.test', retryDelayMs: 0),
         new StaticBearerAuthenticator('token'),
-    ));
+    );
 }
 
 /**
@@ -210,5 +223,19 @@ describe('writing', function (): void {
         apiRepository()->save($subject);
 
         expect(recordedCalls())->toBe(["GET /v1/subjects/{$id}"]);
+    });
+
+    it('dispatches the events recorded before the create call with the key the API assigned', function (): void {
+        Event::fake();
+        $counter = CounterTestSubject::create('one');
+        Http::fake(['*/v1/counters' => Http::response(['data' => ['id' => 7, 'name' => 'one', 'version' => 1]])]);
+
+        apiCounterRepository()->save($counter);
+
+        $dispatched = Event::dispatched(CounterTestCreated::class);
+
+        expect($counter->id()->value())->toBe(7)
+            ->and($dispatched)->toHaveCount(1)
+            ->and($dispatched->first()[0]->aggregateId()->value())->toBe(7);
     });
 });

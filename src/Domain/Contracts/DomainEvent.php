@@ -10,6 +10,11 @@ use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
 
 /**
  * @template-covariant TId of Id
+ *
+ * @todo 2.0 (#47): add `withAggregateId(Id $aggregateId): static`, so that
+ *       Aggregate::idFromPersistence() can rebind every buffered event, not only
+ *       those extending Events\DomainEvent. Adding it in 1.x would break
+ *       existing implementers of this contract.
  */
 interface DomainEvent
 {
