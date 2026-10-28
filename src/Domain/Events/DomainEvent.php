@@ -9,6 +9,8 @@ use DateTimeImmutable;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Contracts\DomainEvent as DomainEventContract;
 use Lava83\LaravelDdd\Domain\ValueObjects\Identity\Id;
+use ReflectionClass;
+use ReflectionProperty;
 
 /**
  * @template-covariant TId of Id
@@ -61,6 +63,30 @@ abstract readonly class DomainEvent implements DomainEventContract
     public function eventVersion(): int
     {
         return $this->eventVersion;
+    }
+
+    /**
+     * A copy of this event for another identity of the same aggregate, e.g. the
+     * key the database assigned on insert. Payload, version and occurrence time
+     * are kept. The final constructor would reset occurredOn, so the copy is
+     * built without it and its readonly properties are initialised by reflection.
+     */
+    public function withAggregateId(Id $aggregateId): static
+    {
+        $copy = (new ReflectionClass($this))->newInstanceWithoutConstructor();
+
+        $state = [
+            'aggregateId' => $aggregateId,
+            'eventData' => new Collection($this->eventData->all()),
+            'eventVersion' => $this->eventVersion,
+            'occurredOn' => $this->occurredOn,
+        ];
+
+        foreach ($state as $property => $value) {
+            (new ReflectionProperty(self::class, $property))->setValue($copy, $value);
+        }
+
+        return $copy;
     }
 
     public function toArray(): array

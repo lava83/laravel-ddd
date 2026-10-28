@@ -79,6 +79,41 @@ describe('toArray', function (): void {
     });
 });
 
+describe('withAggregateId', function (): void {
+    it('returns a copy carrying the new aggregate id', function (): void {
+        $event = new AggregateTestCreated($this->id, ['name' => 'Anna'], 3);
+        $otherId = EntityTestId::generate();
+
+        $copy = $event->withAggregateId($otherId);
+
+        expect($copy)->toBeInstanceOf(AggregateTestCreated::class)
+            ->and($copy)->not->toBe($event)
+            ->and($copy->aggregateId())->toBe($otherId);
+    });
+
+    it('keeps payload, name, version and occurrence time', function (): void {
+        $event = new AggregateTestCreated($this->id, ['name' => 'Anna'], 3);
+
+        $this->travel(5)->minutes();
+
+        $copy = $event->withAggregateId(EntityTestId::generate());
+
+        expect($copy->eventData()->all())->toBe(['name' => 'Anna'])
+            ->and($copy->eventName())->toBe('test.aggregate.created')
+            ->and($copy->eventVersion())->toBe(3)
+            ->and($copy->occurredOn()->toDateTimeString())->toBe('2026-03-18 10:30:00');
+    });
+
+    it('leaves the original event unchanged', function (): void {
+        $event = new AggregateTestCreated($this->id, ['name' => 'Anna']);
+
+        $event->withAggregateId(EntityTestId::generate());
+
+        expect($event->aggregateId())->toBe($this->id)
+            ->and($event->eventData()->all())->toBe(['name' => 'Anna']);
+    });
+});
+
 describe('immutability', function (): void {
     it('does not let a payload array change the event either', function (): void {
         $payload = ['name' => 'Anna'];
