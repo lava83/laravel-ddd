@@ -262,14 +262,14 @@ describe('idFromPersistence rebinds buffered events', function (): void {
             ->toBe([7, 99]);
     });
 
-    it('leaves events that only implement the contract untouched', function (): void {
+    it('rebinds events that only implement the contract as well', function (): void {
         $counter = CounterTestSubject::create('one');
         $counter->recordEvent(new ContractOnlyTestEvent($counter->id()));
 
         $counter->idFromPersistence(IntegerTestId::fromInt(7));
 
         expect($counter->uncommittedEvents()->map(fn ($event) => $event->aggregateId()->value())->all())
-            ->toBe([7, 0]);
+            ->toBe([7, 7]);
     });
 
     it('keeps the buffered events as they are when the id does not change', function (): void {

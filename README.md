@@ -20,6 +20,8 @@ composer require lava83/laravel-ddd
 
 The service provider and the `LaravelDdd` facade are registered automatically through Laravel package discovery. There are no migrations to publish, and no configuration is required — you build your own domains on top of the provided base classes, as shown below. An optional config file tunes the `make:aggregate` scaffolder (see [Scaffolding](#scaffolding)).
 
+Upgrading from an earlier major version? See [UPGRADING.md](UPGRADING.md).
+
 ## Quick start
 
 The example models a single `Article` aggregate with a `Title` value object and persists it through a mapper and a repository. It is the smallest slice that still exercises every core building block: a value object, an aggregate, an Eloquent model, a mapper and a repository.
