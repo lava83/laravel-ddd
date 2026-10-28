@@ -17,6 +17,7 @@ use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\CounterTestSubject;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\EntityTestId;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\AggregateTestCreated;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\AggregateTestRenamed;
+use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\CounterTestCreated;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Mappers\AggregateTestMapper;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Mappers\CounterTestMapper;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Repositories\AggregateTestRepository;
@@ -336,5 +337,19 @@ describe('auto-increment identity (integer keys)', function (): void {
 
         expect($first->id()->value())->toBe(1)
             ->and($second->id()->value())->toBe(2);
+    });
+
+    it('dispatches the events recorded before the insert with the persisted key', function (): void {
+        Event::fake();
+
+        $counter = CounterTestSubject::create('one');
+
+        counterRepository()->save($counter);
+
+        $dispatched = Event::dispatched(CounterTestCreated::class);
+
+        expect($counter->id()->value())->toBe(1)
+            ->and($dispatched)->toHaveCount(1)
+            ->and($dispatched->first()[0]->aggregateId()->value())->toBe(1);
     });
 });

@@ -6,6 +6,7 @@ namespace Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities;
 
 use Lava83\LaravelDdd\Domain\Entities\Aggregate;
 use Lava83\LaravelDdd\Infrastructure\Models\Model;
+use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\CounterTestCreated;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\ValueObjects\Identity\IntegerTestId;
 use ReflectionException;
 
@@ -30,11 +31,16 @@ final class CounterTestSubject extends Aggregate
 
     /**
      * Brand-new aggregate before persistence: id 0 stands in until the database
-     * assigns the real key.
+     * assigns the real key. The creation event is recorded against that
+     * placeholder, as a real factory would.
      */
     public static function create(string $name): self
     {
-        return new self(IntegerTestId::new(), $name);
+        $counter = new self(IntegerTestId::new(), $name);
+
+        $counter->recordEvent(new CounterTestCreated($counter->id(), ['name' => $name]));
+
+        return $counter;
     }
 
     public static function fromState(Model $state): static

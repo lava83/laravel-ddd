@@ -7,12 +7,16 @@ use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\Exceptions\ValidationException;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\AggregateTestModel;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\AggregateTestSubject;
+use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\CounterTestSubject;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\EntityTestId;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\EntityTestSubject;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\PrivateIdAggregate;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\ValidatingAggregate;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\AggregateTestCreated;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\AggregateTestRenamed;
+use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\ContractOnlyTestEvent;
+use Lava83\LaravelDdd\Tests\Fixtures\Domain\Events\CounterTestCreated;
+use Lava83\LaravelDdd\Tests\Fixtures\Domain\ValueObjects\Identity\IntegerTestId;
 
 /**
  * Rebuild an AggregateTestSubject from persisted model state.
@@ -232,6 +236,49 @@ describe('event querying', function (): void {
         expect($aggregate->countEventsOfType('test.aggregate.member_added'))->toBe(0)
             ->and($aggregate->countEventsOfType('test.aggregate.renamed'))->toBe(1)
             ->and($aggregate->hasUncommittedEvents())->toBeTrue();
+    });
+});
+
+describe('idFromPersistence rebinds buffered events', function (): void {
+    it('moves events recorded against the placeholder id onto the persisted id', function (): void {
+        $counter = CounterTestSubject::create('one');
+
+        $counter->idFromPersistence(IntegerTestId::fromInt(7));
+
+        $event = $counter->uncommittedEvents()->first();
+
+        expect($event)->toBeInstanceOf(CounterTestCreated::class)
+            ->and($event->aggregateId()->value())->toBe(7)
+            ->and($event->eventData()->all())->toBe(['name' => 'one']);
+    });
+
+    it('leaves events recorded against another id untouched', function (): void {
+        $counter = CounterTestSubject::create('one');
+        $counter->recordEvent(new CounterTestCreated(IntegerTestId::fromInt(99)));
+
+        $counter->idFromPersistence(IntegerTestId::fromInt(7));
+
+        expect($counter->uncommittedEvents()->map(fn ($event) => $event->aggregateId()->value())->all())
+            ->toBe([7, 99]);
+    });
+
+    it('leaves events that only implement the contract untouched', function (): void {
+        $counter = CounterTestSubject::create('one');
+        $counter->recordEvent(new ContractOnlyTestEvent($counter->id()));
+
+        $counter->idFromPersistence(IntegerTestId::fromInt(7));
+
+        expect($counter->uncommittedEvents()->map(fn ($event) => $event->aggregateId()->value())->all())
+            ->toBe([7, 0]);
+    });
+
+    it('keeps the buffered events as they are when the id does not change', function (): void {
+        $aggregate = AggregateTestSubject::create('Fresh');
+        $buffered = $aggregate->eventByType('test.aggregate.created');
+
+        $aggregate->idFromPersistence(EntityTestId::fromString($aggregate->id()->value()));
+
+        expect($aggregate->eventByType('test.aggregate.created'))->toBe($buffered);
     });
 });
 

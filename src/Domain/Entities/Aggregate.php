@@ -75,6 +75,35 @@ abstract class Aggregate extends Entity implements AggregateRoot
     }
 
     /**
+     * Buffered events recorded against the previous identity (typically the
+     * placeholder of a database-assigned key, recorded in a create() factory)
+     * are rebound to the new one, so they are dispatched with the persisted id.
+     * Events that only implement the DomainEvent contract have no
+     * withAggregateId() and are left as they are.
+     *
+     * @param  TId  $id
+     *
+     * @throws ReflectionException
+     * @throws ValidationException
+     */
+    public function idFromPersistence(Id $id): void
+    {
+        $previousId = $this->id();
+
+        parent::idFromPersistence($id);
+
+        if ($previousId->equals($this->id())) {
+            return;
+        }
+
+        $this->domainEvents = $this->domainEvents->map(
+            fn (DomainEvent $event): DomainEvent => $event instanceof DomainEventClass && $event->aggregateId()->equals($previousId)
+                ? $event->withAggregateId($this->id())
+                : $event,
+        );
+    }
+
+    /**
      * Domain Events Management
      *
      * @param  DomainEvent<TId>  $event
