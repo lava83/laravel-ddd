@@ -550,7 +550,7 @@ php artisan vendor:publish --tag=ddd-config
 
 ## What else is in the box
 
-Beyond the slice above, the package provides an `AggregateRoot` contract with domain-event recording: events collected through `updateAggregateRoot($changes, $eventClass)` are dispatched automatically via Laravel's event system once the surrounding transaction commits — deferred with `DB::afterCommit()` — then cleared from the aggregate. Every aggregate carries a `version` for optimistic locking and raises a `ConcurrencyException` on conflicting writes. You also get a growing catalogue of ready-made value objects — `Uuid`, `Email`, `Phonenumber`, `Money`, `Link`, `Json`, `GeoAddress` and more — plus a fluent Eloquent filtering layer on the base `Model` (see [Filtering](#filtering)).
+Beyond the slice above, the package provides an `AggregateRoot` contract with domain-event recording: events collected through `updateAggregateRoot($changes, $eventClass)` are dispatched automatically via Laravel's event system once the surrounding transaction commits — deferred with `DB::afterCommit()` — then cleared from the aggregate. With an `Integer` identity assigned on insert, events recorded before the first save (such as a `…Created` event in a `create()` factory) are moved onto the persisted key before they are dispatched. Every aggregate carries a `version` for optimistic locking and raises a `ConcurrencyException` on conflicting writes. You also get a growing catalogue of ready-made value objects — `Uuid`, `Email`, `Phonenumber`, `Money`, `Link`, `Json`, `GeoAddress` and more — plus a fluent Eloquent filtering layer on the base `Model` (see [Filtering](#filtering)).
 
 ## API-backed aggregates
 

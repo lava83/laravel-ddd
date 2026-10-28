@@ -90,6 +90,8 @@ final class ArticleId extends Uuid {}
 
 `Integer` exists for persistence-generated keys. **Trap:** after insert the base repository calls `Entity::idFromPersistence()`, which routes through `updateEntity()` → `applyChanges()` → `ReflectionProperty::setValue()` on an already-initialised property. A promoted `readonly $id` throws `Error: Cannot modify readonly property` there — an `Integer`-keyed aggregate must declare its `$id` non-readonly, which trades away the identity-immutability rule. Prefer `Uuid` identities.
 
+Events recorded before the insert (typically a `…Created` in a `create()` factory) carry the placeholder `0`. `Aggregate::idFromPersistence()` rebinds them: every buffered event whose `aggregateId()` equals the previous id is replaced by `withAggregateId($newId)`, so listeners see the persisted key. This covers both save paths, `Repository::saveEntity()` and `ApiRepository::persistCommands()`, because both reach it through `hydrate()`. Only events extending the `DomainEvent` base class are rebound — an event that implements just the contract keeps the placeholder (the contract gains `withAggregateId()` in 2.0, see issue #47).
+
 ## Entities and Aggregates
 
 `Entity` is `@template TModel of Model, TId of Id`. Its constructor promotes three `protected` properties, **all with defaults**:
@@ -184,6 +186,8 @@ final readonly class ArticleRenamed extends DomainEvent
 ```
 
 When you pass `$eventClass` to `updateAggregateRoot()`, it is instantiated as `new $eventClass($this->id(), $changesCollection)` — the payload is the dirty collection with its `old_`/`new_` keys. Need a different payload? Build the event yourself and pass it as the third argument.
+
+`withAggregateId(Id $aggregateId): static` returns a copy for another identity of the same aggregate and keeps payload, version and `occurredOn`. Because the `final` constructor resets `occurredOn`, the copy is built with `newInstanceWithoutConstructor()` and its `readonly` properties are initialised by reflection. `Aggregate::idFromPersistence()` uses it to move buffered events onto a persisted key (see Identities).
 
 Events are buffered on the aggregate (`recordEvent()`, `uncommittedEvents()`, `hasUncommittedEvents()`, `markEventsAsCommitted()`) and dispatched by the repository after a successful save. `uncommittedEvents()` returns clones; `__clone`, `__sleep` and `__wakeup` deliberately drop the buffer.
 
