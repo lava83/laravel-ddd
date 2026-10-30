@@ -550,7 +550,7 @@ php artisan vendor:publish --tag=ddd-config
 
 ## What else is in the box
 
-Beyond the slice above, the package provides an `AggregateRoot` contract with domain-event recording: events collected through `updateAggregateRoot($changes, $eventClass)` are dispatched automatically via Laravel's event system once the surrounding transaction commits — deferred with `DB::afterCommit()` — then cleared from the aggregate. With an `Integer` identity assigned on insert, events recorded before the first save (such as a `…Created` event in a `create()` factory) are moved onto the persisted key before they are dispatched. Every aggregate carries a `version` for optimistic locking and raises a `ConcurrencyException` on conflicting writes. You also get a growing catalogue of ready-made value objects — `Uuid`, `Email`, `Phonenumber`, `Money`, `Link`, `Json`, `GeoAddress` and more — plus a fluent Eloquent filtering layer on the base `Model` (see [Filtering](#filtering)).
+Beyond the slice above, the package provides an `AggregateRoot` contract with domain-event recording: events collected through `updateAggregateRoot($changes, $eventClass)` are dispatched automatically via Laravel's event system once the surrounding transaction commits — deferred with `DB::afterCommit()` — then cleared from the aggregate. With an `Integer` identity assigned on insert, events recorded before the first save (such as a `…Created` event in a `create()` factory) are moved onto the persisted key before they are dispatched. Every aggregate carries a `version` for optimistic locking and raises a `ConcurrencyException` on conflicting writes. You also get a growing catalogue of ready-made value objects — `Uuid`, `Email`, `Phonenumber`, `Money`, `Link`, `Json`, `GeoAddress` and more — plus a fluent Eloquent filtering layer on the base `Model` (see [Filtering](#filtering)), with free-text search and facet counts for read-model lists (see [Search](#search) and [Facets](#facets)).
 
 ## API-backed aggregates
 
@@ -795,6 +795,247 @@ A custom type may not reuse a built-in operator name (`CustomFilterNotValid`), a
 ```
 
 **Merging.** `MergeStrategy::KeepExisting` is unchanged. With `MergeStrategy::Override`, an incoming custom filter replaces existing ones with the same type string and target (no target equals no target).
+
+### Removing client filters (`without()`)
+
+`without(string ...$targets)` returns a new `Builder` without every filter whose target is one of `$targets`, built-in and custom alike. It never changes the builder it is called on, unlike `eq()`, `custom()` and the other operators, which add to the builder in place.
+
+```php
+$requested = Builder::make()
+    ->eq('status_id', 2)
+    ->in('user_type_id', [1, 3])
+    ->custom('$b2cUserSearch', 'müller');
+
+$requested->without('status_id')->toArray();
+// [
+//     ['type' => '$in', 'target' => 'user_type_id', 'value' => [1, 3]],
+//     ['type' => '$b2cUserSearch', 'value' => 'müller'],
+// ]
+```
+
+Custom filters without a target are never removed, an unknown target is a no-op, and `without()` with no arguments returns an equal copy.
+
+> Call `without()` on client (request) filters only, never on a scope filter. A scope can use the same target as a facet (`branch_id`), and removing it widens what the caller sees.
+
+### Search
+
+`Filter\Methods\TokenSearchFilterMethod` is an abstract custom `FilterMethod` for a free-text search over several columns. Extend it with the custom type and the columns:
+
+```php
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Methods\TokenSearchFilterMethod;
+
+final class B2cUserSearchFilter extends TokenSearchFilterMethod
+{
+    public static function type(): string
+    {
+        return '$b2cUserSearch';
+    }
+
+    protected function columns(): array
+    {
+        return ['email', 'data.firstname', 'data.lastname', 'data.personalnr'];
+    }
+}
+```
+
+- The phrase is split on Unicode whitespace. Duplicates are dropped case-insensitively, and only the first `maxTokens()` tokens (default 5) are used. An empty phrase adds no constraint.
+- Every token must match (AND). A token matches when any column matches (OR).
+- `email` is a column of the model. `data.lastname` is a column of the `data` relation, resolved with `whereHas()`: the part before the last dot is the relation, which must live on the same connection. Columns of one relation share one `EXISTS` per token.
+- `mode()` returns `SearchMode::Prefix` (`token%`, the default) or `SearchMode::Contains` (`%token%`). Prefix can use a B-tree index on the column, Contains scans it.
+- `%`, `_` and `!` in a token are literals. The filter escapes them and adds an explicit `ESCAPE '!'`, so it behaves the same on MySQL/MariaDB (with or without `NO_BACKSLASH_ESCAPES`), SQLite and PostgreSQL.
+- Case sensitivity follows the column collation. A `utf8mb4_*_ci` collation on MariaDB matches `müller` to `Müller`, and whether `ß` matches `ss` depends on the collation. SQLite folds ASCII only, and PostgreSQL's `LIKE` is always case-sensitive.
+- The value must be a UTF-8 string or an integer. Anything else fails as a `MalformedFilterFormatException`.
+
+Register the type in `eloquent-filtering.custom_filters` and allow it on the model, like any custom filter. **Do not** list it in `laravel-ddd.filters.custom_types`. Let the request read a dedicated `search` parameter and add the filter with `Builder::custom()`, so a client cannot send it through `filters`:
+
+```php
+// config/eloquent-filtering.php
+'custom_filters' => [
+    B2cUserSearchFilter::class,
+],
+```
+
+```php
+// the model
+public function allowedFilters(): AllowedFilterList
+{
+    return Filter::only(
+        Filter::field('status_id', [FilterType::EQUAL, FilterType::IN]),
+        Filter::field('user_type_id', [FilterType::EQUAL, FilterType::IN]),
+        Filter::custom('$b2cUserSearch'),
+    );
+}
+```
+
+```php
+// the request
+$requested = Builder::fromArray($decodedFilters);
+
+$search = $request->string('search')->trim()->value();
+
+if ($search !== '') {
+    $requested->custom(B2cUserSearchFilter::type(), $search);
+}
+```
+
+## Facets
+
+Facet counts are counts per value of one attribute of a list, for example how many users each status tab of an admin UI holds. They are counted on the database, with the same base query the list uses for its page.
+
+**Read models (Domain).** `Domain\ReadModels\Facets\FacetReadModel` (`key()`, `buckets()`, `toArray()`) holds `FacetBucketReadModel`s (`value()`, `count()`, `toArray()`):
+
+```php
+$facet->toArray();
+// [['value' => null, 'count' => 3], ['value' => 1, 'count' => 120], ['value' => 2, 'count' => 7]]
+```
+
+Buckets are ordered by value ascending, the null bucket first. A NULL column value is a bucket of its own. Values without rows have no bucket, because a `GROUP BY` cannot know them: **a missing value means 0.**
+
+**Definitions.** `Infrastructure\Models\Facets\FacetDefinition` says what to count:
+
+```php
+use Lava83\LaravelDdd\Infrastructure\Models\Facets\FacetDefinition;
+
+FacetDefinition::column('status', 'status_id');           // filter target: status_id
+FacetDefinition::column('type', 'user_type_id');          // filter target: user_type_id
+FacetDefinition::relation('services', 'services', 'id');  // filter target: services
+```
+
+- `column($key, $column, $filterTarget = null)` counts the rows of the list model per value of one of its columns. The filter target defaults to `$column`.
+- `relation($key, $relation, $column, $filterTarget = null)` counts the distinct rows of the list model per value of a column of a `HasMany` or `BelongsToMany` relation: a user with two services counts once for each. The filter target defaults to `$relation`. The related model must live on the list model's connection, otherwise `FacetNotCountable` is thrown. The list's keys go into a subquery, never through PHP memory.
+
+**Counting.** `FacetCounter::count(Closure $baseQuery, Builder $scope, Builder $requested, FacetDefinition ...$facets)` returns a `Collection<int, FacetReadModel>` in the order of the definitions.
+
+- `$baseQuery` is a `Closure(Filter\Builder): Eloquent\Builder`: the base query of the list page, including `->filter($filter->toArray())`. Eager loads, ordering, limit and offset are dropped before grouping.
+- Each facet is counted with `$scope->merge($requested->without($facet->filterTarget()))`: the whole scope, plus every requested filter except the facet's own. The status tabs therefore show how many rows each status holds under the current search and type filter.
+- **Keep the scope and the requested filters apart.** The scope (tenant, branch: what the caller may see at all) is never reduced. Merge the two before calling the counter, and a facet on `branch_id` drops the branch scope along with the client's branch filter.
+- A column facet groups the list query with `count(*)`, so the base query must not join a to-many table, or a row counts once per joined row. A relation facet groups the related rows with `count(distinct …)`, and the soft-delete scopes of both models stay active.
+
+### A list endpoint with search and facets
+
+From the request to the response, with the scope and the request filters kept apart all the way down.
+
+**Request.** The client's filters and the search, nothing else:
+
+```php
+final class ListB2cUsersRequest extends FormRequest
+{
+    public function requested(): Builder
+    {
+        /** @var array<int, array<string, mixed>> $decoded */
+        $decoded = json_decode($this->string('filters', '[]')->value(), true, flags: JSON_THROW_ON_ERROR);
+
+        $requested = Builder::fromArray($decoded);
+        $search = $this->string('search')->trim()->value();
+
+        if ($search !== '') {
+            $requested->custom(B2cUserSearchFilter::type(), $search);
+        }
+
+        return $requested;
+    }
+}
+```
+
+**Use case.** It builds the scope from who is asking, and passes the request filters on untouched:
+
+```php
+final readonly class ListB2cUsers
+{
+    public function __construct(
+        private B2cUserReadQuery $users,
+    ) {}
+
+    /**
+     * @return array{page: CursorPaginator<int, B2cUserReadModel>, facets: Collection<int, FacetReadModel>}
+     */
+    public function __invoke(int $branchId, Builder $requested, int $perPage): array
+    {
+        $scope = Builder::make()->eq('branch_id', $branchId);
+
+        return [
+            'page' => $this->users->page($scope, $requested, $perPage),
+            'facets' => $this->users->facets($scope, $requested),
+        ];
+    }
+}
+```
+
+**Read query.** The page and the facets share one base query:
+
+```php
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Lava83\LaravelDdd\Infrastructure\Models\Facets\FacetCounter;
+use Lava83\LaravelDdd\Infrastructure\Models\Facets\FacetDefinition;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder;
+use Lava83\LaravelDdd\Infrastructure\Pagination\ReadModelCursorPaginator;
+
+final class EloquentB2cUserReadQuery implements B2cUserReadQuery
+{
+    public function page(Builder $scope, Builder $requested, int $perPage): CursorPaginator
+    {
+        return ReadModelCursorPaginator::fromPage(
+            $this->baseQuery($scope->merge($requested))->orderBy('id')->cursorPaginate($perPage),
+            fn (B2cUserModel $model) => B2cUserReadModelMapper::fromModel($model),
+        );
+    }
+
+    public function facets(Builder $scope, Builder $requested): Collection
+    {
+        return FacetCounter::count(
+            fn (Builder $filter) => $this->baseQuery($filter),
+            $scope,
+            $requested,
+            FacetDefinition::column('status', 'status_id'),
+            FacetDefinition::column('type', 'user_type_id'),
+        );
+    }
+
+    /**
+     * @return EloquentBuilder<B2cUserModel>
+     */
+    private function baseQuery(Builder $filter): EloquentBuilder
+    {
+        return B2cUserModel::query()->with('data')->filter($filter->toArray());
+    }
+}
+```
+
+**Controller.** The facets go into `meta` next to the cursor:
+
+```php
+public function index(ListB2cUsersRequest $request, ListB2cUsers $listUsers): AnonymousResourceCollection
+{
+    $result = $listUsers($request->user()->branch_id, $request->requested(), $request->integer('per_page', 50));
+
+    return B2cUserResource::collection($result['page'])->additional([
+        'meta' => [
+            'facets' => $result['facets']->mapWithKeys(
+                fn (FacetReadModel $facet): array => [$facet->key() => $facet->toArray()],
+            ),
+        ],
+    ]);
+}
+```
+
+```json
+{
+    "data": ["…"],
+    "links": {"first": null, "last": null, "prev": null, "next": "…"},
+    "meta": {
+        "path": "…",
+        "per_page": 50,
+        "next_cursor": "…",
+        "prev_cursor": null,
+        "facets": {
+            "status": [{"value": null, "count": 3}, {"value": 1, "count": 120}, {"value": 2, "count": 7}],
+            "type": [{"value": 1, "count": 98}, {"value": 2, "count": 32}]
+        }
+    }
+}
+```
+
+A status the list does not contain has no bucket. Fill the tabs from your own status enum, with 0 for a missing value.
 
 ## Development
 
