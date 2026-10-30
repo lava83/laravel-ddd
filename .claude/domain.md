@@ -201,6 +201,17 @@ Events are buffered on the aggregate (`recordEvent()`, `uncommittedEvents()`, `h
 - `AggregateRoot` — the event buffer surface.
 - `DomainEvent` — `aggregateId()`, `eventName()`, `occurredOn()`, `eventData()`, `eventVersion()`, `toArray()`.
 
+## Read models
+
+`ReadModels\ReadModel` is the base of the read side (CQRS lists): plain objects mapped from Eloquent models in Infrastructure, never persisted. It carries a mutable `recentlyCreatedModel` flag with a setter, so a subclass cannot be a `readonly class` (PHP forbids a readonly class extending a non-readonly one). Subclasses use `private readonly` promoted properties instead.
+
+`ReadModels\Facets` holds the counts per value of one attribute of a list (tabs of an admin UI):
+
+- `FacetBucketReadModel(string|int|float|bool|null $value, int $count)` — `value()`, `count()`, `toArray(): array{value, count}`. A NULL column value is a bucket of its own.
+- `FacetReadModel(string $key, iterable<FacetBucketReadModel> $buckets = [])` — `key()`, `buckets(): Collection<int, FacetBucketReadModel>` (a copy), `toArray(): list<array{value, count}>`. Sorts on construction: null first, then ascending by `<=>`. That is PHP comparison, not database collation, which only matters for string values. The order lives here and not in SQL, because PostgreSQL sorts NULL last.
+- Only values that occur have a bucket: a `GROUP BY` cannot know the others. A missing value means 0, and the consumer fills its tabs from its own enum.
+- Built by `Infrastructure\Models\Facets\FacetCounter` (see `.claude/infrastructure.md`, "Facets and search"). The read models themselves depend on `Collection` only.
+
 ## Structure
 
 ```
@@ -210,5 +221,6 @@ Domain/
 ├── Enums/
 ├── Events/         # DomainEvent base
 ├── Exceptions/     # ValidationException, EntityNotFound
+├── ReadModels/     # ReadModel base, Facets/
 └── ValueObjects/   # by category, plus ValueObject base and Identity/
 ```

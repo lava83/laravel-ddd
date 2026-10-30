@@ -275,11 +275,45 @@ Rules:
 - `Builder::custom($type, $value = true, $target = null)` rejects built-in operator names (`Exceptions\CustomFilterNotValid`). It does not consult the registry — only `fromArray()` does.
 - `fromArray()` accepts an unknown type only if it is in `config('laravel-ddd.filters.custom_types')` (default `[]`); otherwise `FilterArrayNotValid::unknownType`. Custom rows treat a missing/`null` `target` as absent; built-ins still require it. No auto-derivation from `eloquent-filtering.custom_filters` — types are registered twice on purpose, so a client cannot reach filters just because some model registered them. `allowedFilters()` stays the gate at apply time.
 - `merge(Override)` matches on `identifier()` + `target()` (`===`, so null equals null); `KeepExisting` is untouched.
+- `without(string ...$targets)` returns a **new** Builder without every filter whose `target()` is in `$targets` (built-in and custom). Custom filters with a null target are never removed (`in_array(null, $strings, true)` is false), unknown targets are a no-op, no arguments return an equal copy. Only `merge()` and `without()` return new instances; `eq()`, `custom()` and the other operators add to the shared Collection and return `$this`, so a request filter reused for several facets must go through `without()`. Meant for client filters only — see "Facets and search".
 - Recommended use: tenant/scope predicates needing cross-table or cross-connection subqueries — implement a `FilterMethod`, register it in `eloquent-filtering.custom_filters`, allow it with `Filter::custom('$name')`, build it with `Builder::custom()`. Worked example in the README ("Custom filters").
 
 **Upgrade note (static typing only):** `Builder::filters()` now returns `Collection<int, FilterDefinition>` instead of `Collection<int, Filter>`, and `Builder::toArray()`'s shape makes `target` optional and `value` a nested-array-capable type. Code that calls `->type()` on items from `filters()` needs a `FilterContract` check/narrowing. No runtime change for built-in filters; their serialised output is byte-identical.
 
 Tests: `tests/Foundation/Infrastructure/Models/Filter/CustomFilterIntegrationTest.php` runs a real custom `FilterMethod` (`tests/Fixtures/Infrastructure/Filters/OwnedByFilter.php`) against the `testing` DB; `TestCase` registers `EloquentFilteringServiceProvider` for it.
+
+## Facets and search
+
+Free-text search and facet counts for read-model lists, on the relational database and through the same read side as the page (`baseQuery()` → `Model::filter()` → `ReadModelCursorPaginator`). No search engine on purpose: tables written outside the domain would drift from an index, and tenant scoping would have to be duplicated in it.
+
+### Facets
+
+- Read models: `Domain\ReadModels\Facets\FacetReadModel` / `FacetBucketReadModel`, see `.claude/domain.md`.
+- `Models\Facets\FacetDefinition` — `final readonly`, private constructor. Factories `column($key, $column, $filterTarget = null)` (target defaults to `$column`) and `relation($key, $relation, $column, $filterTarget = null)` (target defaults to `$relation`). The getters are `key()`, `columnName()`, `relationName()` and `filterTarget()`, because `column` and `relation` are taken by the static factories.
+- `Models\Facets\FacetCounter::count(Closure $baseQuery, Builder $scope, Builder $requested, FacetDefinition ...$facets): Collection<int, FacetReadModel>`, in definition order. `@template TModel of Model` on `count()`, so a `Closure(Builder): Builder<UserModel>` type-checks (Eloquent's builder template is invariant).
+- Per facet: `$scope->merge($requested->without($facet->filterTarget()), KeepExisting)` → `$baseQuery(…)` → `setEagerLoads([])`, `reorder()`, `limit`/`offset` set to null → `toBase()` (applies global scopes, soft deletes included) → group:
+  - Column: `select <table.column> as facet_value, count(*) as facet_count … group by <table.column>`.
+  - Relation: `Relation::noConstraints()` drops the parent constraint (BelongsToMany still joins the pivot). The related model's query gets `whereIn(<foreign key | foreign pivot key>, <list query selecting the qualified parent key>)` and `count(distinct <that key>)`, grouped by `<related table.column>`. Constraints written into the relation method (`where()`, `wherePivot()`) and the related model's global scopes stay.
+- No `ORDER BY`: `FacetReadModel` sorts the buckets (null first), because PostgreSQL sorts NULL last.
+- `Facets\Exceptions\FacetNotCountable`: unknown relation; a relation that is not HasMany/BelongsToMany (MorphToMany explicitly — without constraints it would lose its morph type); a related model on another connection (compared via `getConnection()->getName()`, since `getConnectionName()` is null for the default); a non-scalar value from the database.
+
+**Trap — the scope rule.** The whole security property of the counter is that `$scope` is applied in full to every facet and only `$requested` is reduced. Keep the two apart from the request down to the read query:
+
+- Merge them first and pass the result as `$requested`, and a facet on `branch_id` drops the branch scope together with the client's branch filter: counts across tenants.
+- Pass the merged filter as `$scope`, and the facet's own client filter is never dropped: every tab shows the count of the selected one.
+- Never call `without()` on a scope.
+
+**Trap — joins.** A column facet counts `count(*)` on the list query. A base query that joins a to-many table counts a row once per joined row. Relation facets are not affected (`count(distinct …)`).
+
+### Search
+
+- `Models\Filter\Methods\TokenSearchFilterMethod` — abstract, `implements FilterMethod`, `use CustomFilter`. Constructor `(protected readonly string|int $value)`, named `$value` because `PendingFilter::createFilter()` passes the filter data by constructor parameter name. Subclasses implement `type()` and `columns(): list<string>`, and may override `mode(): SearchMode` (default `Prefix`) and `maxTokens(): int` (default 5). `Filter\Enums\SearchMode { Prefix, Contains }`.
+- `format()` overrides the trait's `[]`: `value` must be present and an int or a UTF-8 string, else `MalformedFilterFormatException` instead of a `TypeError` in the constructor. `''` passes (Laravel skips non-implicit rules on empty strings) and adds no constraint.
+- Tokens: `preg_split('/\s+/u', …, PREG_SPLIT_NO_EMPTY)` (Unicode whitespace, NBSP included), de-duplicated by `mb_strtolower()` with the first occurrence kept, then `array_slice(…, 0, maxTokens())`.
+- SQL: one nested `where (… or …)` per token. Own columns are `orWhereRaw('<wrapped qualified column> like ? escape \'!\'')`. Relation columns are grouped by relation (split at the last dot) into one `orWhereHas()` per relation, with the ORs nested inside. Escaping is a single-pass `strtr` (`!` → `!!`, `%` → `!%`, `_` → `!_`).
+- Why raw: `where($column, 'like', …)` and Laravel's `whereLike()` emit no ESCAPE clause, and the implicit escape differs (`\` on MySQL unless `NO_BACKSLASH_ESCAPES`, none on SQLite).
+- Register the type in `eloquent-filtering.custom_filters` only, **not** in `laravel-ddd.filters.custom_types`. The request adds it from a dedicated `search` parameter with `Builder::custom()`, so a client cannot send it through `filters`.
+- Case sensitivity is the collation's business. The `testing` connection is SQLite, which folds ASCII only: tests can prove byte-exact umlaut matching, not `Ü`/`ü` folding or `ß` = `ss`.
 
 ## Exceptions
 
@@ -288,6 +322,7 @@ Tests: `tests/Foundation/Infrastructure/Models/Filter/CustomFilterIntegrationTes
 | `Infrastructure\Exceptions` | `CantSaveModel`, `CantDeleteModel`, `CantDeleteRelatedModel`, `ConcurrencyException` |
 | `Infrastructure\Mappers\Exceptions` | `NoMapperFoundForEntity` |
 | `Infrastructure\Models\Exceptions` | `EntityClassNotAvailable` |
+| `Infrastructure\Models\Facets\Exceptions` | `FacetNotCountable` |
 | `Infrastructure\Models\Filter\Filters\Exceptions` | `FilterArrayNotValid`, `FilterValueNotValid`, `CustomFilterNotValid` |
 | `Infrastructure\Repositories\Exceptions` | `EntityClassNotAvailable` |
 
