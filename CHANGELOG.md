@@ -2,6 +2,69 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v1.2.0 - 2026-10-30
+
+This release adds free-text search and facet counts for cursor-paginated read-model lists. Both run on the relational database through the existing read side (`Model::filter()` and `ReadModelCursorPaginator`), with no search engine and no new dependency. It is backwards compatible; existing code needs no changes.
+
+### Added
+
+#### Facet counts
+
+`FacetCounter::count()` counts per value of one attribute of a list, for example the status tabs of an admin UI. It uses the same base query the list uses for its page (#50).
+
+```php
+use Lava83\LaravelDdd\Infrastructure\Models\Facets\FacetCounter;
+use Lava83\LaravelDdd\Infrastructure\Models\Facets\FacetDefinition;
+
+$facets = FacetCounter::count(
+    fn (Builder $filter) => $this->baseQuery($filter),
+    $scope,      // what the caller may see (tenant, branch), applied in full
+    $requested,  // the client's filters; each facet drops its own
+    FacetDefinition::column('status', 'status_id'),
+    FacetDefinition::relation('services', 'services', 'id'),
+);
+
+$facets->first()->toArray();
+// [['value' => null, 'count' => 3], ['value' => 1, 'count' => 120], ['value' => 2, 'count' => 7]]
+
+```
+- `FacetDefinition::column()` counts the rows per value of a column of the list model. `FacetDefinition::relation()` counts the distinct rows per value of a column of a `HasMany` or `BelongsToMany` relation on the same connection.
+- Each facet keeps the whole scope and every requested filter except its own. Pass the scope and the client's filters separately: the scope is never reduced.
+- The results are `Domain\ReadModels\Facets\FacetReadModel`s holding `FacetBucketReadModel`s, ordered by value with the null bucket first. A value without rows has no bucket, so a missing value means 0.
+
+#### Search
+
+`TokenSearchFilterMethod` is an abstract eloquent-filtering custom filter for a search over several columns, columns of a relation included:
+
+```php
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Methods\TokenSearchFilterMethod;
+
+final class B2cUserSearchFilter extends TokenSearchFilterMethod
+{
+    public static function type(): string
+    {
+        return '$b2cUserSearch';
+    }
+
+    protected function columns(): array
+    {
+        return ['email', 'data.firstname', 'data.lastname'];
+    }
+}
+
+```
+Every token of the phrase must match, in any of the columns. Matching uses `SearchMode::Prefix` (the default) or `SearchMode::Contains`, with at most `maxTokens()` tokens (default 5). `%`, `_` and `!` are literals on MySQL/MariaDB, SQLite and PostgreSQL alike.
+
+#### Removing client filters
+
+- **`Filter\Builder::without(string ...$targets)`** returns a new builder without the filters on the given targets. Use it on client filters only, never on a scope.
+
+### Upgrade notes
+
+No action required. To use the search, register the filter in `eloquent-filtering.custom_filters` and allow it on the model. The README recommends not listing it in `laravel-ddd.filters.custom_types`, and setting it from a dedicated `search` parameter instead.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v1.1.0...v1.2.0
+
 ## v1.1.0 - 2026-10-28
 
 This release fixes the id carried by domain events of integer-keyed aggregates and adds `DomainEvent::withAggregateId()`, which the fix is built on. It is backwards compatible; existing code needs no changes.
@@ -19,6 +82,7 @@ $counter = Counter::create('one');      // records CounterCreated with id 0
 $repository->save($counter);
 
 // Listeners now receive CounterCreated with aggregateId() === $counter->id(), e.g. 1
+
 
 ```
 `Uuid` identities were not affected: their id is known before the event is recorded.
@@ -70,6 +134,7 @@ final class Title extends ValueObject
         return [];
     }
 }
+
 
 
 ```
@@ -176,6 +241,7 @@ return $pages->fromResponse(
 
 
 
+
 ```
 - **`RelayedCursorPaginator`:** a `CursorPaginator` subclass built from items, page size and the `next` / `prev` tokens of the neighbouring pages. Nothing is derived from the items, so read models need no sort column. `Resource::collection($page)` produces `data`, `links` and `meta` as usual, with your own URLs.
 - **`RelayedCursor`:** keeps the token exactly as received. Laravel's `Cursor::encode()` rebuilds a token from decoded parameters, which is not guaranteed to give the same string back.
@@ -210,6 +276,7 @@ return ReadModelCursorPaginator::fromPage(
     $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
     fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
 );
+
 
 
 
@@ -279,6 +346,7 @@ public function validate(): array
 
 
 
+
 ```
 `isValid()` is unchanged (`validate() === []`).
 
@@ -301,6 +369,7 @@ $exceptions->render(function (DomainValidationException $e) {
         ? null
         : throw LaravelValidationException::withMessages($e->errors());
 });
+
 
 
 
@@ -455,6 +524,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -488,6 +558,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -546,6 +617,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 
