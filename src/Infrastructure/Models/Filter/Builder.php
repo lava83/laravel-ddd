@@ -73,6 +73,25 @@ final readonly class Builder implements Countable
     }
 
     /**
+     * Return a new Builder without every filter whose target is one of
+     * `$targets`, built-in and custom alike, mutating neither operand.
+     *
+     * Meant for client (request) filters, e.g. to drop a facet's own filter
+     * before counting it. Never call it on a scope filter: a scope can share a
+     * target (`branch_id`) with a facet, and removing it widens what the caller
+     * may see. Custom filters without a target are never removed, unknown
+     * targets are a no-op, and no targets return an equal copy.
+     */
+    public function without(string ...$targets): self
+    {
+        return new self(
+            $this->filters
+                ->reject(fn (FilterDefinition $filter): bool => in_array($filter->target(), $targets, true))
+                ->values(),
+        );
+    }
+
+    /**
      * Rebuild a Builder from the array shape produced by {@see self::toArray()}.
      *
      * Unknown types are rejected unless registered in

@@ -15,6 +15,11 @@ describe('Domain purity', function (): void {
                 'Carbon\Carbon',
             ]);
     });
+
+    it('keeps the read models free of Infrastructure', function (): void {
+        expect('Lava83\LaravelDdd\Domain\ReadModels')
+            ->not->toUse('Lava83\LaravelDdd\Infrastructure');
+    });
 });
 
 describe('Value objects', function (): void {

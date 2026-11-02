@@ -812,3 +812,73 @@ describe('Builder merge with custom filters', function () {
         ]);
     });
 });
+
+describe('Builder without', function () {
+    it('returns a new builder and leaves the original unchanged', function () {
+        $requested = Builder::make()->eq('status_id', 1)->eq('type_id', 2);
+
+        $result = $requested->without('status_id');
+        $result->eq('branch_id', 3);
+
+        expect($result)->not->toBe($requested)
+            ->and($requested->toArray())->toBe([
+                ['type' => '$eq', 'target' => 'status_id', 'value' => 1],
+                ['type' => '$eq', 'target' => 'type_id', 'value' => 2],
+            ]);
+    });
+
+    it('removes every built-in filter on the target', function () {
+        $requested = Builder::make()->gte('age', 18)->lte('age', 65)->eq('status', 'active');
+
+        expect($requested->without('age')->toArray())->toBe([
+            ['type' => '$eq', 'target' => 'status', 'value' => 'active'],
+        ]);
+    });
+
+    it('removes custom filters on the target', function () {
+        $requested = Builder::make()->custom('$hasService', [1, 2], 'services')->eq('status', 'active');
+
+        expect($requested->without('services')->toArray())->toBe([
+            ['type' => '$eq', 'target' => 'status', 'value' => 'active'],
+        ]);
+    });
+
+    it('removes the filters of several targets at once', function () {
+        $requested = Builder::make()
+            ->eq('status', 'active')
+            ->custom('$hasService', 1, 'services')
+            ->in('type', ['a', 'b'])
+            ->isNull('archived_at');
+
+        expect($requested->without('status', 'services', 'archived_at')->toArray())->toBe([
+            ['type' => '$in', 'target' => 'type', 'value' => ['a', 'b']],
+        ]);
+    });
+
+    it('keeps custom filters without a target', function () {
+        $requested = Builder::make()->custom('$search', 'müller')->eq('status', 'active');
+
+        expect($requested->without('status')->toArray())->toBe([
+            ['type' => '$search', 'value' => 'müller'],
+        ]);
+    });
+
+    it('treats an unknown target as a no-op', function () {
+        $requested = Builder::make()->eq('status', 'active')->custom('$search', 'müller');
+
+        expect($requested->without('unknown')->toArray())->toBe($requested->toArray());
+    });
+
+    it('returns an equal but independent copy without arguments', function () {
+        $requested = Builder::make()->eq('status', 'active');
+
+        $copy = $requested->without();
+        $copy->eq('type', 'b');
+
+        expect($copy)->not->toBe($requested)
+            ->and($copy)->toHaveCount(2)
+            ->and($requested->toArray())->toBe([
+                ['type' => '$eq', 'target' => 'status', 'value' => 'active'],
+            ]);
+    });
+});
