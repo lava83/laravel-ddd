@@ -2,7 +2,7 @@
 
 Orchestration and use-case coordination. Deptrac: `Application → Domain, AllowedPrimitives`.
 
-In this package the layer holds exactly one class: `Resources\ErrorResource`. Everything below is the shape **consumers** are expected to follow, and the shape to scaffold when asked.
+In this package the layer holds three resources: `Resources\ErrorResource`, the abstract `Resources\JsonResource` (a `201` for a read model of a just-created model) and `Resources\FacetsResource` (see "List endpoints" below). Everything else here is the shape **consumers** are expected to follow, and the shape to scaffold when asked.
 
 ## What belongs here
 
@@ -136,6 +136,21 @@ final class ArticleResource extends JsonResource
 ```
 
 `ErrorResource` in this package renders any `Exception` as `{error, code}` — useful in an exception handler, since `ValidationException` from the domain carries code 422.
+
+## List endpoints
+
+A read-model list endpoint is built from package blocks; details and traps in `.claude/infrastructure.md` ("List requests and sorting"), the worked example in the README ("A list endpoint").
+
+- **Request:** a `FormRequest` that uses the traits from `Infrastructure\Http\Requests\Concerns` its list accepts (`PaginatesByCursor`, `AcceptsFilters`, `AcceptsSort`, `AcceptsSearch`, `AcceptsFacets`) and spreads their `…Rules()` into `rules()`. It declares `listKey()`, and as needed `sortableFields()`, `searchFilterType()` and `facetEnum()`. Request rules of its own on `filters.*` stay possible (e.g. a target only the use case may set).
+- **Use case:** builds the scope from the acting user, merges the client filters behind it (`MergeStrategy::KeepExisting`), wraps the read query in `ClientFilterErrors::translate()` and returns the resource collection, with `FacetsResource::addTo()` for `meta.facets`. The controller is one line. The package does not enforce that split.
+- **Wire contract:** `per_page` (1–200, default 50), `cursor`, `filters` (JSON string or bracket-notation array, JSON wins), `sort[]` (`-` for descending), `search` (max 100), `facets[]`. Every error is a 422 on its field.
+
+Traps, in short:
+
+- A request that overrides `validationData()` must return `$this->withDecodedFilters(...)`.
+- The search type goes into `eloquent-filtering.custom_filters`, never into `laravel-ddd.filters.custom_types`.
+- `listKey()` must be the key the read query orders by; with `AcceptsSort` the read query takes it from `Sort::key()`.
+- Sort columns must not hold NULL, and datetime sort columns must store whole seconds.
 
 ## Layering caveat
 

@@ -2,6 +2,74 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v1.3.0 - 2026-11-02
+
+This release adds the request side of cursor-paginated read-model lists: request blocks for page size, cursor, filters, sort, search and facets, a sort that works with cursor pagination, and the translation of read-time filter errors into 422. There is no new dependency. One existing behaviour changes: `ReadModelCursorPaginator` now fails on a NULL cursor value instead of paging wrong (see upgrade notes).
+
+### Added
+
+#### Request blocks for list endpoints
+
+Traits for a `FormRequest` in `Infrastructure\Http\Requests\Concerns`, one per concern, each usable without the others (#51):
+
+```php
+final class ListUsersRequest extends FormRequest
+{
+    /** @use AcceptsFacets<UserFacet> */
+    use AcceptsFacets;
+
+    use AcceptsFilters;
+    use AcceptsSearch;
+    use AcceptsSort;
+    use PaginatesByCursor;
+
+    public function rules(): array
+    {
+        return [
+            ...$this->cursorPaginationRules(),
+            ...$this->filterRules(),
+            ...$this->sortRules(),
+            ...$this->searchRules(),
+            ...$this->facetRules(),
+        ];
+    }
+
+    protected function listKey(): string { return 'id'; }
+    protected function sortableFields(): array { return ['created_at', 'email']; }
+    protected function searchFilterType(): string { return UserSearchFilter::type(); }
+    protected function facetEnum(): string { return UserFacet::class; }
+}
+
+```
+- `PaginatesByCursor`: `per_page` (1–200, default 50, overridable) and `cursor`. The cursor must carry exactly the parameters of the order of the list, so a cursor issued for another sort is a 422 on `cursor` instead of an `UnexpectedValueException` in the read query.
+- `AcceptsFilters`: `filters` as a JSON string or a bracket-notation query array, read with `filters()`. JSON is decoded before the rules run, so rules of the request on `filters.*` apply to both forms. Where both forms meet, the JSON string wins.
+- `AcceptsSort`: `sort[]=-created_at&sort[]=email`. The sortable fields appear in the OpenAPI spec through `Rule::in()`.
+- `AcceptsSearch`: `search`, added to `filters()` as the custom search filter, with or without `AcceptsFilters`.
+- `AcceptsFacets`: `facets[]`, the values of a string-backed enum.
+
+Every check is a rule, so a request wires in no validation hook. Every error is a 422 on its field.
+
+#### Sorting
+
+`Infrastructure\Models\Sort\Sort` is the order of a list: the requested fields, then the key of the list as the tie-breaker, so the order is unique for cursor pagination. The read query applies it with `$sort->apply($query)` before `cursorPaginate()`. Without a requested sort, the order is the key ascending. Facet counts do not change with the sort.
+
+#### Errors and facets in the response
+
+- **`ClientFilterErrors::translate(Closure $read)`** turns a filter error of eloquent-filtering that only shows up when the read query runs, such as a target the model does not allow, into a 422 on `filters`. Every other exception passes unchanged.
+- **`Application\Resources\FacetsResource`** renders facet counts for `meta.facets`. `FacetsResource::addTo()` adds them to a resource collection only if the client asked for facets, so without them no facet query runs.
+
+### Changed
+
+- **`ReadModelCursorPaginator` throws `CursorValueIsNull`** when an order column of a page item holds NULL. Laravel's cursor pagination cannot page over NULL and used to skip or repeat rows silently.
+
+### Upgrade notes
+
+- No action required for lists ordered by their key. If a list orders by a column that can hold NULL, it now fails with `CursorValueIsNull` where it paged wrong before: order only by columns that never hold NULL.
+- To switch a consumer to the request blocks, see "List requests" in the README. Register the search type in `eloquent-filtering.custom_filters` only, never in `laravel-ddd.filters.custom_types`. A request that overrides `validationData()` must pass its data through `withDecodedFilters()`.
+- Datetime columns used for sorting must store whole seconds: the cursor carries them as `Y-m-d H:i:s`.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v1.2.0...v1.3.0
+
 ## v1.2.0 - 2026-10-30
 
 This release adds free-text search and facet counts for cursor-paginated read-model lists. Both run on the relational database through the existing read side (`Model::filter()` and `ReadModelCursorPaginator`), with no search engine and no new dependency. It is backwards compatible; existing code needs no changes.
@@ -27,6 +95,7 @@ $facets = FacetCounter::count(
 $facets->first()->toArray();
 // [['value' => null, 'count' => 3], ['value' => 1, 'count' => 120], ['value' => 2, 'count' => 7]]
 
+
 ```
 - `FacetDefinition::column()` counts the rows per value of a column of the list model. `FacetDefinition::relation()` counts the distinct rows per value of a column of a `HasMany` or `BelongsToMany` relation on the same connection.
 - Each facet keeps the whole scope and every requested filter except its own. Pass the scope and the client's filters separately: the scope is never reduced.
@@ -51,6 +120,7 @@ final class B2cUserSearchFilter extends TokenSearchFilterMethod
         return ['email', 'data.firstname', 'data.lastname'];
     }
 }
+
 
 ```
 Every token of the phrase must match, in any of the columns. Matching uses `SearchMode::Prefix` (the default) or `SearchMode::Contains`, with at most `maxTokens()` tokens (default 5). `%`, `_` and `!` are literals on MySQL/MariaDB, SQLite and PostgreSQL alike.
@@ -82,6 +152,7 @@ $counter = Counter::create('one');      // records CounterCreated with id 0
 $repository->save($counter);
 
 // Listeners now receive CounterCreated with aggregateId() === $counter->id(), e.g. 1
+
 
 
 ```
@@ -134,6 +205,7 @@ final class Title extends ValueObject
         return [];
     }
 }
+
 
 
 
@@ -242,6 +314,7 @@ return $pages->fromResponse(
 
 
 
+
 ```
 - **`RelayedCursorPaginator`:** a `CursorPaginator` subclass built from items, page size and the `next` / `prev` tokens of the neighbouring pages. Nothing is derived from the items, so read models need no sort column. `Resource::collection($page)` produces `data`, `links` and `meta` as usual, with your own URLs.
 - **`RelayedCursor`:** keeps the token exactly as received. Laravel's `Cursor::encode()` rebuilds a token from decoded parameters, which is not guaranteed to give the same string back.
@@ -276,6 +349,7 @@ return ReadModelCursorPaginator::fromPage(
     $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
     fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
 );
+
 
 
 
@@ -347,6 +421,7 @@ public function validate(): array
 
 
 
+
 ```
 `isValid()` is unchanged (`validate() === []`).
 
@@ -369,6 +444,7 @@ $exceptions->render(function (DomainValidationException $e) {
         ? null
         : throw LaravelValidationException::withMessages($e->errors());
 });
+
 
 
 
@@ -525,6 +601,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -558,6 +635,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -617,6 +695,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 
