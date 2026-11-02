@@ -7,6 +7,7 @@ use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\FullListReques
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\ListRequests;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\PagedListRequest;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\TunedListRequest;
+use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\UniqueSortListRequest;
 
 describe('PaginatesByCursor per_page', function (): void {
     it('rejects a page size that is not an integer from 1 to 200', function (mixed $perPage): void {
@@ -73,6 +74,25 @@ describe('PaginatesByCursor cursor', function (): void {
 
         expect(ListRequests::errors(FullListRequest::class, ['cursor' => $cursor]))->toHaveKey('cursor');
     });
+
+    it('takes a cursor that ends at a unique field or at the key', function (array $sort, array $parameters): void {
+        $cursor = (new Cursor($parameters))->encode();
+
+        expect(ListRequests::errors(UniqueSortListRequest::class, ['sort' => $sort, 'cursor' => $cursor]))->toBe([]);
+    })->with([
+        'a unique field' => [['email', '-rank'], ['email' => 'a@example.com']],
+        'the key' => [['-id', 'rank'], ['id' => 5]],
+    ]);
+
+    it('rejects a cursor of 1.3, with the key after a unique field or fields after the key', function (array $sort, array $parameters): void {
+        $cursor = (new Cursor($parameters))->encode();
+
+        expect(ListRequests::errors(UniqueSortListRequest::class, ['sort' => $sort, 'cursor' => $cursor]))
+            ->toBe(['cursor' => ['The cursor does not belong to the sort of the list.']]);
+    })->with([
+        'a unique field' => [['email'], ['email' => 'a@example.com', 'id' => 5]],
+        'the key' => [['-id', 'rank'], ['id' => 5, 'rank' => 2]],
+    ]);
 
     it('leaves an invalid sort to the sort rule and only checks that the cursor decodes', function (): void {
         $cursor = (new Cursor(['id' => 5]))->encode();

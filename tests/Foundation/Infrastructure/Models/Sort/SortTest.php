@@ -36,19 +36,36 @@ describe('Sort', function (): void {
             ->and($sort->fields()[1]->direction())->toBe(SortDirection::Ascending);
     });
 
-    it('appends the key ascending as the tie-breaker', function (): void {
-        $sort = Sort::fromArray(['-rank'], ['rank'], 'id');
+    it('appends the key as the tie-breaker, in the direction of the last field', function (array $fields, array $orders): void {
+        $sort = Sort::fromArray($fields, ['rank', 'name'], 'id');
 
-        expect(sortOrders($sort))->toBe(['-rank', 'id'])
-            ->and($sort->cursorParameters())->toBe(['rank', 'id']);
-    });
+        expect(sortOrders($sort))->toBe($orders)
+            ->and($sort->cursorParameters())->toBe(array_map(fn (string $order): string => ltrim($order, '-'), $orders));
+    })->with([
+        'ascending' => [['rank'], ['rank', 'id']],
+        'descending' => [['-rank'], ['-rank', '-id']],
+        'descending, then ascending' => [['-rank', 'name'], ['-rank', 'name', 'id']],
+        'ascending, then descending' => [['rank', '-name'], ['rank', '-name', '-id']],
+    ]);
 
-    it('does not repeat the key the client sorts by', function (): void {
+    it('ends the order at the key the client sorts by', function (): void {
         $sort = Sort::fromArray(['-id', 'rank'], ['rank', 'id'], 'id');
 
-        expect(sortOrders($sort))->toBe(['-id', 'rank'])
-            ->and($sort->cursorParameters())->toBe(['id', 'rank']);
+        expect(sortOrders($sort))->toBe(['-id'])
+            ->and($sort->cursorParameters())->toBe(['id']);
     });
+
+    it('ends the order at a unique field, without the key', function (array $fields, array $orders): void {
+        $sort = Sort::fromArray($fields, ['rank', 'email'], 'id', unique: ['email']);
+
+        expect(sortOrders($sort))->toBe($orders)
+            ->and($sort->fields())->toHaveCount(count($fields));
+    })->with([
+        'alone' => [['-email'], ['-email']],
+        'first' => [['email', '-rank'], ['email']],
+        'last' => [['-rank', 'email'], ['-rank', 'email']],
+        'not requested' => [['-rank'], ['-rank', '-id']],
+    ]);
 
     it('rejects a field', function (array $fields, string $message): void {
         expect(fn () => Sort::fromArray($fields, ['rank', 'name'], 'id'))->toThrow(SortNotValid::class, $message);
@@ -70,7 +87,7 @@ describe('Sort', function (): void {
         expect($applied)->toBe($query)
             ->and($query->getQuery()->orders)->toBe([
                 ['column' => 'rank', 'direction' => 'desc'],
-                ['column' => 'id', 'direction' => 'asc'],
+                ['column' => 'id', 'direction' => 'desc'],
             ]);
     });
 });

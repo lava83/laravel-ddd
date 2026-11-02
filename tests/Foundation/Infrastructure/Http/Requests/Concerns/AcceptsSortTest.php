@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\SortField;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\ListRequests;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\SortedListRequest;
+use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\UniqueSortListRequest;
 
 /**
  * @param  array<string, mixed>  $query
@@ -23,8 +24,8 @@ describe('AcceptsSort', function (): void {
         expect(requestedOrder(['sort' => ['rank']]))->toBe(['rank', 'id']);
     });
 
-    it('sorts descending with a leading minus', function (): void {
-        expect(requestedOrder(['sort' => ['-rank']]))->toBe(['-rank', 'id']);
+    it('sorts descending with a leading minus, ties by the key descending', function (): void {
+        expect(requestedOrder(['sort' => ['-rank']]))->toBe(['-rank', '-id']);
     });
 
     it('sorts by several fields in the order of the request', function (): void {
@@ -41,6 +42,17 @@ describe('AcceptsSort', function (): void {
         'missing' => [[]],
         'blank' => [['sort' => '']],
     ]);
+
+    it('ends the sort at a unique field of the request', function (): void {
+        $sort = ListRequests::resolve(UniqueSortListRequest::class, ['sort' => ['email', '-rank']])->sort();
+
+        expect(array_map(fn (SortField $field): string => $field->toString(), $sort->orders()))->toBe(['email'])
+            ->and($sort->cursorParameters())->toBe(['email']);
+    });
+
+    it('declares no unique field by default', function (): void {
+        expect(requestedOrder(['sort' => ['name', '-rank']]))->toBe(['name', '-rank', '-id']);
+    });
 
     it('carries the key of the request', function (): void {
         expect(ListRequests::resolve(SortedListRequest::class)->sort()->key())->toBe('id');

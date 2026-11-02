@@ -141,9 +141,9 @@ final class ArticleResource extends JsonResource
 
 A read-model list endpoint is built from package blocks; details and traps in `.claude/infrastructure.md` ("List requests and sorting"), the worked example in the README ("A list endpoint").
 
-- **Request:** a `FormRequest` that uses the traits from `Infrastructure\Http\Requests\Concerns` its list accepts (`PaginatesByCursor`, `AcceptsFilters`, `AcceptsSort`, `AcceptsSearch`, `AcceptsFacets`) and spreads their `…Rules()` into `rules()`. It declares `listKey()`, and as needed `sortableFields()`, `searchFilterType()` and `facetEnum()`. Request rules of its own on `filters.*` stay possible (e.g. a target only the use case may set).
-- **Use case:** builds the scope from the acting user, merges the client filters behind it (`MergeStrategy::KeepExisting`), wraps the read query in `ClientFilterErrors::translate()` and returns the resource collection, with `FacetsResource::addTo()` for `meta.facets`. The controller is one line. The package does not enforce that split.
-- **Wire contract:** `per_page` (1–200, default 50), `cursor`, `filters` (JSON string or bracket-notation array, JSON wins), `sort[]` (`-` for descending), `search` (max 100), `facets[]`. Every error is a 422 on its field.
+- **Request:** a `FormRequest` that uses the traits from `Infrastructure\Http\Requests\Concerns` its list accepts (`PaginatesByCursor`, `AcceptsFilters`, `AcceptsSort`, `AcceptsSearch`, `AcceptsFacets`) and spreads their `…Rules()` into `rules()`. It declares `listKey()`, and as needed `sortableFields()` (plus `uniqueSortableFields()` for columns with a unique index), `searchFilterType()` and `facetEnum()`. Request rules of its own on `filters.*` stay possible (e.g. a target only the use case may set).
+- **Use case:** builds the scope from the acting user, merges the client filters behind it (`MergeStrategy::KeepExisting`), wraps the read query in `ClientFilterErrors::translate()` and returns the resource collection, with `FacetsResource::addTo()` for `meta.facets` (documented through the package's Scramble extension). The controller is one line. The package does not enforce that split.
+- **Wire contract:** `per_page` (1–200, default 50), `cursor`, `filters` (JSON string or bracket-notation array, JSON wins), `sort[]` (`-` for descending, ties by the key in the direction of the last field), `search` (max 100), `facets[]`. Every error is a 422 on its field; a blank parameter counts as missing.
 
 Traps, in short:
 

@@ -913,12 +913,13 @@ FacetDefinition::relation('services', 'services', 'id');  // filter target: serv
 
 ## Sorting
 
-`Infrastructure\Models\Sort\Sort` is the order of a list: the fields a client asked for, then the key of the list as the tie-breaker. Cursor pagination needs a unique order, so the key always comes last, unless the client already sorts by it.
+`Infrastructure\Models\Sort\Sort` is the order of a list: the fields a client asked for, then the key of the list as the tie-breaker. Cursor pagination needs a unique order, so the order ends with the key, or earlier with a field that is unique already.
 
 ```php
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\Sort;
 
-$sort = Sort::fromArray(['-created_at', 'email'], allowed: ['created_at', 'email'], key: 'id');
+$sort = Sort::fromArray(['-created_at'], allowed: ['created_at', 'email'], key: 'id');                    // created_at DESC, id DESC
+$sort = Sort::fromArray(['email', '-created_at'], allowed: ['created_at', 'email'], key: 'id', unique: ['email']); // email
 $sort = Sort::byKey('id'); // no sort requested: the key ascending
 
 $page = ReadModelCursorPaginator::fromPage(
@@ -928,16 +929,21 @@ $page = ReadModelCursorPaginator::fromPage(
 ```
 
 - `fromArray()` throws `Sort\Exceptions\SortNotValid` for a field that is not allowed, a field given twice (`email` and `-email` count as the same field) and a field that is not a non-empty string. In a request, `AcceptsSort` turns these into a 422 (see [List requests](#list-requests)).
-- `apply()` replaces any order the query had and orders by the column names without the table. The cursor parameters are named after these columns, and `cursorParameters()` lists them: `['created_at', 'email', 'id']`.
+- The key follows the direction of the last field: `-created_at` orders by `created_at DESC, id DESC`. Ties of a descending sort therefore come in descending key order.
+- The order ends at the first field that is unique: the key itself (`sort[]=-id&sort[]=email` orders by `id DESC` only) or a field in `unique`, such as `email` with a unique index. Fields after it never decide, and no key follows it.
+- `apply()` replaces any order the query had and orders by the column names without the table. The cursor parameters are named after these columns, and `cursorParameters()` lists them: `['created_at', 'id']` for the first sort above, `['email']` for the second.
 - The cursor rule of `PaginatesByCursor` expects exactly these parameters, so a cursor issued for another sort is a 422 on `cursor`. A cursor of the same columns in the other direction passes, because Laravel's cursor does not record the direction. The page then starts at the cursor row in the new direction.
 - `ReadModelCursorPaginator` reads the cursor values from the source models, so a sort column does not have to be a property of the read model.
 - `FacetCounter` drops the order before grouping, so the facets do not change with the sort.
 - Only columns of the list model are sortable. Sorting by a column of a relation, such as a last name in a profile table, needs a join and the joined value in the select under a name of its own. That is not built. It would be a second kind of sort field next to the plain column, with that name as its cursor parameter.
 
+**Indexes.** An index on the sort column serves the sort in both directions: the index carries the key ascending, and read backwards, descending, which is why the key follows the direction of the last field. A sort by several columns needs an index on them in that order. Declare a column with a unique index as unique: MariaDB does not serve `ORDER BY email, id` from a unique index on `email` and sorts the whole table instead, on every page.
+
 **Traps.**
 
 - **No NULL in a sort column.** Laravel's cursor pagination compares the cursor value with `>` and `<`, which never matches NULL, so the next page would skip or repeat rows. Allow only columns that never hold NULL. `ReadModelCursorPaginator` throws `Pagination\Exceptions\CursorValueIsNull` instead of putting NULL into a cursor, so the mistake fails loudly.
 - **No fractions of a second in a datetime sort column.** A `datetime` cast puts the value into the cursor as `Y-m-d H:i:s`. If the column stores fractions of a second, the next page repeats rows when sorting ascending and skips rows when sorting descending. Sort by such a column only if it stores whole seconds.
+- **Only unique columns as unique fields.** The order ends at a unique field, so the next page skips every row that has the same value as the cursor row.
 
 ## List requests
 
@@ -993,6 +999,11 @@ final class ListUsersRequest extends FormRequest
         return ['created_at', 'email'];
     }
 
+    protected function uniqueSortableFields(): array
+    {
+        return ['email'];
+    }
+
     protected function searchFilterType(): string
     {
         return UserSearchFilter::type();
@@ -1005,12 +1016,14 @@ final class ListUsersRequest extends FormRequest
 }
 ```
 
-Every error is a 422 on its field: `per_page`, `cursor`, `filters`, `sort` (a field given twice) or `sort.N` (a field that is not allowed), `search`, `facets.N`. Rules check everything, so no trait defines `after()`, `withValidator()` or `prepareForValidation()`, and a request has no validation hook to wire in. The rule arrays carry doc comments, which Scramble reads through the spread. `Rule::in()` on `sort.*` lists the sortable fields in the OpenAPI spec, and `Rule::enum()` on `facets.*` the facets. A blank parameter (`sort=`, `facets=`, `per_page=`) counts as a missing one.
+Every error is a 422 on its field: `per_page`, `cursor`, `filters`, `sort` (a field given twice) or `sort.N` (a field that is not allowed or blank), `search`, `facets.N`. Rules check everything, so no trait defines `after()`, `withValidator()` or `prepareForValidation()`, and a request has no validation hook to wire in. A blank parameter (`sort=`, `facets=`, `per_page=`) counts as a missing one, with or without Laravel's `ConvertEmptyStringsToNull` middleware.
+
+**OpenAPI.** With [Scramble](https://scramble.dedoc.co) installed, the package registers extensions for it, and the blocks document themselves: every parameter optional, with the doc comment of its rule as the description; `sort[]` as an array of the sortable fields; `filters` as a JSON string or a list of filter objects; `facets[]` as an array of the facet enum; and the response with `meta.facets` (see **Facets in `meta`** below). Scramble alone cannot get these right: it drops `sort` and `filters` with their descriptions because `sort.*` and `filters.*` have rules, and it does not see the facets that `FacetsResource::addTo()` adds. The extensions are tested against Scramble 0.13.
 
 **Cursor pagination.**
 
-- `per_page` is an integer from 1 to 200, and 50 if it is missing. Override `defaultPerPage()` and `maxPerPage()` to change that. They are methods, not constants, because a class cannot redefine a constant it got from a trait. Scramble shows the `@default 50` of the trait, so a request with another default documents it in a rule of its own.
-- `cursor` must decode and carry exactly the parameters of the order of the list: the key alone, or with `AcceptsSort` the sort columns plus the key. A cursor of another order is a 422 on `cursor`, so the read query never throws `UnexpectedValueException` for it. Do not catch that exception around the read query.
+- `per_page` is an integer from 1 to 200, and 50 if it is missing. Override `defaultPerPage()` and `maxPerPage()` to change that. They are methods, not constants, because a class cannot redefine a constant it got from a trait. Scramble shows the 50 of the trait, in the description and as `@default 50`, so a request with another default documents it in a rule of its own.
+- `cursor` must decode and carry exactly the parameters of the order of the list: the key alone, or with `AcceptsSort` the columns of the requested sort (`Sort::cursorParameters()`). A cursor of another order is a 422 on `cursor`, so the read query never throws `UnexpectedValueException` for it. Do not catch that exception around the read query.
 
 **The key.** `listKey()` is the column the list is ordered by last, unique per row. With `AcceptsSort`, `sort()` carries it to the read query, which calls `$sort->apply()` and names no key of its own. Without `AcceptsSort`, the read query orders by its own key, and `listKey()` must name the same column. If it does not, the cursor rule rejects every cursor from the second page on.
 
@@ -1026,7 +1039,7 @@ GET /users?filters[0][type]=$in&filters[0][target]=status_id&filters[0][value][0
 - **JSON wins.** Within the query string `filters` has one form, but Laravel merges a JSON body and the query string into one input. If both carry `filters`, a JSON string wins over an array, whichever of the two carries it.
 - Invalid JSON, JSON that is not a list, a malformed filter, an unknown operator and a value the operator rejects are a 422 on `filters`.
 
-**Sort.** `sort[]=-created_at&sort[]=email`: the first field sorts first, and a leading `-` sorts descending. Only the `sortableFields()` are allowed, and none of them may hold NULL. Without `sort`, `sort()` is the key ascending. See [Sorting](#sorting).
+**Sort.** `sort[]=-created_at&sort[]=email`: the first field sorts first, and a leading `-` sorts descending. Only the `sortableFields()` are allowed, and none of them may hold NULL. List the ones with a unique index in `uniqueSortableFields()` too (none by default), so the sort ends at them and the database can use that index. Without `sort`, `sort()` is the key ascending. See [Sorting](#sorting).
 
 **Search.**
 
@@ -1038,7 +1051,7 @@ GET /users?filters[0][type]=$in&filters[0][target]=status_id&filters[0][value][0
 
 **Errors at read time.** Validation cannot know whether the model allows a filter target. `allowedFilters()` decides that when the read query runs, and throws an `eloquent-filtering` `FilterException`. Wrap the read query in `Infrastructure\Http\ClientFilterErrors::translate()` to turn that into a 422 on `filters`. Every other exception passes through unchanged. Wrap reads only: a write that fails on a filter is not the client's error.
 
-**Facets in `meta`.** `Application\Resources\FacetsResource` renders a `Collection<int, FacetReadModel>` as `{<key>: [{value, count}, …]}`. Its `@return` array shape is what makes Scramble document `meta.facets`. `FacetsResource::addTo($collection, $facets, $count)` adds the facets to `meta.facets`, next to the cursor meta and to any additional data the collection already has. It does so only if the client asked for facets. Without them, `$count` never runs and no facet query is made.
+**Facets in `meta`.** `Application\Resources\FacetsResource` renders a `Collection<int, FacetReadModel>` as `{<key>: [{value, count}, …]}`. `FacetsResource::addTo($collection, $facets, $count)` adds the facets to `meta.facets`, next to the cursor meta and to any additional data the collection already has. It does so only if the client asked for facets. Without them, `$count` never runs and no facet query is made. In the OpenAPI spec, the package's Scramble extension for `addTo()` documents the response as the page without and the page with `meta.facets`, and the `@return` array shape of `toArray()` is the schema of the `FacetsResource` component.
 
 ### A list endpoint
 

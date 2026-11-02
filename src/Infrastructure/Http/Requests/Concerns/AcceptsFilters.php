@@ -29,6 +29,9 @@ trait AcceptsFilters
     private bool $filtersDecodedForValidation = false;
 
     /**
+     * `filled`, not `required`, on `filters.*`: it fails a blank filter as
+     * well, and Scramble does not take it for a required `filters`.
+     *
      * @return array<string, list<mixed>>
      */
     protected function filterRules(): array
@@ -39,8 +42,8 @@ trait AcceptsFilters
              * notation (`filters[0][type]=$eq&…`). JSON keeps numbers and booleans. Bracket notation sends every value
              * as a string, which `$gt`, `$gte`, `$lt`, `$lte` and `$null` reject.
              */
-            'filters' => ['bail', new ValidFilters, 'array'],
-            'filters.*' => ['required', 'array'],
+            'filters' => ['bail', 'nullable', new ValidFilters, 'array'],
+            'filters.*' => ['filled', 'array'],
         ];
     }
 
