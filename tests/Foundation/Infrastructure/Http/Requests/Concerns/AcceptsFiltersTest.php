@@ -73,6 +73,7 @@ describe('AcceptsFilters errors', function (): void {
         'invalid JSON' => ['[{"type":', 'The filters must be a JSON list of filters.'],
         'a JSON object' => ['{"type":"$eq","target":"name","value":"a"}', 'The filters must be a JSON list of filters.'],
         'a JSON scalar' => ['5', 'The filters must be a JSON list of filters.'],
+        'keyed filters' => [['a' => ['type' => '$eq', 'target' => 'name', 'value' => 'a']], 'The filters must be a list of filters.'],
         'a missing key' => ['[{"type":"$eq","value":"a"}]', 'The filter array is missing the required "target" key.'],
         'an unknown operator' => ['[{"type":"$nope","target":"name","value":"a"}]', 'The filter type "$nope" is not a known filter type.'],
         'a value of the wrong type' => [[['type' => '$gte', 'target' => 'rank', 'value' => '2']], 'The value for filter type "$gte" has an invalid type (string).'],
