@@ -322,7 +322,8 @@ The HTTP side of a read-model list: what turns `per_page`, `cursor`, `filters`, 
 
 ### Sort
 
-- `Models\Sort\Sort` — `final readonly`, private constructor. `byKey($key)` (no fields) and `fromArray(array $fields, list<string> $allowed, string $key)` (`'-created_at'` = descending). `fields()` are the requested fields, `orders()` the fields plus the key ascending (not repeated if requested), `cursorParameters()` the column names of `orders()`.
+- `Models\Sort\Sort` — `final readonly`, private constructor. `byKey($key)` (no fields) and `fromArray(array $fields, list<string> $allowed, string $key, list<string> $unique = [])` (`'-created_at'` = descending). `fields()` are the requested fields, `orders()` the applied order, `cursorParameters()` the column names of `orders()`.
+- `orders()`: the fields up to the first unique one (the key or a field in `$unique`), which ends the order; without one, all fields and then the key **in the direction of the last field** (ascending without fields). Both are for the index: an index on `(field)` carries the key ascending, so a backward scan gives `field DESC, key DESC`, never `field DESC, key ASC`; and MariaDB does not serve `ORDER BY email, id` from a unique index on `email` (measured in waz-api, GINI-308: filesort on every page, seconds on 1M rows).
 - `fromArray()` throws `Sort\Exceptions\SortNotValid`: `malformedField` (not a string, `''`, `'-'`), `unknownField`, `duplicateField` (also `x` with `-x`).
 - `apply(EloquentBuilder)` calls `reorder()` and then `orderBy()` per order with the **unqualified** column, so the cursor parameters are named exactly as `cursorParameters()` says and the cursor rule can check them before the query runs. `@template TModel of Model`, returns the same builder.
 - `SortField(column, SortDirection = Ascending)`, `toString()` gives the request form. `Sort\Enums\SortDirection` is backed by `asc` / `desc`.
@@ -337,12 +338,22 @@ Traits in `Http\Requests\Concerns`, each with `@phpstan-require-extends FormRequ
 - `ValidFilters` runs `Builder::fromArray($rows)->toArray()`: `toArray()` is where the built-in filters check their values (`FilterValueNotValid`).
 - `ValidCursor($parameters)` wants exactly the expected parameters (sorted comparison) and scalar values; `null` only checks that the cursor decodes. The cursor block passes `null` when the sort is invalid, so only the sort rule reports.
 - Seams, detected with `method_exists()` on private, distinctly named methods: `ProvidesFilters::filters()` (used by `AcceptsFilters` and `AcceptsSearch`, PHP imports the identical trait method once) calls `clientFilterRows()` and `withSearchFilter()`; `PaginatesByCursor` calls `sortCursorParameters()` of `AcceptsSort`. PHPStan does not analyse the traits in this package (no class in `src` uses them) and does not report errors in vendor files for consumers, so the tests are their only check.
-- Empty strings: Laravel skips non-implicit rules on `''`, so `sort.*`, `facets.*` and `filters.*` are `required`, and `perPage()`, `sort()` and `facets()` treat a blank parameter as a missing one.
+- Blank input: Laravel skips non-implicit rules on `''`, and `ConvertEmptyStringsToNull` turns it into `null` before the rules see it over HTTP. So the parameters are `nullable` (a blank `sort=` counts as missing either way), the elements `sort.*`, `facets.*` and `filters.*` are `filled` (implicit, so a blank element fails), and `perPage()`, `sort()` and `facets()` check `filled()`. Not `required` on the elements: Scramble marks the parameter required for it. `ListRequests::resolve()` skips the middleware, so the blank cases are tested over HTTP too (`BlankListParametersTest`).
+- `AcceptsSort::uniqueSortableFields()` (default `[]`) feeds `$unique` of the sort.
 
 ### Errors and facets
 
 - `Http\ClientFilterErrors::translate(Closure $read, string $attribute = 'filters')` turns any `FilterException` of `eloquent-filtering` (e.g. `DeniedFilterException` from `allowedFilters()`) into `ValidationException::withMessages()`; everything else passes unchanged. Reads only.
-- `Application\Resources\FacetsResource` renders `Collection<int, FacetReadModel>` as `{key: [{value, count}]}`; the `@return` array shape is what Scramble documents. `addTo($collection, $facets, Closure $count)` returns the collection untouched for `[]` (no query), otherwise merges `meta.facets` into the existing `additional` with `array_replace_recursive()`.
+- `Application\Resources\FacetsResource` renders `Collection<int, FacetReadModel>` as `{key: [{value, count}]}`; the `@return` array shape of `toArray()` is the schema of the `FacetsResource` component. `addTo($collection, $facets, Closure $count)` returns the collection untouched for `[]` (no query), otherwise merges `meta.facets` into the existing `additional` with `array_replace_recursive()`. Scramble cannot see `meta.facets` through `addTo()` on its own, see below.
+
+### Scramble
+
+`dedoc/scramble` is a dev dependency and a `suggest`. `Infrastructure\Scramble\ScrambleExtensions::register()` runs from `LaravelDddServiceProvider` once the app has booted, and only if Scramble is installed and its provider loaded:
+
+- `FacetsResourceAddToExtension` (`StaticMethodReturnTypeExtension`): types `FacetsResource::addTo()` as the collection or the collection with `additional(['meta' => ['facets' => FacetsResource]])`, so the 200 response is `anyOf` the page without and with `meta.facets`. Scramble reads a class in `vendor/` from its signature and PHPDoc only, and `@return TCollection` loses the `additional` data.
+- `SortParameterSchema`, `FiltersParameterSchema` (`AllRulesSchemasTransformer`, added with `withRuleTransformers()` to the default API; APIs registered later clone it). Scramble drops a parameter whose `x.*` has rules, and with it its doc comment, and builds `sort[]` from `sort.*` with the enum copied onto the array. They run on `DistinctSortFields` and `ValidFilters`, the rules only `sort` and `filters` have: `sort[]` becomes an array of the `sort.*` schema (`uniqueItems`, not nullable), `filters` `anyOf` a JSON string and a list of `{type, target, value}`, with every `filters.*` rule removed, those of the request too.
+
+These use Scramble's internal types (0.13, pre-1.0). CI runs `composer update`, so a Scramble release that breaks them fails `ListEndpointSpecTest`. That test reads the package classes through reflection (`PackageClasses` matcher), as in a consumer; without it, Scramble analyses their code and documents something a consumer never gets.
 
 **Traps.**
 
@@ -350,8 +361,9 @@ Traits in `Http\Requests\Concerns`, each with `@phpstan-require-extends FormRequ
 - **The search type** goes into `eloquent-filtering.custom_filters` only, never into `laravel-ddd.filters.custom_types`. `filters()` throws a `LogicException` if it is there.
 - **The key of the request and the read query must match.** With `AcceptsSort` the read query takes it from `Sort::key()`. Without it, the read query orders by its own key, and a different `listKey()` makes the cursor rule reject every cursor from page 2 on.
 - **Sort columns must not hold NULL** (`CursorValueIsNull`), and a datetime sort column must store whole seconds: the cursor carries the cast value as `Y-m-d H:i:s`, so fractions repeat rows ascending and skip rows descending (`SortPaginationTest` pins this).
+- **A unique sort field must be unique.** The order ends at it without the key, so the next page skips every row that ties with the cursor row.
 
-Tests: `tests/Foundation/Infrastructure/Http/**`, `tests/Foundation/Infrastructure/Models/Sort/**` (`SortPaginationTest` pages the `testing` DB), `tests/Foundation/Application/Resources/FacetsResourceTest.php`; fixtures in `tests/Fixtures/Infrastructure/Http/Requests` (`ListRequests::resolve()` resolves a request through the container, which validates it) and `SortTestItemModel`.
+Tests: `tests/Foundation/Infrastructure/Http/**`, `tests/Foundation/Infrastructure/Models/Sort/**` (`SortPaginationTest` pages the `testing` DB), `tests/Foundation/Infrastructure/Scramble/**` (the generated document), `tests/Foundation/Application/Resources/FacetsResourceTest.php`; fixtures in `tests/Fixtures/Infrastructure/Http/Requests` (`ListRequests::resolve()` resolves a request through the container, which validates it, without the HTTP middleware), `tests/Fixtures/Infrastructure/Scramble` and `SortTestItemModel`.
 
 ## Exceptions
 
