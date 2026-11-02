@@ -54,14 +54,14 @@ function sortTestWalk(Sort $sort, int $perPage): array
 }
 
 /**
- * id  rank  name  happened_at          score  status_id
- * 1   2     c     2026-01-02 10:00:00  null   1
- * 2   1     a     2026-01-01 10:00:00  5      1
- * 3   2     b     2026-01-02 10:00:00  7      2
- * 4   1     d     2026-01-01 10:00:00  1      2
- * 5   3     a     2026-01-03 10:00:00  3      1
- * 6   2     e     2026-01-02 10:00:00  9      3
- * 7   1     b     2026-01-01 10:00:00  2      1
+ * id  rank  name  code  happened_at          score  status_id
+ * 1   2     c     g     2026-01-02 10:00:00  null   1
+ * 2   1     a     c     2026-01-01 10:00:00  5      1
+ * 3   2     b     e     2026-01-02 10:00:00  7      2
+ * 4   1     d     a     2026-01-01 10:00:00  1      2
+ * 5   3     a     f     2026-01-03 10:00:00  3      1
+ * 6   2     e     b     2026-01-02 10:00:00  9      3
+ * 7   1     b     d     2026-01-01 10:00:00  2      1
  */
 beforeEach(function (): void {
     Schema::dropIfExists('sort_test_items');
@@ -69,43 +69,47 @@ beforeEach(function (): void {
         $table->id();
         $table->unsignedInteger('rank');
         $table->string('name');
+        $table->string('code')->unique();
         $table->dateTime('happened_at');
         $table->unsignedInteger('score')->nullable();
         $table->unsignedInteger('status_id');
     });
 
     foreach ([
-        [2, 'c', '2026-01-02 10:00:00', null, 1],
-        [1, 'a', '2026-01-01 10:00:00', 5, 1],
-        [2, 'b', '2026-01-02 10:00:00', 7, 2],
-        [1, 'd', '2026-01-01 10:00:00', 1, 2],
-        [3, 'a', '2026-01-03 10:00:00', 3, 1],
-        [2, 'e', '2026-01-02 10:00:00', 9, 3],
-        [1, 'b', '2026-01-01 10:00:00', 2, 1],
-    ] as [$rank, $name, $happenedAt, $score, $status]) {
-        SortTestItemModel::query()->create(['rank' => $rank, 'name' => $name, 'happened_at' => $happenedAt, 'score' => $score, 'status_id' => $status]);
+        [2, 'c', 'g', '2026-01-02 10:00:00', null, 1],
+        [1, 'a', 'c', '2026-01-01 10:00:00', 5, 1],
+        [2, 'b', 'e', '2026-01-02 10:00:00', 7, 2],
+        [1, 'd', 'a', '2026-01-01 10:00:00', 1, 2],
+        [3, 'a', 'f', '2026-01-03 10:00:00', 3, 1],
+        [2, 'e', 'b', '2026-01-02 10:00:00', 9, 3],
+        [1, 'b', 'd', '2026-01-01 10:00:00', 2, 1],
+    ] as [$rank, $name, $code, $happenedAt, $score, $status]) {
+        SortTestItemModel::query()->create(['rank' => $rank, 'name' => $name, 'code' => $code, 'happened_at' => $happenedAt, 'score' => $score, 'status_id' => $status]);
     }
 });
 
 describe('Sort with cursor pagination', function (): void {
     it('pages every row once, in the order of the sort', function (array $fields, array $order): void {
-        $sort = Sort::fromArray($fields, ['rank', 'name', 'happened_at'], 'id');
+        $sort = Sort::fromArray($fields, ['rank', 'name', 'code', 'happened_at', 'id'], 'id', unique: ['code']);
 
         foreach ([1, 2, 3] as $perPage) {
             expect(array_merge(...sortTestWalk($sort, $perPage)))->toBe($order);
         }
     })->with([
         'by the key' => [[], [1, 2, 3, 4, 5, 6, 7]],
+        'by the key descending' => [['-id', 'rank'], [7, 6, 5, 4, 3, 2, 1]],
         'a repeating column ascending' => [['rank'], [2, 4, 7, 1, 3, 6, 5]],
-        'a repeating column descending' => [['-rank'], [5, 1, 3, 6, 2, 4, 7]],
-        'a string column descending' => [['-name'], [6, 4, 1, 3, 7, 2, 5]],
+        'a repeating column descending, ties descending' => [['-rank'], [5, 6, 3, 1, 7, 4, 2]],
+        'a string column descending' => [['-name'], [6, 4, 1, 7, 3, 5, 2]],
         'a datetime column ascending' => [['happened_at'], [2, 4, 7, 1, 3, 6, 5]],
-        'a datetime column descending' => [['-happened_at'], [5, 1, 3, 6, 2, 4, 7]],
+        'a datetime column descending' => [['-happened_at'], [5, 6, 3, 1, 7, 4, 2]],
         'two columns in opposite directions' => [['-rank', 'name'], [5, 3, 1, 6, 2, 7, 4]],
+        'a unique column' => [['code', '-rank'], [4, 6, 2, 7, 3, 5, 1]],
+        'a unique column descending' => [['-code'], [1, 5, 3, 7, 2, 6, 4]],
     ]);
 
-    it('pages back through the same pages', function (): void {
-        $sort = Sort::fromArray(['-rank', 'name'], ['rank', 'name'], 'id');
+    it('pages back through the same pages', function (array $fields): void {
+        $sort = Sort::fromArray($fields, ['rank', 'name', 'code'], 'id', unique: ['code']);
         $forward = sortTestWalk($sort, 2);
 
         $page = sortTestPage($sort, 2);
@@ -122,7 +126,11 @@ describe('Sort with cursor pagination', function (): void {
         }
 
         expect(array_reverse($backward))->toBe($forward);
-    });
+    })->with([
+        'two columns in opposite directions' => [['-rank', 'name']],
+        'a column descending' => [['-rank']],
+        'a unique column' => [['-code']],
+    ]);
 
     it('counts the same facets with and without a sort', function (): void {
         $count = fn (?Sort $sort): array => FacetCounter::count(

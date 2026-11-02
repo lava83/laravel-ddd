@@ -12,9 +12,10 @@ use Lava83\LaravelDdd\Infrastructure\Models\Sort\Sort;
  * The cursor pagination of a list: `per_page` and `cursor`.
  *
  * The cursor must carry the parameters of the order of the list: the key
- * alone, or with {@see AcceptsSort} the sort columns plus the key. A cursor
- * of another order fails validation, so the read query never throws
- * `UnexpectedValueException` for it.
+ * alone, or with {@see AcceptsSort} the columns of the requested sort, see
+ * {@see Sort::cursorParameters()}. A cursor of another order fails
+ * validation, so the read query never throws `UnexpectedValueException` for
+ * it.
  *
  * @phpstan-require-extends FormRequest
  */
@@ -44,16 +45,16 @@ trait PaginatesByCursor
     {
         return [
             /**
-             * The number of entries per page.
+             * The number of entries per page, 50 if omitted.
              *
              * @default 50
              */
-            'per_page' => ['bail', 'integer', 'min:1', 'max:'.$this->maxPerPage()],
+            'per_page' => ['bail', 'nullable', 'integer', 'min:1', 'max:'.$this->maxPerPage()],
             /**
              * The cursor of the page to load (`next_cursor` or `prev_cursor` of the previous response), the first page
              * if omitted. It only fits the sort it was issued for.
              */
-            'cursor' => ['bail', 'string', new ValidCursor($this->expectedCursorParameters())],
+            'cursor' => ['bail', 'nullable', 'string', new ValidCursor($this->expectedCursorParameters())],
         ];
     }
 

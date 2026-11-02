@@ -2,6 +2,53 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v1.4.0 - 2026-11-02
+
+This release makes the list request blocks of 1.3.0 document themselves correctly in the OpenAPI spec, sorts lists in an order the database can serve from an index, and fixes blank list parameters over HTTP. `dedoc/scramble` is a new dev dependency and a suggestion, not a requirement. The order of ties in a descending sort changes (see upgrade notes).
+
+### Added
+
+#### Scramble integration
+
+With Scramble installed, the package registers extensions for it, so a list endpoint that follows the README documents itself (#52):
+
+- `sort[]`, `facets[]` and `filters` are optional, each with the doc comment of its rule as the description.
+- `sort[]` is an array of the sortable fields, with the enum on the items only.
+- `filters` is documented as a JSON string or a list of `{type, target, value}` filters.
+- The 200 response documents the page with `meta.facets` (`$ref: FacetsResource`) next to the page without, and `FacetsResource` is a component schema.
+
+Scramble alone dropped `sort` and `filters` with their descriptions, marked them required, and could not see the facets that `FacetsResource::addTo()` adds. The extensions are tested against Scramble 0.13.
+
+#### Unique sort fields
+
+`AcceptsSort::uniqueSortableFields()` (none by default) lists the sortable columns that are unique per row, such as `email` with a unique index. A sort ends at the first of them, without the key after it, so the database can serve the order from that index alone. `Sort::fromArray()` takes them as a new optional `unique` parameter.
+
+```php
+protected function uniqueSortableFields(): array
+{
+    return ['email'];
+}
+
+```
+### Changed
+
+- **The key follows the direction of the last sort field.** `sort[]=-created_at` now orders by `created_at DESC, id DESC`, so an index on `created_at` serves it by reading backwards. Before, the key was always ascending, and MariaDB sorted the whole table on every page.
+- **A sort ends at the key.** `sort[]=-id&sort[]=rank` orders by `id DESC` only, since fields after a unique column never decide.
+- **Blank element message.** A blank sort field, facet or filter (`sort[]=`) is still a 422 on its field, but reads "must have a value" instead of "is required".
+
+### Fixed
+
+- **Blank list parameters over HTTP.** Laravel's `ConvertEmptyStringsToNull` middleware turns `sort=`, `per_page=`, `cursor=`, `filters=` and `facets=` into `null`, which was a 422. They now count as missing, as documented.
+
+### Upgrade notes
+
+- Ties of a descending sort now come in descending key order. If a client relies on the old order of ties, sort by the key explicitly.
+- Cursors issued before the update: a cursor of a sort that now ends earlier (a sort starting with the key, or with a field you declare unique) is a 422 on `cursor` once, and the client starts again from the first page. A cursor of a descending sort still passes, but its next page can repeat or skip ties at the page boundary once.
+- To get index scans, declare columns with a unique index in `uniqueSortableFields()`. An index on a sort column serves it in both directions. Declare only columns that are really unique: the next page skips rows that tie with the cursor row.
+- No change is needed for the spec: the Scramble extensions register themselves when Scramble is installed. In the spec, `per_page` and `cursor` are now nullable, as `search` already was.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v1.3.0...v1.4.0
+
 ## v1.3.0 - 2026-11-02
 
 This release adds the request side of cursor-paginated read-model lists: request blocks for page size, cursor, filters, sort, search and facets, a sort that works with cursor pagination, and the translation of read-time filter errors into 422. There is no new dependency. One existing behaviour changes: `ReadModelCursorPaginator` now fails on a NULL cursor value instead of paging wrong (see upgrade notes).
@@ -39,6 +86,7 @@ final class ListUsersRequest extends FormRequest
     protected function searchFilterType(): string { return UserSearchFilter::type(); }
     protected function facetEnum(): string { return UserFacet::class; }
 }
+
 
 ```
 - `PaginatesByCursor`: `per_page` (1–200, default 50, overridable) and `cursor`. The cursor must carry exactly the parameters of the order of the list, so a cursor issued for another sort is a 422 on `cursor` instead of an `UnexpectedValueException` in the read query.
@@ -96,6 +144,7 @@ $facets->first()->toArray();
 // [['value' => null, 'count' => 3], ['value' => 1, 'count' => 120], ['value' => 2, 'count' => 7]]
 
 
+
 ```
 - `FacetDefinition::column()` counts the rows per value of a column of the list model. `FacetDefinition::relation()` counts the distinct rows per value of a column of a `HasMany` or `BelongsToMany` relation on the same connection.
 - Each facet keeps the whole scope and every requested filter except its own. Pass the scope and the client's filters separately: the scope is never reduced.
@@ -120,6 +169,7 @@ final class B2cUserSearchFilter extends TokenSearchFilterMethod
         return ['email', 'data.firstname', 'data.lastname'];
     }
 }
+
 
 
 ```
@@ -152,6 +202,7 @@ $counter = Counter::create('one');      // records CounterCreated with id 0
 $repository->save($counter);
 
 // Listeners now receive CounterCreated with aggregateId() === $counter->id(), e.g. 1
+
 
 
 
@@ -205,6 +256,7 @@ final class Title extends ValueObject
         return [];
     }
 }
+
 
 
 
@@ -315,6 +367,7 @@ return $pages->fromResponse(
 
 
 
+
 ```
 - **`RelayedCursorPaginator`:** a `CursorPaginator` subclass built from items, page size and the `next` / `prev` tokens of the neighbouring pages. Nothing is derived from the items, so read models need no sort column. `Resource::collection($page)` produces `data`, `links` and `meta` as usual, with your own URLs.
 - **`RelayedCursor`:** keeps the token exactly as received. Laravel's `Cursor::encode()` rebuilds a token from decoded parameters, which is not guaranteed to give the same string back.
@@ -349,6 +402,7 @@ return ReadModelCursorPaginator::fromPage(
     $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
     fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
 );
+
 
 
 
@@ -422,6 +476,7 @@ public function validate(): array
 
 
 
+
 ```
 `isValid()` is unchanged (`validate() === []`).
 
@@ -444,6 +499,7 @@ $exceptions->render(function (DomainValidationException $e) {
         ? null
         : throw LaravelValidationException::withMessages($e->errors());
 });
+
 
 
 
@@ -602,6 +658,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -635,6 +692,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -695,6 +753,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 

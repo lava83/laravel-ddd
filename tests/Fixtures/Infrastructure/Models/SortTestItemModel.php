@@ -11,7 +11,8 @@ use Lava83\LaravelDdd\Infrastructure\Models\Model;
 
 /**
  * The list model of the sort tests: `rank` and `happened_at` repeat, so only
- * the key tie-breaker makes the order unique, and `score` may hold NULL.
+ * the key tie-breaker makes the order unique, `code` is unique, and `score`
+ * may hold NULL.
  *
  * @extends Model<*>
  */
@@ -21,7 +22,7 @@ final class SortTestItemModel extends Model
 
     public $timestamps = false;
 
-    protected $fillable = ['rank', 'name', 'happened_at', 'score', 'status_id'];
+    protected $fillable = ['rank', 'name', 'code', 'happened_at', 'score', 'status_id'];
 
     public function allowedFilters(): AllowedFilterList
     {
