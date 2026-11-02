@@ -2,6 +2,21 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v1.4.1 - 2026-11-02
+
+This release fixes the Scramble integration of 1.4.0 for APIs registered in a service provider's `boot()`. There is no change in validation, sorting or filtering.
+
+### Fixed
+
+- **Rule transformers for every API.** 1.4.0 added the rule transformers that document `sort[]` and `filters` to the default API only, after the application had booted. An API registered with `Scramble::registerApi()` in a service provider's `boot()`, as Scramble's docs show for several APIs, was set up before that and never got them: its `sort[]` had no description and an enum on the array, and `filters` was an untyped object. They now go to every API, wherever it is registered (#53).
+- **`value` in the `filters` schema** is a schema object with a description. It was an empty schema, which became `[]`, no valid JSON Schema, once the document was decoded to PHP arrays and encoded again.
+
+### Upgrade notes
+
+- No action required. Remove any `withRuleTransformers([SortParameterSchema::class, FiltersParameterSchema::class])` you added as a workaround, or keep it: Scramble runs each transformer once.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v1.4.0...v1.4.1
+
 ## v1.4.0 - 2026-11-02
 
 This release makes the list request blocks of 1.3.0 document themselves correctly in the OpenAPI spec, sorts lists in an order the database can serve from an index, and fixes blank list parameters over HTTP. `dedoc/scramble` is a new dev dependency and a suggestion, not a requirement. The order of ties in a descending sort changes (see upgrade notes).
@@ -28,6 +43,7 @@ protected function uniqueSortableFields(): array
 {
     return ['email'];
 }
+
 
 ```
 ### Changed
@@ -88,6 +104,7 @@ final class ListUsersRequest extends FormRequest
 }
 
 
+
 ```
 - `PaginatesByCursor`: `per_page` (1–200, default 50, overridable) and `cursor`. The cursor must carry exactly the parameters of the order of the list, so a cursor issued for another sort is a 422 on `cursor` instead of an `UnexpectedValueException` in the read query.
 - `AcceptsFilters`: `filters` as a JSON string or a bracket-notation query array, read with `filters()`. JSON is decoded before the rules run, so rules of the request on `filters.*` apply to both forms. Where both forms meet, the JSON string wins.
@@ -145,6 +162,7 @@ $facets->first()->toArray();
 
 
 
+
 ```
 - `FacetDefinition::column()` counts the rows per value of a column of the list model. `FacetDefinition::relation()` counts the distinct rows per value of a column of a `HasMany` or `BelongsToMany` relation on the same connection.
 - Each facet keeps the whole scope and every requested filter except its own. Pass the scope and the client's filters separately: the scope is never reduced.
@@ -169,6 +187,7 @@ final class B2cUserSearchFilter extends TokenSearchFilterMethod
         return ['email', 'data.firstname', 'data.lastname'];
     }
 }
+
 
 
 
@@ -202,6 +221,7 @@ $counter = Counter::create('one');      // records CounterCreated with id 0
 $repository->save($counter);
 
 // Listeners now receive CounterCreated with aggregateId() === $counter->id(), e.g. 1
+
 
 
 
@@ -256,6 +276,7 @@ final class Title extends ValueObject
         return [];
     }
 }
+
 
 
 
@@ -368,6 +389,7 @@ return $pages->fromResponse(
 
 
 
+
 ```
 - **`RelayedCursorPaginator`:** a `CursorPaginator` subclass built from items, page size and the `next` / `prev` tokens of the neighbouring pages. Nothing is derived from the items, so read models need no sort column. `Resource::collection($page)` produces `data`, `links` and `meta` as usual, with your own URLs.
 - **`RelayedCursor`:** keeps the token exactly as received. Laravel's `Cursor::encode()` rebuilds a token from decoded parameters, which is not guaranteed to give the same string back.
@@ -402,6 +424,7 @@ return ReadModelCursorPaginator::fromPage(
     $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
     fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
 );
+
 
 
 
@@ -477,6 +500,7 @@ public function validate(): array
 
 
 
+
 ```
 `isValid()` is unchanged (`validate() === []`).
 
@@ -499,6 +523,7 @@ $exceptions->render(function (DomainValidationException $e) {
         ? null
         : throw LaravelValidationException::withMessages($e->errors());
 });
+
 
 
 
@@ -659,6 +684,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -692,6 +718,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -753,6 +780,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 

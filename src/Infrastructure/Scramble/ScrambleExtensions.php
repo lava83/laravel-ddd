@@ -12,8 +12,11 @@ use Illuminate\Contracts\Foundation\Application;
  * The Scramble extensions of the package. The service provider registers them
  * once the application has booted, if Scramble is installed and loaded.
  *
- * The rule transformers go to the default API and to every API registered
- * after it, which Scramble clones from the default one.
+ * Scramble keeps rule transformers per API. They go to every API registered
+ * by then, so also to one a service provider registered in its `boot()`, and
+ * to the default API, which Scramble clones for every API registered later.
+ * An API that has them already, by hand, keeps each once: Scramble drops
+ * duplicate transformer classes.
  */
 final class ScrambleExtensions
 {
@@ -25,9 +28,11 @@ final class ScrambleExtensions
 
         Scramble::registerExtension(FacetsResourceAddToExtension::class);
 
-        Scramble::configure()->withRuleTransformers([
-            SortParameterSchema::class,
-            FiltersParameterSchema::class,
-        ]);
+        foreach (Scramble::getConfigurationsInstance()->all() as $api) {
+            $api->withRuleTransformers([
+                SortParameterSchema::class,
+                FiltersParameterSchema::class,
+            ]);
+        }
     }
 }

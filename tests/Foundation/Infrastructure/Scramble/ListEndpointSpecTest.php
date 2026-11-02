@@ -7,33 +7,54 @@ use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\ScrambleServiceProvider;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
+use Lava83\LaravelDdd\Infrastructure\Scramble\FiltersParameterSchema;
+use Lava83\LaravelDdd\Infrastructure\Scramble\SortParameterSchema;
 use Lava83\LaravelDdd\LaravelDddServiceProvider;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Scramble\PackageClasses;
+use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Scramble\SpecApiServiceProvider;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Scramble\SpecListController;
 
 /**
- * The OpenAPI document of two list endpoints, as a consumer gets it: Scramble
- * loaded before the package provider, the package read like a vendor package.
- *
- * @return array<string, mixed>
+ * Two list endpoints, as a consumer has them: Scramble loaded before the
+ * package provider, APIs of the consumer registered in a `boot()` before the
+ * package provider has booted, and the package read like a vendor package.
  */
-function listEndpointSpec(): array
+function bootListEndpoints(): void
 {
     app()->register(ScrambleServiceProvider::class);
+    app()->register(SpecApiServiceProvider::class);
     app()->register(LaravelDddServiceProvider::class, force: true);
 
     Scramble::infer()->configure()->buildDefinitionsUsingReflectionFor([new PackageClasses]);
-    Scramble::configure()->routes(fn (RoutingRoute $route): bool => str_starts_with($route->uri, 'api/'));
 
     Route::get('api/full', [SpecListController::class, 'full']);
     Route::get('api/filtered', [SpecListController::class, 'filtered']);
-
-    $document = app(Generator::class)->setThrowExceptions(true)(Scramble::getGeneratorConfig(Scramble::DEFAULT_API));
-
-    // As JSON, the way a client reads it: `{}` for an empty schema, not a stdClass.
-    /** @var array<string, mixed> */
-    return json_decode((string) json_encode($document), true);
 }
+
+/**
+ * The OpenAPI document of the list endpoints in one API, as JSON.
+ */
+function listEndpointJson(string $api = Scramble::DEFAULT_API): string
+{
+    $config = Scramble::getGeneratorConfig($api)->routes(fn (RoutingRoute $route): bool => str_starts_with($route->uri, 'api/'));
+
+    return (string) json_encode(app(Generator::class)->setThrowExceptions(true)($config));
+}
+
+/**
+ * The document decoded to arrays: `{}` and `[]` both become `[]`.
+ *
+ * @return array<string, mixed>
+ */
+function listEndpointSpec(string $api = Scramble::DEFAULT_API): array
+{
+    /** @var array<string, mixed> */
+    return json_decode(listEndpointJson($api), true);
+}
+
+beforeEach(function (): void {
+    bootListEndpoints();
+});
 
 /**
  * @param  array<string, mixed>  $spec
@@ -76,7 +97,11 @@ describe('The OpenAPI spec of a list endpoint', function (): void {
                 ['type' => 'string', 'contentMediaType' => 'application/json'],
                 ['type' => 'array', 'items' => [
                     'type' => 'object',
-                    'properties' => ['type' => ['type' => 'string'], 'target' => ['type' => 'string'], 'value' => []],
+                    'properties' => [
+                        'type' => ['type' => 'string'],
+                        'target' => ['type' => 'string'],
+                        'value' => ['description' => 'A value, a list of values or nested filters, as the type takes it.'],
+                    ],
                     'required' => ['type'],
                 ]],
             ]]);
@@ -84,6 +109,12 @@ describe('The OpenAPI spec of a list endpoint', function (): void {
         'with rules of the request on filters.*' => ['/full'],
         'with the rules of the trait only' => ['/filtered'],
     ]);
+
+    it('documents the value of a filter as a schema object, not a list', function (): void {
+        $filters = collect(json_decode(listEndpointJson())->paths->{'/full'}->get->parameters)->firstWhere('name', 'filters');
+
+        expect($filters->schema->anyOf[1]->items->properties->value)->toBeInstanceOf(stdClass::class);
+    });
 
     it('documents facets[] as an array of the facets', function (): void {
         expect($this->parameters['facets[]']['description'])->toStartWith('The attributes to count')
@@ -105,4 +136,33 @@ describe('The OpenAPI spec of a list endpoint', function (): void {
             ->toEqualCanonicalizing([null, ['$ref' => '#/components/schemas/FacetsResource']])
             ->and($this->spec['components']['schemas'])->toHaveKey('FacetsResource');
     });
+});
+
+describe('The OpenAPI spec of a list endpoint in every API', function (): void {
+    it('documents sort[] and filters once, with their schemas', function (string $api): void {
+        if ($api === 'late') {
+            Scramble::registerApi('late');
+        }
+
+        if ($api === 'late-by-hand') {
+            Scramble::registerApi('late-by-hand')->withRuleTransformers([SortParameterSchema::class, FiltersParameterSchema::class]);
+        }
+
+        $spec = listEndpointSpec($api);
+        $parameters = specParameters($spec, '/full');
+
+        expect(collect($spec['paths']['/full']['get']['parameters'])->pluck('name')->all())
+            ->toEqualCanonicalizing(['per_page', 'cursor', 'filters', 'sort[]', 'search', 'facets[]'])
+            ->and($parameters['sort[]']['description'])->toStartWith('The fields to sort by')
+            ->and($parameters['sort[]']['schema'])->not->toHaveKey('enum')
+            ->and($parameters['sort[]']['schema']['items']['enum'])->toBe(['rank', '-rank', 'name', '-name', 'happened_at', '-happened_at'])
+            ->and($parameters['filters']['description'])->toStartWith('The filters of the list')
+            ->and($parameters['filters']['schema'])->toHaveKey('anyOf');
+    })->with([
+        'registered in boot(), before the package' => ['early'],
+        'registered in boot(), with the transformers by hand' => ['early-by-hand'],
+        'registered after boot' => ['late'],
+        'registered after boot, with the transformers by hand' => ['late-by-hand'],
+        'the default API' => [Scramble::DEFAULT_API],
+    ]);
 });
