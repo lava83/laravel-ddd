@@ -550,7 +550,7 @@ php artisan vendor:publish --tag=ddd-config
 
 ## What else is in the box
 
-Beyond the slice above, the package provides an `AggregateRoot` contract with domain-event recording: events collected through `updateAggregateRoot($changes, $eventClass)` are dispatched automatically via Laravel's event system once the surrounding transaction commits — deferred with `DB::afterCommit()` — then cleared from the aggregate. With an `Integer` identity assigned on insert, events recorded before the first save (such as a `…Created` event in a `create()` factory) are moved onto the persisted key before they are dispatched. Every aggregate carries a `version` for optimistic locking and raises a `ConcurrencyException` on conflicting writes. You also get a growing catalogue of ready-made value objects — `Uuid`, `Email`, `Phonenumber`, `Money`, `Link`, `Json`, `GeoAddress` and more — plus a fluent Eloquent filtering layer on the base `Model` (see [Filtering](#filtering)), with free-text search and facet counts for read-model lists (see [Search](#search) and [Facets](#facets)).
+Beyond the slice above, the package provides an `AggregateRoot` contract with domain-event recording: events collected through `updateAggregateRoot($changes, $eventClass)` are dispatched automatically via Laravel's event system once the surrounding transaction commits — deferred with `DB::afterCommit()` — then cleared from the aggregate. With an `Integer` identity assigned on insert, events recorded before the first save (such as a `…Created` event in a `create()` factory) are moved onto the persisted key before they are dispatched. Every aggregate carries a `version` for optimistic locking and raises a `ConcurrencyException` on conflicting writes. You also get a growing catalogue of ready-made value objects — `Uuid`, `Email`, `Phonenumber`, `Money`, `Link`, `Json`, `GeoAddress` and more — plus a fluent Eloquent filtering layer on the base `Model` (see [Filtering](#filtering)), with free-text search and facet counts for read-model lists (see [Search](#search) and [Facets](#facets)), sorting (see [Sorting](#sorting)) and the request side of a list endpoint (see [List requests](#list-requests)).
 
 ## API-backed aggregates
 
@@ -628,7 +628,7 @@ $page = ReadModelCursorPaginator::fromPage(
 );
 ```
 
-The result is a regular `Illuminate\Pagination\CursorPaginator`, so `Resource::collection($page)` produces `data`, `links` and `meta` as usual. The ordering must be unique (use the primary key).
+The result is a regular `Illuminate\Pagination\CursorPaginator`, so `Resource::collection($page)` produces `data`, `links` and `meta` as usual. The ordering must be unique (use the primary key), and no order column may hold NULL: the paginator throws `Pagination\Exceptions\CursorValueIsNull` rather than build a cursor that skips or repeats rows. For an order the client chooses, see [Sorting](#sorting).
 
 ### Reading a paginated list from an API
 
@@ -703,7 +703,7 @@ GET /api/articles?filters=[{"type":"$like","target":"title","value":"DDD"},{"typ
 
 > URL-encode the `filters` value in practice (`[` → `%5B`, `"` → `%22`, `$` → `%24`, …); it is shown decoded here for readability.
 
-On the server, decode the JSON and hand the array to `fromArray()`:
+In a `FormRequest`, `AcceptsFilters` does this for JSON and bracket notation alike (see [List requests](#list-requests)). By hand, decode the JSON and hand the array to `fromArray()`:
 
 ```php
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder;
@@ -846,7 +846,7 @@ final class B2cUserSearchFilter extends TokenSearchFilterMethod
 - Case sensitivity follows the column collation. A `utf8mb4_*_ci` collation on MariaDB matches `müller` to `Müller`, and whether `ß` matches `ss` depends on the collation. SQLite folds ASCII only, and PostgreSQL's `LIKE` is always case-sensitive.
 - The value must be a UTF-8 string or an integer. Anything else fails as a `MalformedFilterFormatException`.
 
-Register the type in `eloquent-filtering.custom_filters` and allow it on the model, like any custom filter. **Do not** list it in `laravel-ddd.filters.custom_types`. Let the request read a dedicated `search` parameter and add the filter with `Builder::custom()`, so a client cannot send it through `filters`:
+Register the type in `eloquent-filtering.custom_filters` and allow it on the model, like any custom filter. **Do not** list it in `laravel-ddd.filters.custom_types`. Let the request read a dedicated `search` parameter and add the filter with `Builder::custom()`, so a client cannot send it through `filters`. In a `FormRequest`, `AcceptsSearch` does this (see [List requests](#list-requests)). By hand:
 
 ```php
 // config/eloquent-filtering.php
@@ -911,52 +911,163 @@ FacetDefinition::relation('services', 'services', 'id');  // filter target: serv
 - **Keep the scope and the requested filters apart.** The scope (tenant, branch: what the caller may see at all) is never reduced. Merge the two before calling the counter, and a facet on `branch_id` drops the branch scope along with the client's branch filter.
 - A column facet groups the list query with `count(*)`, so the base query must not join a to-many table, or a row counts once per joined row. A relation facet groups the related rows with `count(distinct …)`, and the soft-delete scopes of both models stay active.
 
-### A list endpoint with search and facets
+## Sorting
 
-From the request to the response, with the scope and the request filters kept apart all the way down.
-
-**Request.** The client's filters and the search, nothing else:
+`Infrastructure\Models\Sort\Sort` is the order of a list: the fields a client asked for, then the key of the list as the tie-breaker. Cursor pagination needs a unique order, so the key always comes last, unless the client already sorts by it.
 
 ```php
-final class ListB2cUsersRequest extends FormRequest
+use Lava83\LaravelDdd\Infrastructure\Models\Sort\Sort;
+
+$sort = Sort::fromArray(['-created_at', 'email'], allowed: ['created_at', 'email'], key: 'id');
+$sort = Sort::byKey('id'); // no sort requested: the key ascending
+
+$page = ReadModelCursorPaginator::fromPage(
+    $sort->apply(UserModel::query()->filter($filter->toArray()))->cursorPaginate($perPage),
+    fn (UserModel $model) => UserReadModel::fromModel($model),
+);
+```
+
+- `fromArray()` throws `Sort\Exceptions\SortNotValid` for a field that is not allowed, a field given twice (`email` and `-email` count as the same field) and a field that is not a non-empty string. In a request, `AcceptsSort` turns these into a 422 (see [List requests](#list-requests)).
+- `apply()` replaces any order the query had and orders by the column names without the table. The cursor parameters are named after these columns, and `cursorParameters()` lists them: `['created_at', 'email', 'id']`.
+- The cursor rule of `PaginatesByCursor` expects exactly these parameters, so a cursor issued for another sort is a 422 on `cursor`. A cursor of the same columns in the other direction passes, because Laravel's cursor does not record the direction. The page then starts at the cursor row in the new direction.
+- `ReadModelCursorPaginator` reads the cursor values from the source models, so a sort column does not have to be a property of the read model.
+- `FacetCounter` drops the order before grouping, so the facets do not change with the sort.
+- Only columns of the list model are sortable. Sorting by a column of a relation, such as a last name in a profile table, needs a join and the joined value in the select under a name of its own. That is not built. It would be a second kind of sort field next to the plain column, with that name as its cursor parameter.
+
+**Traps.**
+
+- **No NULL in a sort column.** Laravel's cursor pagination compares the cursor value with `>` and `<`, which never matches NULL, so the next page would skip or repeat rows. Allow only columns that never hold NULL. `ReadModelCursorPaginator` throws `Pagination\Exceptions\CursorValueIsNull` instead of putting NULL into a cursor, so the mistake fails loudly.
+- **No fractions of a second in a datetime sort column.** A `datetime` cast puts the value into the cursor as `Y-m-d H:i:s`. If the column stores fractions of a second, the next page repeats rows when sorting ascending and skips rows when sorting descending. Sort by such a column only if it stores whole seconds.
+
+## List requests
+
+The HTTP side of a list endpoint comes as traits for a `FormRequest` in `Infrastructure\Http\Requests\Concerns`, one per concern. A request uses the ones its list accepts and spreads their rules into `rules()`:
+
+| Trait | Parameters | Rules | Read with |
+| --- | --- | --- | --- |
+| `PaginatesByCursor` | `per_page`, `cursor` | `cursorPaginationRules()` | `perPage()` |
+| `AcceptsFilters` | `filters` | `filterRules()` | `filters()` |
+| `AcceptsSort` | `sort[]` | `sortRules()` | `sort()` |
+| `AcceptsSearch` | `search` | `searchRules()` | `filters()`, `searchPhrase()` |
+| `AcceptsFacets` | `facets[]` | `facetRules()` | `facets()` |
+
+```php
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Lava83\LaravelDdd\Infrastructure\Http\Requests\Concerns\AcceptsFacets;
+use Lava83\LaravelDdd\Infrastructure\Http\Requests\Concerns\AcceptsFilters;
+use Lava83\LaravelDdd\Infrastructure\Http\Requests\Concerns\AcceptsSearch;
+use Lava83\LaravelDdd\Infrastructure\Http\Requests\Concerns\AcceptsSort;
+use Lava83\LaravelDdd\Infrastructure\Http\Requests\Concerns\PaginatesByCursor;
+
+final class ListUsersRequest extends FormRequest
 {
-    public function requested(): Builder
+    /** @use AcceptsFacets<UserFacet> */
+    use AcceptsFacets;
+
+    use AcceptsFilters;
+    use AcceptsSearch;
+    use AcceptsSort;
+    use PaginatesByCursor;
+
+    public function rules(): array
     {
-        /** @var array<int, array<string, mixed>> $decoded */
-        $decoded = json_decode($this->string('filters', '[]')->value(), true, flags: JSON_THROW_ON_ERROR);
+        return [
+            ...$this->cursorPaginationRules(),
+            ...$this->filterRules(),
+            ...$this->sortRules(),
+            ...$this->searchRules(),
+            ...$this->facetRules(),
+            // A rule of its own: the tenant scope is a filter of the model too, but only the use case sets it.
+            'filters.*.target' => ['string', Rule::notIn(['$tenantScope'])],
+        ];
+    }
 
-        $requested = Builder::fromArray($decoded);
-        $search = $this->string('search')->trim()->value();
+    protected function listKey(): string
+    {
+        return 'id';
+    }
 
-        if ($search !== '') {
-            $requested->custom(B2cUserSearchFilter::type(), $search);
-        }
+    protected function sortableFields(): array
+    {
+        return ['created_at', 'email'];
+    }
 
-        return $requested;
+    protected function searchFilterType(): string
+    {
+        return UserSearchFilter::type();
+    }
+
+    protected function facetEnum(): string
+    {
+        return UserFacet::class;
     }
 }
 ```
 
-**Use case.** It builds the scope from who is asking, and passes the request filters on untouched:
+Every error is a 422 on its field: `per_page`, `cursor`, `filters`, `sort` (a field given twice) or `sort.N` (a field that is not allowed), `search`, `facets.N`. Rules check everything, so no trait defines `after()`, `withValidator()` or `prepareForValidation()`, and a request has no validation hook to wire in. The rule arrays carry doc comments, which Scramble reads through the spread. `Rule::in()` on `sort.*` lists the sortable fields in the OpenAPI spec, and `Rule::enum()` on `facets.*` the facets. A blank parameter (`sort=`, `facets=`, `per_page=`) counts as a missing one.
+
+**Cursor pagination.**
+
+- `per_page` is an integer from 1 to 200, and 50 if it is missing. Override `defaultPerPage()` and `maxPerPage()` to change that. They are methods, not constants, because a class cannot redefine a constant it got from a trait. Scramble shows the `@default 50` of the trait, so a request with another default documents it in a rule of its own.
+- `cursor` must decode and carry exactly the parameters of the order of the list: the key alone, or with `AcceptsSort` the sort columns plus the key. A cursor of another order is a 422 on `cursor`, so the read query never throws `UnexpectedValueException` for it. Do not catch that exception around the read query.
+
+**The key.** `listKey()` is the column the list is ordered by last, unique per row. With `AcceptsSort`, `sort()` carries it to the read query, which calls `$sort->apply()` and names no key of its own. Without `AcceptsSort`, the read query orders by its own key, and `listKey()` must name the same column. If it does not, the cursor rule rejects every cursor from the second page on.
+
+**Client filters.** `filters` comes as a JSON string or as a bracket-notation query array. Both give the same `Filter\Builder`. Prefer JSON: bracket notation sends every value as a string, which `$gt`, `$gte`, `$lt`, `$lte` and `$null` reject (see [Reconstructing filters from a request](#reconstructing-filters-from-a-request)).
+
+```text
+GET /users?filters=[{"type":"$in","target":"status_id","value":[1,2]}]
+GET /users?filters[0][type]=$in&filters[0][target]=status_id&filters[0][value][0]=1&filters[0][value][1]=2
+```
+
+- `AcceptsFilters` decodes the JSON in `validationData()`, before the rules run, so the rules of the request on `filters.*` see both forms.
+- A request that overrides `validationData()` itself must pass its data through `$this->withDecodedFilters(...)`. If it does not, its rules on `filters.*` never see JSON filters, and `filters()` throws a `LogicException` rather than hand out filters those rules did not check.
+- **JSON wins.** Within the query string `filters` has one form, but Laravel merges a JSON body and the query string into one input. If both carry `filters`, a JSON string wins over an array, whichever of the two carries it.
+- Invalid JSON, JSON that is not a list, a malformed filter, an unknown operator and a value the operator rejects are a 422 on `filters`.
+
+**Sort.** `sort[]=-created_at&sort[]=email`: the first field sorts first, and a leading `-` sorts descending. Only the `sortableFields()` are allowed, and none of them may hold NULL. Without `sort`, `sort()` is the key ascending. See [Sorting](#sorting).
+
+**Search.**
+
+- `search` is a nullable string of at most 100 characters. Override `maxSearchLength()` to change that.
+- A trimmed, non-blank phrase ends up in `filters()` as `custom(searchFilterType(), $phrase)`, with or without `AcceptsFilters`: a list can search without accepting `filters`.
+- Register the search type in `eloquent-filtering.custom_filters` only, never in `laravel-ddd.filters.custom_types`. `filters` then rejects it, and a client reaches the search only through `search` and its length limit. `filters()` throws a `LogicException` if the type is in `custom_types`.
+
+**Facets.** `facets[]` takes distinct values of a string-backed enum (`facetEnum()`). `facets()` returns the enum cases in the order of the request.
+
+**Errors at read time.** Validation cannot know whether the model allows a filter target. `allowedFilters()` decides that when the read query runs, and throws an `eloquent-filtering` `FilterException`. Wrap the read query in `Infrastructure\Http\ClientFilterErrors::translate()` to turn that into a 422 on `filters`. Every other exception passes through unchanged. Wrap reads only: a write that fails on a filter is not the client's error.
+
+**Facets in `meta`.** `Application\Resources\FacetsResource` renders a `Collection<int, FacetReadModel>` as `{<key>: [{value, count}, …]}`. Its `@return` array shape is what makes Scramble document `meta.facets`. `FacetsResource::addTo($collection, $facets, $count)` adds the facets to `meta.facets`, next to the cursor meta and to any additional data the collection already has. It does so only if the client asked for facets. Without them, `$count` never runs and no facet query is made.
+
+### A list endpoint
+
+From the request to the response, with the scope and the client filters kept apart all the way down. The request is the `ListUsersRequest` above.
+
+**Use case.** It builds the scope from who is asking, passes the client filters on untouched and returns the resource:
 
 ```php
-final readonly class ListB2cUsers
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Lava83\LaravelDdd\Application\Resources\FacetsResource;
+use Lava83\LaravelDdd\Infrastructure\Http\ClientFilterErrors;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder;
+use Lava83\LaravelDdd\Infrastructure\Models\Sort\Sort;
+
+final readonly class ListUsersUseCase
 {
     public function __construct(
-        private B2cUserReadQuery $users,
+        private UserReadQuery $users,
     ) {}
 
-    /**
-     * @return array{page: CursorPaginator<int, B2cUserReadModel>, facets: Collection<int, FacetReadModel>}
-     */
-    public function __invoke(int $branchId, Builder $requested, int $perPage): array
+    public function execute(int $branchId, int $perPage, Sort $sort, Builder $requested, UserFacet ...$facets): AnonymousResourceCollection
     {
         $scope = Builder::make()->eq('branch_id', $branchId);
 
-        return [
-            'page' => $this->users->page($scope, $requested, $perPage),
-            'facets' => $this->users->facets($scope, $requested),
-        ];
+        return ClientFilterErrors::translate(fn () => FacetsResource::addTo(
+            UserResource::collection($this->users->page($scope->merge($requested), $sort, $perPage)),
+            $facets,
+            fn () => $this->users->facets($scope, $requested, ...$facets),
+        ));
     }
 }
 ```
@@ -968,54 +1079,55 @@ use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Lava83\LaravelDdd\Infrastructure\Models\Facets\FacetCounter;
 use Lava83\LaravelDdd\Infrastructure\Models\Facets\FacetDefinition;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder;
+use Lava83\LaravelDdd\Infrastructure\Models\Sort\Sort;
 use Lava83\LaravelDdd\Infrastructure\Pagination\ReadModelCursorPaginator;
 
-final class EloquentB2cUserReadQuery implements B2cUserReadQuery
+final class EloquentUserReadQuery implements UserReadQuery
 {
-    public function page(Builder $scope, Builder $requested, int $perPage): CursorPaginator
+    public function page(Builder $filter, Sort $sort, int $perPage): CursorPaginator
     {
         return ReadModelCursorPaginator::fromPage(
-            $this->baseQuery($scope->merge($requested))->orderBy('id')->cursorPaginate($perPage),
-            fn (B2cUserModel $model) => B2cUserReadModelMapper::fromModel($model),
+            $sort->apply($this->baseQuery($filter))->cursorPaginate($perPage),
+            fn (UserModel $model) => UserReadModelMapper::fromModel($model),
         );
     }
 
-    public function facets(Builder $scope, Builder $requested): Collection
+    public function facets(Builder $scope, Builder $requested, UserFacet ...$facets): Collection
     {
         return FacetCounter::count(
             fn (Builder $filter) => $this->baseQuery($filter),
             $scope,
             $requested,
-            FacetDefinition::column('status', 'status_id'),
-            FacetDefinition::column('type', 'user_type_id'),
+            ...array_map(fn (UserFacet $facet): FacetDefinition => match ($facet) {
+                UserFacet::Status => FacetDefinition::column('status', 'status_id'),
+                UserFacet::Type => FacetDefinition::column('type', 'user_type_id'),
+            }, $facets),
         );
     }
 
     /**
-     * @return EloquentBuilder<B2cUserModel>
+     * @return EloquentBuilder<UserModel>
      */
     private function baseQuery(Builder $filter): EloquentBuilder
     {
-        return B2cUserModel::query()->with('data')->filter($filter->toArray());
+        return UserModel::query()->with('data')->filter($filter->toArray());
     }
 }
 ```
 
-**Controller.** The facets go into `meta` next to the cursor:
+**Controller.** One line:
 
 ```php
-public function index(ListB2cUsersRequest $request, ListB2cUsers $listUsers): AnonymousResourceCollection
+public function __invoke(ListUsersRequest $request, ListUsersUseCase $useCase): AnonymousResourceCollection
 {
-    $result = $listUsers($request->user()->branch_id, $request->requested(), $request->integer('per_page', 50));
-
-    return B2cUserResource::collection($result['page'])->additional([
-        'meta' => [
-            'facets' => $result['facets']->mapWithKeys(
-                fn (FacetReadModel $facet): array => [$facet->key() => $facet->toArray()],
-            ),
-        ],
-    ]);
+    return $useCase->execute($request->user()->branch_id, $request->perPage(), $request->sort(), $request->filters(), ...$request->facets());
 }
+```
+
+The package does not enforce this split: a controller can do what the use case does here.
+
+```text
+GET /users?sort[]=-created_at&search=anna&facets[]=status&facets[]=type&filters=[{"type":"$eq","target":"user_type_id","value":1}]
 ```
 
 ```json

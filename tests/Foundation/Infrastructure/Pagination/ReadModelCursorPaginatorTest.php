@@ -8,6 +8,7 @@ use Illuminate\Pagination\Cursor;
 use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Lava83\LaravelDdd\Infrastructure\Pagination\Exceptions\CursorValueIsNull;
 use Lava83\LaravelDdd\Infrastructure\Pagination\ReadModelCursorPaginator;
 use Lava83\LaravelDdd\Tests\Fixtures\Application\Resources\CursorTestResource;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\ReadModels\CursorTestReadModel;
@@ -216,6 +217,21 @@ describe('ReadModelCursorPaginator', function (): void {
         $page->setCollection($page->getCollection()->map(fn (CursorTestReadModel $r) => new CursorTestResource($r)));
 
         expect($page->nextCursor()?->parameter('account_id'))->toBe(2);
+    });
+
+    it('refuses to build a cursor from a NULL order value', function (): void {
+        Schema::table('cursor_test_items', function (Blueprint $table): void {
+            $table->unsignedInteger('rank')->nullable();
+        });
+        seedCursorItems(3);
+        DB::table('cursor_test_items')->where('account_id', 2)->update(['rank' => 1]);
+
+        $page = ReadModelCursorPaginator::fromPage(
+            CursorTestModel::query()->with('owner')->orderBy('rank')->orderBy('account_id')->cursorPaginate(1),
+            fn (CursorTestModel $m) => new CursorTestReadModel($m->account_id, $m->owner->name),
+        );
+
+        expect(fn () => $page->nextCursor())->toThrow(CursorValueIsNull::class, 'The cursor parameter "rank" is NULL');
     });
 
     it('is still a CursorPaginator', function (): void {

@@ -245,7 +245,8 @@ Do **not** use `->through(...)` for this. Laravel reads `next_cursor` / `prev_cu
 - `fromPage()` calls `withQueryString()` and keeps the query of the source page. Query parameters therefore stay in `links`.
 - Lookup is by object identity. `filter()`, `reject()` and reordering the collection keep working, and `JsonResource` wrappers are unwrapped. If you *replace* the read models (e.g. `transform()` into new objects), the item itself is used as fallback, which fails again if it lacks the sort column. Cursor values are only read from the first and last item of the page.
 - No resource class is needed: `XResource::collection($page)` yields `data`, `links` and `meta` (`path`, `per_page`, `next_cursor`, `prev_cursor`). Application must not depend on this class (Deptrac: `Application` does not see `Infrastructure`).
-- Ordering must be unique and stable (primary key). A cursor that does not match the ordering throws `UnexpectedValueException` (Laravel behaviour, unchanged).
+- Ordering must be unique and stable (primary key). A cursor that does not match the ordering throws `UnexpectedValueException` (Laravel behaviour, unchanged). The cursor rule of `PaginatesByCursor` rejects such a cursor as a 422 before the query runs, see "List requests and sorting".
+- `getParametersForItem()` throws `Pagination\Exceptions\CursorValueIsNull` (a `LogicException`) when an order column of the item holds NULL. Laravel would build a cursor whose `>` / `<` never matches NULL and skip or repeat rows.
 
 Tests: `tests/Foundation/Infrastructure/Pagination/ReadModelCursorPaginatorTest.php`, fixtures `CursorTest*`.
 
@@ -312,8 +313,45 @@ Free-text search and facet counts for read-model lists, on the relational databa
 - Tokens: `preg_split('/\s+/u', …, PREG_SPLIT_NO_EMPTY)` (Unicode whitespace, NBSP included), de-duplicated by `mb_strtolower()` with the first occurrence kept, then `array_slice(…, 0, maxTokens())`.
 - SQL: one nested `where (… or …)` per token. Own columns are `orWhereRaw('<wrapped qualified column> like ? escape \'!\'')`. Relation columns are grouped by relation (split at the last dot) into one `orWhereHas()` per relation, with the ORs nested inside. Escaping is a single-pass `strtr` (`!` → `!!`, `%` → `!%`, `_` → `!_`).
 - Why raw: `where($column, 'like', …)` and Laravel's `whereLike()` emit no ESCAPE clause, and the implicit escape differs (`\` on MySQL unless `NO_BACKSLASH_ESCAPES`, none on SQLite).
-- Register the type in `eloquent-filtering.custom_filters` only, **not** in `laravel-ddd.filters.custom_types`. The request adds it from a dedicated `search` parameter with `Builder::custom()`, so a client cannot send it through `filters`.
+- Register the type in `eloquent-filtering.custom_filters` only, **not** in `laravel-ddd.filters.custom_types`. The request adds it from a dedicated `search` parameter with `Builder::custom()` (`AcceptsSearch` does this), so a client cannot send it through `filters`.
 - Case sensitivity is the collation's business. The `testing` connection is SQLite, which folds ASCII only: tests can prove byte-exact umlaut matching, not `Ü`/`ü` folding or `ß` = `ss`.
+
+## List requests and sorting
+
+The HTTP side of a read-model list: what turns `per_page`, `cursor`, `filters`, `sort`, `search` and `facets[]` into a page size, a `Sort`, a `Filter\Builder` and a list of facets, and the read-time errors into 422. It lives in `Infrastructure` because it uses `Filter\Builder`, Eloquent and `eloquent-filtering`; only `FacetsResource` is in `Application\Resources` (it depends on the Domain read models alone).
+
+### Sort
+
+- `Models\Sort\Sort` — `final readonly`, private constructor. `byKey($key)` (no fields) and `fromArray(array $fields, list<string> $allowed, string $key)` (`'-created_at'` = descending). `fields()` are the requested fields, `orders()` the fields plus the key ascending (not repeated if requested), `cursorParameters()` the column names of `orders()`.
+- `fromArray()` throws `Sort\Exceptions\SortNotValid`: `malformedField` (not a string, `''`, `'-'`), `unknownField`, `duplicateField` (also `x` with `-x`).
+- `apply(EloquentBuilder)` calls `reorder()` and then `orderBy()` per order with the **unqualified** column, so the cursor parameters are named exactly as `cursorParameters()` says and the cursor rule can check them before the query runs. `@template TModel of Model`, returns the same builder.
+- `SortField(column, SortDirection = Ascending)`, `toString()` gives the request form. `Sort\Enums\SortDirection` is backed by `asc` / `desc`.
+- Relation columns are not sortable yet. They would need a join, a qualified order column and the joined value selected under its own name, which becomes the cursor parameter (`ReadModelCursorPaginator` already reads parameters from model attributes).
+
+### Request blocks
+
+Traits in `Http\Requests\Concerns`, each with `@phpstan-require-extends FormRequest`: `PaginatesByCursor`, `AcceptsFilters`, `AcceptsSort`, `AcceptsSearch`, `AcceptsFacets` (`@template TFacet of BackedEnum`). Each has a `…Rules()` method the request spreads into `rules()`; the doc comments on the rule items are for Scramble. Limits are methods (`defaultPerPage()`, `maxPerPage()`, `maxSearchLength()`), because a class cannot redefine a constant it got from a trait.
+
+- No hooks: no trait defines `after()`, `withValidator()` or `prepareForValidation()` (the last is used by many requests in waz-api). Everything is a rule: `Http\Rules\ValidCursor`, `ValidFilters`, `DistinctSortFields`.
+- `AcceptsFilters` overrides `validationData()` and decodes a JSON `filters` there, so request rules on `filters.*` (B2B: the tenant scope target) also see JSON. A non-blank string wins over an array between `getInputSource()` and `query`, because `input()` would let the body win whatever its form. The JSON is decoded twice (objects first) to tell a JSON list from a JSON object.
+- `ValidFilters` runs `Builder::fromArray($rows)->toArray()`: `toArray()` is where the built-in filters check their values (`FilterValueNotValid`).
+- `ValidCursor($parameters)` wants exactly the expected parameters (sorted comparison) and scalar values; `null` only checks that the cursor decodes. The cursor block passes `null` when the sort is invalid, so only the sort rule reports.
+- Seams, detected with `method_exists()` on private, distinctly named methods: `ProvidesFilters::filters()` (used by `AcceptsFilters` and `AcceptsSearch`, PHP imports the identical trait method once) calls `clientFilterRows()` and `withSearchFilter()`; `PaginatesByCursor` calls `sortCursorParameters()` of `AcceptsSort`. PHPStan does not analyse the traits in this package (no class in `src` uses them) and does not report errors in vendor files for consumers, so the tests are their only check.
+- Empty strings: Laravel skips non-implicit rules on `''`, so `sort.*`, `facets.*` and `filters.*` are `required`, and `perPage()`, `sort()` and `facets()` treat a blank parameter as a missing one.
+
+### Errors and facets
+
+- `Http\ClientFilterErrors::translate(Closure $read, string $attribute = 'filters')` turns any `FilterException` of `eloquent-filtering` (e.g. `DeniedFilterException` from `allowedFilters()`) into `ValidationException::withMessages()`; everything else passes unchanged. Reads only.
+- `Application\Resources\FacetsResource` renders `Collection<int, FacetReadModel>` as `{key: [{value, count}]}`; the `@return` array shape is what Scramble documents. `addTo($collection, $facets, Closure $count)` returns the collection untouched for `[]` (no query), otherwise merges `meta.facets` into the existing `additional` with `array_replace_recursive()`.
+
+**Traps.**
+
+- **A request that overrides `validationData()`** must return `$this->withDecodedFilters(...)`. Otherwise its rules on `filters.*` never see JSON filters; `filters()` then throws a `LogicException` instead of handing them out.
+- **The search type** goes into `eloquent-filtering.custom_filters` only, never into `laravel-ddd.filters.custom_types`. `filters()` throws a `LogicException` if it is there.
+- **The key of the request and the read query must match.** With `AcceptsSort` the read query takes it from `Sort::key()`. Without it, the read query orders by its own key, and a different `listKey()` makes the cursor rule reject every cursor from page 2 on.
+- **Sort columns must not hold NULL** (`CursorValueIsNull`), and a datetime sort column must store whole seconds: the cursor carries the cast value as `Y-m-d H:i:s`, so fractions repeat rows ascending and skip rows descending (`SortPaginationTest` pins this).
+
+Tests: `tests/Foundation/Infrastructure/Http/**`, `tests/Foundation/Infrastructure/Models/Sort/**` (`SortPaginationTest` pages the `testing` DB), `tests/Foundation/Application/Resources/FacetsResourceTest.php`; fixtures in `tests/Fixtures/Infrastructure/Http/Requests` (`ListRequests::resolve()` resolves a request through the container, which validates it) and `SortTestItemModel`.
 
 ## Exceptions
 
@@ -324,6 +362,8 @@ Free-text search and facet counts for read-model lists, on the relational databa
 | `Infrastructure\Models\Exceptions` | `EntityClassNotAvailable` |
 | `Infrastructure\Models\Facets\Exceptions` | `FacetNotCountable` |
 | `Infrastructure\Models\Filter\Filters\Exceptions` | `FilterArrayNotValid`, `FilterValueNotValid`, `CustomFilterNotValid` |
+| `Infrastructure\Models\Sort\Exceptions` | `SortNotValid` |
+| `Infrastructure\Pagination\Exceptions` | `CursorValueIsNull` (`LogicException`) |
 | `Infrastructure\Repositories\Exceptions` | `EntityClassNotAvailable` |
 
 The two `EntityClassNotAvailable` classes are distinct — check the namespace when catching or asserting.

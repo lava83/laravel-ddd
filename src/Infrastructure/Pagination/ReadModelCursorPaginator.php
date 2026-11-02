@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Support\Collection;
+use Lava83\LaravelDdd\Infrastructure\Pagination\Exceptions\CursorValueIsNull;
 use WeakMap;
 
 /**
@@ -18,6 +19,9 @@ use WeakMap;
  * ORDER BY column name. After mapping to read models that column may not exist
  * as a property (`account_id` vs. `id`). Each read model therefore remembers its
  * source model, and the cursor parameters are read from there.
+ *
+ * A cursor value of NULL fails with {@see CursorValueIsNull} instead of
+ * producing a cursor that skips or repeats rows.
  *
  * @template TModel of Model
  * @template TReadModel of object
@@ -78,6 +82,8 @@ class ReadModelCursorPaginator extends CursorPaginator
     /**
      * @param  mixed  $item
      * @return array<string, mixed>
+     *
+     * @throws CursorValueIsNull an order column of the item holds NULL
      */
     public function getParametersForItem($item)
     {
@@ -85,7 +91,15 @@ class ReadModelCursorPaginator extends CursorPaginator
 
         $source = is_object($key) ? ($this->sources()[$key] ?? null) : null;
 
-        return parent::getParametersForItem($source ?? $item);
+        $parameters = parent::getParametersForItem($source ?? $item);
+
+        foreach ($parameters as $parameter => $value) {
+            if ($value === null) {
+                throw CursorValueIsNull::forParameter($parameter);
+            }
+        }
+
+        return $parameters;
     }
 
     /**
