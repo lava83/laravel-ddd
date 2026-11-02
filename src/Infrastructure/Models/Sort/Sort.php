@@ -12,6 +12,12 @@ use Lava83\LaravelDdd\Infrastructure\Models\Sort\Exceptions\SortNotValid;
 /**
  * The order of a list: the fields a client asked for, then the key of the
  * list as the tie-breaker, so the order is unique, as cursor pagination needs.
+ * The order ends early at a field that is unique already: the key itself or a
+ * field declared unique.
+ *
+ * The key follows the direction of the last field, so an index on that field
+ * serves the order in both directions: the index carries the key ascending,
+ * and read backwards, descending.
  *
  * The request produces it and the read query applies it, so both use the one
  * key the request declares. Only columns of the list model are sortable, and
@@ -22,10 +28,12 @@ final readonly class Sort
 {
     /**
      * @param  list<SortField>  $fields
+     * @param  list<string>  $unique
      */
     private function __construct(
         private string $key,
         private array $fields,
+        private array $unique = [],
     ) {}
 
     /**
@@ -42,10 +50,11 @@ final readonly class Sort
      *
      * @param  array<array-key, mixed>  $fields
      * @param  list<string>  $allowed  the sortable columns of the list
+     * @param  list<string>  $unique  the sortable columns that are unique per row, e.g. `email` with a unique index
      *
      * @throws SortNotValid
      */
-    public static function fromArray(array $fields, array $allowed, string $key): self
+    public static function fromArray(array $fields, array $allowed, string $key, array $unique = []): self
     {
         $parsed = [];
 
@@ -74,7 +83,7 @@ final readonly class Sort
             );
         }
 
-        return new self($key, array_values($parsed));
+        return new self($key, array_values($parsed), $unique);
     }
 
     public function key(): string
@@ -93,20 +102,28 @@ final readonly class Sort
     }
 
     /**
-     * The order columns as applied: the fields, then the key ascending. The
-     * key is not repeated when the client sorted by it already.
+     * The order columns as applied: the fields up to the first that is unique,
+     * the key or a unique field, as the fields after it never decide. Without
+     * such a field, all fields, then the key in the direction of the last one,
+     * ascending without fields.
      *
      * @return list<SortField>
      */
     public function orders(): array
     {
+        $orders = [];
+
         foreach ($this->fields as $field) {
-            if ($field->column() === $this->key) {
-                return $this->fields;
+            $orders[] = $field;
+
+            if ($field->column() === $this->key || in_array($field->column(), $this->unique, true)) {
+                return $orders;
             }
         }
 
-        return [...$this->fields, new SortField($this->key)];
+        $last = $this->fields === [] ? null : $this->fields[array_key_last($this->fields)];
+
+        return [...$orders, new SortField($this->key, $last?->direction() ?? SortDirection::Ascending)];
     }
 
     /**

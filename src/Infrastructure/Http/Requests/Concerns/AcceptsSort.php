@@ -37,6 +37,20 @@ trait AcceptsSort
     abstract protected function sortableFields(): array;
 
     /**
+     * The sortable fields that are unique per row, e.g. `email` with a unique
+     * index. A sort ends at the first of them, without the key after it, so
+     * the database can serve the order from that index alone. Declare only
+     * columns that are unique: the next page skips rows that tie with the
+     * cursor row.
+     *
+     * @return list<string>
+     */
+    protected function uniqueSortableFields(): array
+    {
+        return [];
+    }
+
+    /**
      * `filled`, not `required`, on `sort.*`: it fails a blank field as well,
      * and Scramble does not take it for a required `sort[]`.
      *
@@ -47,7 +61,8 @@ trait AcceptsSort
         return [
             /**
              * The fields to sort by, the first one first, `-` in front for descending (`sort[]=-created_at&sort[]=email`).
-             * Ties are broken by the key of the list, which is also the order without `sort`.
+             * Ties are broken by the key of the list, in the direction of the last field. Without `sort`, the list is in
+             * key order.
              */
             'sort' => ['bail', 'nullable', 'array', 'list', 'min:1', new DistinctSortFields],
             'sort.*' => ['bail', 'filled', 'string', Rule::in($this->sortOptions())],
@@ -71,7 +86,7 @@ trait AcceptsSort
             throw SortNotValid::malformedField($fields);
         }
 
-        return Sort::fromArray($fields, $this->sortableFields(), $this->listKey());
+        return Sort::fromArray($fields, $this->sortableFields(), $this->listKey(), $this->uniqueSortableFields());
     }
 
     /**

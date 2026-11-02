@@ -12,9 +12,10 @@ use Lava83\LaravelDdd\Infrastructure\Models\Sort\Sort;
  * The cursor pagination of a list: `per_page` and `cursor`.
  *
  * The cursor must carry the parameters of the order of the list: the key
- * alone, or with {@see AcceptsSort} the sort columns plus the key. A cursor
- * of another order fails validation, so the read query never throws
- * `UnexpectedValueException` for it.
+ * alone, or with {@see AcceptsSort} the columns of the requested sort, see
+ * {@see Sort::cursorParameters()}. A cursor of another order fails
+ * validation, so the read query never throws `UnexpectedValueException` for
+ * it.
  *
  * @phpstan-require-extends FormRequest
  */
