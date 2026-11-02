@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd;
 
+use Illuminate\Contracts\Foundation\Application;
 use Lava83\LaravelDdd\Infrastructure\Contracts\EntityMapperResolverContract;
 use Lava83\LaravelDdd\Infrastructure\Contracts\PolymorphicReferenceResolver;
 use Lava83\LaravelDdd\Infrastructure\Mappers\EntityMapperResolver;
 use Lava83\LaravelDdd\Infrastructure\Mappers\PolymorphicReferenceMapper;
+use Lava83\LaravelDdd\Infrastructure\Scramble\ScrambleExtensions;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -32,6 +34,11 @@ class LaravelDddServiceProvider extends PackageServiceProvider
             ->hasConsoleCommands(
                 Commands\MakeAggregateCommand::class,
             );
+    }
+
+    public function packageBooted(): void
+    {
+        $this->app->booted(fn (Application $app) => ScrambleExtensions::register($app));
     }
 
     private function bindSingletons(): void
