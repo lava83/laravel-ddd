@@ -46,7 +46,7 @@ trait AcceptsSort
              * The fields to sort by, the first one first, `-` in front for descending (`sort[]=-created_at&sort[]=email`).
              * Ties are broken by the key of the list, which is also the order without `sort`.
              */
-            'sort' => ['bail', 'array', 'list', 'min:1', new DistinctSortFields],
+            'sort' => ['bail', 'nullable', 'array', 'list', 'min:1', new DistinctSortFields],
             'sort.*' => ['bail', 'required', 'string', Rule::in($this->sortOptions())],
         ];
     }

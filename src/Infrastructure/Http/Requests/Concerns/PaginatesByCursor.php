@@ -48,12 +48,12 @@ trait PaginatesByCursor
              *
              * @default 50
              */
-            'per_page' => ['bail', 'integer', 'min:1', 'max:'.$this->maxPerPage()],
+            'per_page' => ['bail', 'nullable', 'integer', 'min:1', 'max:'.$this->maxPerPage()],
             /**
              * The cursor of the page to load (`next_cursor` or `prev_cursor` of the previous response), the first page
              * if omitted. It only fits the sort it was issued for.
              */
-            'cursor' => ['bail', 'string', new ValidCursor($this->expectedCursorParameters())],
+            'cursor' => ['bail', 'nullable', 'string', new ValidCursor($this->expectedCursorParameters())],
         ];
     }
 

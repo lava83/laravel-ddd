@@ -39,7 +39,7 @@ trait AcceptsFilters
              * notation (`filters[0][type]=$eq&…`). JSON keeps numbers and booleans. Bracket notation sends every value
              * as a string, which `$gt`, `$gte`, `$lt`, `$lte` and `$null` reject.
              */
-            'filters' => ['bail', new ValidFilters, 'array'],
+            'filters' => ['bail', 'nullable', new ValidFilters, 'array'],
             'filters.*' => ['required', 'array'],
         ];
     }

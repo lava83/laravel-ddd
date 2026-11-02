@@ -29,7 +29,7 @@ trait AcceptsFacets
     protected function facetRules(): array
     {
         return [
-            'facets' => ['bail', 'array'],
+            'facets' => ['bail', 'nullable', 'array'],
             /**
              * The attributes to count the entries of the whole list by, returned in `meta.facets`. A facet ignores the
              * filter on its own attribute. Ask for them with the first page only.
