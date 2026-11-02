@@ -44,7 +44,7 @@ trait PaginatesByCursor
     {
         return [
             /**
-             * The number of entries per page.
+             * The number of entries per page, 50 if omitted.
              *
              * @default 50
              */

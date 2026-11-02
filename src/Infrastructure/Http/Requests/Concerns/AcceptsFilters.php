@@ -29,6 +29,9 @@ trait AcceptsFilters
     private bool $filtersDecodedForValidation = false;
 
     /**
+     * `filled`, not `required`, on `filters.*`: it fails a blank filter as
+     * well, and Scramble does not take it for a required `filters`.
+     *
      * @return array<string, list<mixed>>
      */
     protected function filterRules(): array
@@ -40,7 +43,7 @@ trait AcceptsFilters
              * as a string, which `$gt`, `$gte`, `$lt`, `$lte` and `$null` reject.
              */
             'filters' => ['bail', 'nullable', new ValidFilters, 'array'],
-            'filters.*' => ['required', 'array'],
+            'filters.*' => ['filled', 'array'],
         ];
     }
 

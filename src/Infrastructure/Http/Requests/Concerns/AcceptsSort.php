@@ -37,6 +37,9 @@ trait AcceptsSort
     abstract protected function sortableFields(): array;
 
     /**
+     * `filled`, not `required`, on `sort.*`: it fails a blank field as well,
+     * and Scramble does not take it for a required `sort[]`.
+     *
      * @return array<string, list<mixed>>
      */
     protected function sortRules(): array
@@ -47,7 +50,7 @@ trait AcceptsSort
              * Ties are broken by the key of the list, which is also the order without `sort`.
              */
             'sort' => ['bail', 'nullable', 'array', 'list', 'min:1', new DistinctSortFields],
-            'sort.*' => ['bail', 'required', 'string', Rule::in($this->sortOptions())],
+            'sort.*' => ['bail', 'filled', 'string', Rule::in($this->sortOptions())],
         ];
     }
 

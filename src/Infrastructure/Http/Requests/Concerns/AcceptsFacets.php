@@ -24,6 +24,9 @@ trait AcceptsFacets
     abstract protected function facetEnum(): string;
 
     /**
+     * `filled`, not `required`, on `facets.*`: it fails a blank facet as well,
+     * and Scramble does not take it for a required `facets[]`.
+     *
      * @return array<string, list<mixed>>
      */
     protected function facetRules(): array
@@ -34,7 +37,7 @@ trait AcceptsFacets
              * The attributes to count the entries of the whole list by, returned in `meta.facets`. A facet ignores the
              * filter on its own attribute. Ask for them with the first page only.
              */
-            'facets.*' => ['bail', 'required', 'string', 'distinct', Rule::enum($this->facetEnum())],
+            'facets.*' => ['bail', 'filled', 'string', 'distinct', Rule::enum($this->facetEnum())],
         ];
     }
 
