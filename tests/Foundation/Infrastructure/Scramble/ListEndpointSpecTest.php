@@ -97,7 +97,11 @@ describe('The OpenAPI spec of a list endpoint', function (): void {
                 ['type' => 'string', 'contentMediaType' => 'application/json'],
                 ['type' => 'array', 'items' => [
                     'type' => 'object',
-                    'properties' => ['type' => ['type' => 'string'], 'target' => ['type' => 'string'], 'value' => []],
+                    'properties' => [
+                        'type' => ['type' => 'string'],
+                        'target' => ['type' => 'string'],
+                        'value' => ['description' => 'A value, a list of values or nested filters, as the type takes it.'],
+                    ],
                     'required' => ['type'],
                 ]],
             ]]);
@@ -105,6 +109,12 @@ describe('The OpenAPI spec of a list endpoint', function (): void {
         'with rules of the request on filters.*' => ['/full'],
         'with the rules of the trait only' => ['/filtered'],
     ]);
+
+    it('documents the value of a filter as a schema object, not a list', function (): void {
+        $filters = collect(json_decode(listEndpointJson())->paths->{'/full'}->get->parameters)->firstWhere('name', 'filters');
+
+        expect($filters->schema->anyOf[1]->items->properties->value)->toBeInstanceOf(stdClass::class);
+    });
 
     it('documents facets[] as an array of the facets', function (): void {
         expect($this->parameters['facets[]']['description'])->toStartWith('The attributes to count')
