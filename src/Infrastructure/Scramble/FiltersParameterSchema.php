@@ -37,7 +37,8 @@ final class FiltersParameterSchema implements AllRulesSchemasTransformer
         $filter = (new ObjectType)
             ->addProperty('type', new StringType)
             ->addProperty('target', new StringType)
-            ->addProperty('value', new MixedType)
+            // Any value, with a description: an empty schema would be `{}` only as long as nobody decodes the JSON to arrays.
+            ->addProperty('value', (new MixedType)->setDescription('A value, a list of values or nested filters, as the type takes it.'))
             ->setRequired(['type']);
 
         $schemaBag->set($context->field, (new AnyOf)->setItems([
