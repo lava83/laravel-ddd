@@ -117,11 +117,12 @@ describe('The OpenAPI spec of a list endpoint', function (): void {
     });
 
     it('documents facets[] as an array of the facets', function (): void {
+        $schema = $this->parameters['facets[]']['schema'];
+
+        // Not the whole schema: Scramble 0.13.53 added `null` to the type and `uniqueItems`.
         expect($this->parameters['facets[]']['description'])->toStartWith('The attributes to count')
-            ->and($this->parameters['facets[]']['schema'])->toBe([
-                'type' => 'array',
-                'items' => ['$ref' => '#/components/schemas/ListTestFacet'],
-            ]);
+            ->and($schema['type'])->toContain('array')
+            ->and($schema['items'])->toBe(['$ref' => '#/components/schemas/ListTestFacet']);
     });
 
     it('documents the default page size', function (): void {
