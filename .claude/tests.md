@@ -1,10 +1,10 @@
 # Tests — `tests/**`
 
-Pest 4 with Orchestra Testbench 11. Suites live under `tests/Foundation`, mirroring `src/`.
+Pest 5 with Orchestra Testbench 11. Suites live under `tests/Foundation`, mirroring `src/`.
 
 ## Harness
 
-`tests/TestCase.php` extends Testbench, registers `LaravelDddServiceProvider`, points factory discovery at `Lava83\LaravelDdd\Database\Factories\`, and sets `database.default = testing`.
+`tests/TestCase.php` extends Testbench, registers `EloquentFilteringServiceProvider` and `LaravelDddServiceProvider`, and sets `database.default = testing`.
 
 `tests/Pest.php` applies to `Foundation` and, in `beforeEach`:
 
