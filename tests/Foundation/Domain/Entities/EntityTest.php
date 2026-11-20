@@ -351,6 +351,124 @@ describe('change tracking via updateEntity', function (): void {
     });
 });
 
+describe('dirty state across several calls', function (): void {
+    it('keeps an earlier change when a later call changes nothing', function (): void {
+        $entity = new ValidatingEntity(EntityTestId::generate(), 'Bob');
+
+        $entity->rename('Alice');
+        $diff = $entity->relabel('Alice', 'default');
+
+        expect($diff->all())->toBe([])
+            ->and($entity->isDirty())->toBeTrue()
+            ->and($entity->dirty()->all())->toBe(['old_name' => 'Bob', 'new_name' => 'Alice'])
+            ->and($entity->version())->toBe(2);
+    });
+
+    it('adds up the changes of different properties', function (): void {
+        $entity = new ValidatingEntity(EntityTestId::generate(), 'Bob');
+
+        $entity->rename('Alice');
+        $entity->relabel('Alice', 'second');
+
+        expect($entity->dirty()->all())->toBe([
+            'old_name' => 'Bob',
+            'new_name' => 'Alice',
+            'old_label' => 'default',
+            'new_label' => 'second',
+        ]);
+    });
+
+    it('keeps the first old_ and the last new_ value of a property, but returns the diff of the call', function (): void {
+        $entity = new EntityTestSubject(EntityTestId::generate(), 'First');
+
+        $entity->rename('Second');
+        $diff = $entity->rename('Third');
+
+        expect($diff->all())->toBe(['old_name' => 'Second', 'new_name' => 'Third'])
+            ->and($entity->dirty()->all())->toBe(['old_name' => 'First', 'new_name' => 'Third'])
+            ->and($entity->version())->toBe(3);
+    });
+
+    it('treats A -> B -> A as no change and restores version and updatedAt', function (): void {
+        $updatedAt = CarbonImmutable::now()->subDay();
+        $entity = reconstituteSubject(['name' => 'A', 'updated_at' => $updatedAt, 'version' => 4]);
+
+        $entity->rename('B');
+        $entity->rename('A');
+
+        expect($entity->isDirty())->toBeFalse()
+            ->and($entity->version())->toBe(4)
+            ->and($entity->updatedAt()->getTimestamp())->toBe($updatedAt->getTimestamp());
+    });
+
+    it('restores a null updatedAt on a fresh entity after A -> B -> A', function (): void {
+        $entity = new EntityTestSubject(EntityTestId::generate(), 'A');
+
+        $entity->rename('B');
+        $entity->rename('A');
+
+        expect($entity->isDirty())->toBeFalse()
+            ->and($entity->version())->toBe(1)
+            ->and($entity->toArray()['updated_at'])->toBeNull();
+    });
+
+    it('drops only the property that is back at its original value', function (): void {
+        $entity = new ValidatingEntity(EntityTestId::generate(), 'Bob');
+
+        $entity->relabel('Alice', 'second');
+        $entity->rename('Bob');
+
+        expect($entity->dirty()->all())->toBe(['old_label' => 'default', 'new_label' => 'second'])
+            ->and($entity->version())->toBe(3);
+    });
+
+    it('keeps the changes of earlier calls when a later one is rejected', function (): void {
+        $entity = new ValidatingEntity(EntityTestId::generate(), 'Bob');
+        $entity->rename('Alice');
+
+        expect(fn () => $entity->rename('   '))->toThrow(ValidationException::class);
+
+        expect($entity->name())->toBe('Alice')
+            ->and($entity->dirty()->all())->toBe(['old_name' => 'Bob', 'new_name' => 'Alice'])
+            ->and($entity->version())->toBe(2);
+    });
+
+    it('starts clean after hydrate, with the hydrated state as the new baseline', function (): void {
+        $id = EntityTestId::generate();
+        $entity = new EntityTestSubject($id, 'Old');
+        $entity->rename('Saved');
+
+        $updatedAt = CarbonImmutable::now()->subHour();
+        $entity->hydrate((new EntityTestModel)->newFromBuilder([
+            'id' => $id->value(),
+            'name' => 'Saved',
+            'updated_at' => $updatedAt,
+            'version' => 2,
+        ]));
+
+        expect($entity->isDirty())->toBeFalse();
+
+        $entity->rename('Other');
+        $entity->rename('Saved');
+
+        expect($entity->isDirty())->toBeFalse()
+            ->and($entity->version())->toBe(2)
+            ->and($entity->updatedAt()->getTimestamp())->toBe($updatedAt->getTimestamp());
+    });
+
+    it('leaves no id change behind when hydrate brings a new key', function (): void {
+        $entity = new EntityTestSubject(EntityTestId::generate(), 'Fresh');
+
+        $entity->hydrate((new EntityTestModel)->newFromBuilder([
+            'id' => EntityTestId::generate()->value(),
+            'name' => 'Fresh',
+            'version' => 1,
+        ]));
+
+        expect($entity->isDirty())->toBeFalse();
+    });
+});
+
 describe('hasChanged type semantics', function (): void {
     it('ignores a CarbonImmutable with the same instant and timezone', function (): void {
         $entity = new RichEntity(EntityTestId::generate(), moment: CarbonImmutable::now());
