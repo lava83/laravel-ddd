@@ -118,6 +118,19 @@ describe('updateAggregateRoot', function (): void {
             ]);
     });
 
+    it('gives each event the diff of its own call, not the accumulated dirty state', function (): void {
+        $aggregate = new AggregateTestSubject(EntityTestId::generate(), 'First');
+
+        $aggregate->rename('Second');
+        $aggregate->rename('Third');
+
+        expect($aggregate->uncommittedEvents()->map(fn ($event) => $event->eventData()->all())->all())->toBe([
+            ['old_name' => 'First', 'new_name' => 'Second'],
+            ['old_name' => 'Second', 'new_name' => 'Third'],
+        ])
+            ->and($aggregate->dirty()->all())->toBe(['old_name' => 'First', 'new_name' => 'Third']);
+    });
+
     it('moves state without recording anything when given no event', function (): void {
         $aggregate = new AggregateTestSubject(EntityTestId::generate(), 'Old');
 
@@ -307,6 +320,23 @@ describe('clone and serialization drop the event buffer', function (): void {
             ->and($restored->name())->toBe('New')
             ->and($restored->version())->toBe(2)
             ->and($restored->id()->equals($aggregate->id()))->toBeTrue();
+    });
+
+    it('keeps the dirty state and its clean baseline across serialize/unserialize', function (): void {
+        $updatedAt = CarbonImmutable::now()->subDay();
+        $aggregate = reconstituteAggregate(['name' => 'A', 'updated_at' => $updatedAt, 'version' => 3]);
+        $aggregate->rename('B');
+
+        /** @var AggregateTestSubject $restored */
+        $restored = unserialize(serialize($aggregate));
+
+        expect($restored->dirty()->all())->toBe(['old_name' => 'A', 'new_name' => 'B']);
+
+        $restored->rename('A');
+
+        expect($restored->isDirty())->toBeFalse()
+            ->and($restored->version())->toBe(3)
+            ->and($restored->updatedAt()->getTimestamp())->toBe($updatedAt->getTimestamp());
     });
 });
 
