@@ -134,7 +134,7 @@ There is no `database/` directory and no migration loader: DB-backed tests build
 - **Commits are signed and made in the developer's name, nothing else.** Commit only with the developer's own git identity and signing key (`commit.gpgsign` is on, SSH key). Never pass `--no-gpg-sign`, never change `user.name` or `user.email`, never set another author. If signing fails, stop and report it instead of committing unsigned.
 - Conventional Commits: `type(scope): description`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
 - Phased, isolated commits: pure style changes separate from logic and type fixes. Never mix a Pint run into a feature commit.
-- CI on PHP 8.4 and 8.5 / Laravel 13: `run-qa.yml` (Pint `--test`, PHPStan, Deptrac, Pest; push + PR). The PHP 8.4 row runs Pest with PCOV and fails below 90 % coverage. `update-changelog.yml` runs on release.
+- CI on PHP 8.4, 8.5 and 8.6 / Laravel 13: `run-qa.yml` (Pint `--test`, PHPStan, Deptrac, Pest; push + PR). The PHP 8.4 row runs Pest with PCOV and fails below 90 % coverage. `update-changelog.yml` runs on release.
 - `CHANGELOG.md` is generated on release — do not edit it by hand.
 - `composer.lock` is gitignored, and CI runs `composer update`. Dependency resolution is never reproducible; suspect a fresh upstream release before blaming the diff for a CI-only failure.
 
