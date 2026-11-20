@@ -161,6 +161,36 @@ describe('saveEntity()', function (): void {
             ->and($aggregate->version())->toBe(2);
     });
 
+    it('writes an earlier change when a later call changed nothing', function (): void {
+        $id = seedAggregateRow('Original');
+
+        $aggregate = aggregateRepository()->find($id);
+        $aggregate->rename('Renamed');
+        $aggregate->rename('Renamed');
+
+        aggregateRepository()->save($aggregate);
+
+        $row = AggregateTestModel::query()->find($id->value());
+
+        expect($row->name)->toBe('Renamed')
+            ->and($row->version)->toBe(2)
+            ->and($aggregate->version())->toBe(2)
+            ->and($aggregate->isDirty())->toBeFalse();
+    });
+
+    it('writes nothing for a change taken back before the save', function (): void {
+        $id = seedAggregateRow('Original');
+
+        $aggregate = aggregateRepository()->find($id);
+        $aggregate->rename('Other');
+        $aggregate->rename('Original');
+
+        aggregateRepository()->save($aggregate);
+
+        expect(AggregateTestModel::query()->find($id->value())->version)->toBe(1)
+            ->and($aggregate->version())->toBe(1);
+    });
+
     it('throws CantSaveModel when the underlying insert fails', function (): void {
         AggregateTestModel::saving(static fn () => false);
 
