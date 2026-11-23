@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Lava83\LaravelDdd\Infrastructure\Models\Facets;
 
 use Closure;
+use Illuminate\Contracts\Database\Query\Expression as ExpressionContract;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\ReadModels\Facets\FacetBucketReadModel;
 use Lava83\LaravelDdd\Domain\ReadModels\Facets\FacetReadModel;
@@ -48,14 +50,14 @@ final class FacetCounter
 
         foreach ($facets as $facet) {
             $query = self::forCounting($baseQuery(self::filterFor($facet, $scope, $requested)));
+            $expression = $facet->rawExpression();
             $relation = $facet->relationName();
 
-            $readModels[] = new FacetReadModel(
-                $facet->key(),
-                $relation === null
-                    ? self::countColumn($query, $facet)
-                    : self::countRelation($query, $facet, $relation),
-            );
+            $readModels[] = new FacetReadModel($facet->key(), match (true) {
+                $expression !== null => self::countExpression($query, $facet, $expression),
+                $relation !== null => self::countRelation($query, $facet, $relation),
+                default => self::countColumn($query, $facet),
+            });
         }
 
         return new Collection($readModels);
@@ -114,6 +116,39 @@ final class FacetCounter
             ->select($column.' as facet_value')
             ->selectRaw('count(*) as facet_count')
             ->groupBy($column)
+            ->get());
+    }
+
+    /**
+     * Selects the expression once in a derived table and groups its column
+     * outside. Repeating the expression in GROUP BY would repeat its `?`
+     * placeholders, and PostgreSQL (and MySQL under ONLY_FULL_GROUP_BY) treat
+     * two placeholders as different expressions. Grouping by a column of the
+     * derived table also needs no alias support in GROUP BY.
+     *
+     * The expression is the only raw SQL here; its values travel as bindings.
+     *
+     * @template TModel of Model
+     *
+     * @param  EloquentBuilder<TModel>  $query
+     * @return list<FacetBucketReadModel>
+     *
+     * @throws FacetNotCountable
+     */
+    private static function countExpression(EloquentBuilder $query, FacetDefinition $facet, ExpressionContract $expression): array
+    {
+        $base = $query->toBase();
+        $sql = (string) $expression->getValue($base->getGrammar());
+
+        $values = $base
+            ->select(new Expression('('.$sql.') as facet_value'))
+            ->addBinding($facet->bindings(), 'select');
+
+        return self::buckets($facet, $base->newQuery()
+            ->fromSub($values, 'facet_values')
+            ->select('facet_value')
+            ->selectRaw('count(*) as facet_count')
+            ->groupBy('facet_value')
             ->get());
     }
 
