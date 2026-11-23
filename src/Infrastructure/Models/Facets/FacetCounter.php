@@ -37,7 +37,7 @@ final class FacetCounter
      *
      * @param  Closure(Builder): EloquentBuilder<TModel>  $baseQuery  the base query of the list page, including `->filter($filter->toArray())`
      * @param  Builder  $scope  what the caller may see (tenant, branch); applied in full to every facet
-     * @param  Builder  $requested  the client's filters; each facet drops those on its own filter target
+     * @param  Builder  $requested  the client's filters; each facet drops its own (on its filter target, of its filter type)
      * @return Collection<int, FacetReadModel> in the order of `$facets`
      *
      * @throws FacetNotCountable
@@ -62,15 +62,20 @@ final class FacetCounter
     }
 
     /**
-     * The scope in full, plus the requested filters without the facet's own.
+     * The scope in full, plus the requested filters without the facet's own:
+     * those on its filter target and, if it names one, those of its custom
+     * filter type, which a client may send without a target.
      *
      * Only `$requested` is ever reduced. A scope filter can share the facet's
-     * target (`branch_id`), and dropping it would count rows the caller must
-     * not see.
+     * target (`branch_id`) or type, and dropping it would count rows the
+     * caller must not see.
      */
     private static function filterFor(FacetDefinition $facet, Builder $scope, Builder $requested): Builder
     {
-        return $scope->merge($requested->without($facet->filterTarget()), MergeStrategy::KeepExisting);
+        $own = $requested->without($facet->filterTarget());
+        $type = $facet->filterType();
+
+        return $scope->merge($type === null ? $own : $own->withoutType($type), MergeStrategy::KeepExisting);
     }
 
     /**
