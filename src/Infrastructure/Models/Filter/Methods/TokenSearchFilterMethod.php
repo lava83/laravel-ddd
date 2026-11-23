@@ -5,11 +5,20 @@ declare(strict_types=1);
 namespace Lava83\LaravelDdd\Infrastructure\Models\Filter\Methods;
 
 use Closure;
+use Illuminate\Contracts\Database\Eloquent\SupportsPartialRelations;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOneOrMany;
+use Illuminate\Database\Eloquent\Relations\MorphOneOrMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Database\Query\JoinClause;
 use IndexZer0\EloquentFiltering\Filter\Contracts\FilterMethod;
 use IndexZer0\EloquentFiltering\Filter\Traits\FilterMethod\FilterContext\CustomFilter;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Enums\SearchMode;
+use Lava83\LaravelDdd\Infrastructure\Models\Filter\Methods\Exceptions\RelationNotSearchable;
 
 /**
  * Free-text search as an `indexzer0/eloquent-filtering` custom filter. Extend
@@ -39,8 +48,9 @@ abstract class TokenSearchFilterMethod implements FilterMethod
 
     /**
      * The searched columns: a column of the model (`email`) or a column of a
-     * relation (`data.lastname`). The part before the last dot goes to
-     * `whereHas()`, so the relation must live on the same connection.
+     * relation (`data.lastname`, `user.data.personalnr`). The part before the
+     * last dot is the relation path. Its first relation may live on another
+     * connection of the same database server, see {@see self::orWhereRelated()}.
      *
      * @return list<string>
      */
@@ -85,6 +95,8 @@ abstract class TokenSearchFilterMethod implements FilterMethod
     /**
      * @param  Builder<Model>  $query
      * @return Builder<Model>
+     *
+     * @throws RelationNotSearchable
      */
     public function apply(Builder $query): Builder
     {
@@ -101,7 +113,7 @@ abstract class TokenSearchFilterMethod implements FilterMethod
                         continue;
                     }
 
-                    $query->orWhereHas($relation, fn (Builder $related) => $related->where(
+                    $this->orWhereRelated($query, $relation, fn (Builder $related) => $related->where(
                         fn (Builder $related) => $this->orLike($related, $relationColumns, $pattern),
                     ));
                 }
@@ -112,8 +124,122 @@ abstract class TokenSearchFilterMethod implements FilterMethod
     }
 
     /**
+     * A relation path whose first relation lives on the model's connection
+     * goes to `whereHas()`.
+     *
+     * One on another connection becomes `whereIn(<key>, <related query
+     * selecting its key>)`, the rest of the path a `whereHas()` inside it.
+     * `whereHas()` would name the related table without its database, and
+     * Laravel prefixes only the outermost table of a `whereIn` subquery, so
+     * every table in it is qualified here. That needs both databases on one
+     * server, readable through the list's connection.
+     *
+     * @param  Builder<Model>  $query
+     * @param  Closure(Builder<Model>): mixed  $constraint
+     *
+     * @throws RelationNotSearchable
+     */
+    private function orWhereRelated(Builder $query, string $path, Closure $constraint): void
+    {
+        [$name, $rest] = array_pad(explode('.', $path, 2), 2, null);
+        $model = $query->getModel();
+        $relation = $model->isRelation($name) ? Relation::noConstraints(fn (): mixed => $model->{$name}()) : null;
+
+        // getName() resolves the default connection; getConnectionName() would be null for it.
+        $connection = $model->getConnection();
+
+        // An unknown relation goes to whereHas() as well, which reports it.
+        if (! $relation instanceof Relation || $relation->getRelated()->getConnection()->getName() === $connection->getName()) {
+            $query->orWhereHas($path, $constraint);
+
+            return;
+        }
+
+        $relatedConnection = $relation->getRelated()->getConnection();
+        [$key, $relatedKey] = self::keys($relation, $name, $model, (string) $connection->getName(), (string) $relatedConnection->getName());
+        $related = $relation->getQuery();
+
+        if ($rest === null) {
+            $constraint($related);
+        } else {
+            $related->whereHas($rest, $constraint);
+        }
+
+        $subquery = $related->toBase()->select($relatedKey);
+        self::qualifyTables($subquery, $connection->getDatabaseName());
+
+        $query->orWhereIn($key, $subquery);
+    }
+
+    /**
+     * The key of the list model and the key of the related model that match.
+     *
+     * Without the parent constraint, a morph relation would lose its morph
+     * type, and a one-of-many relation joins a subquery that is SQL already,
+     * so its tables cannot be qualified.
+     *
+     * @param  Relation<Model, Model, mixed>  $relation
+     * @return array{string, string}
+     *
+     * @throws RelationNotSearchable
+     */
+    private static function keys(Relation $relation, string $name, Model $model, string $connection, string $relatedConnection): array
+    {
+        if ($relation instanceof BelongsTo && ! $relation instanceof MorphTo) {
+            return [$relation->getQualifiedForeignKeyName(), $relation->getQualifiedOwnerKeyName()];
+        }
+
+        if ($relation instanceof HasOneOrMany
+            && ! $relation instanceof MorphOneOrMany
+            && ! ($relation instanceof SupportsPartialRelations && $relation->isOneOfMany())) {
+            return [$relation->getQualifiedParentKeyName(), $relation->getQualifiedForeignKeyName()];
+        }
+
+        throw RelationNotSearchable::unsupportedOnOtherConnection($name, get_debug_type($relation), $model::class, $connection, $relatedConnection);
+    }
+
+    /**
+     * Prefixes the table and the joined tables of the query, and of every
+     * subquery in its where clauses (`whereHas()`, nested wheres), with their
+     * database name where it is not the list's.
+     *
+     * SQL that is a string already, a raw where or a `whereIn` subquery in a
+     * scope of the related model, is out of reach.
+     */
+    private static function qualifyTables(QueryBuilder $query, string $listDatabase): void
+    {
+        $database = $query->getConnection()->getDatabaseName();
+
+        if ($database !== $listDatabase) {
+            if (is_string($query->from)) {
+                $query->from = self::qualifyTable($query->from, $database);
+            }
+
+            foreach ($query->joins ?? [] as $join) {
+                if ($join instanceof JoinClause && is_string($join->table)) {
+                    $join->table = self::qualifyTable($join->table, $database);
+                }
+            }
+        }
+
+        foreach ($query->wheres as $where) {
+            if (($where['query'] ?? null) instanceof QueryBuilder) {
+                self::qualifyTables($where['query'], $listDatabase);
+            }
+        }
+    }
+
+    /**
+     * A table that names its database (or schema) already is left alone.
+     */
+    private static function qualifyTable(string $table, string $database): string
+    {
+        return str_contains($table, '.') ? $table : $database.'.'.$table;
+    }
+
+    /**
      * The columns grouped by relation, the model's own under `''`, so a
-     * relation costs one EXISTS subquery per token, not one per column.
+     * relation costs one subquery per token, not one per column.
      *
      * @return array<string, list<string>>
      */

@@ -249,7 +249,7 @@ return new class extends Migration
 
 ### 4. Mapper
 
-The mapper is the single translation point between the domain and the database. `findOrCreateModelFillData()` (from the base mapper) loads or creates the row and fills the shared columns (`id`, `version`, timestamps) for you.
+The mapper is the single translation point between the domain and the database. `findOrCreateModelFillData()` (from the base mapper) loads or creates the row and fills the shared columns (`id`, `version`, timestamps) for you. It creates a row only for a new aggregate: one loaded from the database (`isPersisted()`, set by `hydrate()`) must find its row again. If that row was deleted after loading, saving or removing the aggregate throws `EntityNotFound`, or `ModelWasDeleted` when the row is soft-deleted, instead of inserting a copy.
 
 ```php
 <?php
@@ -817,7 +817,17 @@ $requested->without('status_id')->toArray();
 
 Custom filters without a target are never removed, an unknown target is a no-op, and `without()` with no arguments returns an equal copy.
 
-> Call `without()` on client (request) filters only, never on a scope filter. A scope can use the same target as a facet (`branch_id`), and removing it widens what the caller sees.
+`withoutType(string ...$types)` removes custom filters by their type instead, whatever their target, so it also reaches the ones a client sends without a target. Built-in filters are never removed, even when named by their operator (`'$eq'`), and an unknown type is a no-op. Like `without()`, it returns a new `Builder`.
+
+```php
+$requested->withoutType('$b2cUserSearch')->toArray();
+// [
+//     ['type' => '$eq', 'target' => 'status_id', 'value' => 2],
+//     ['type' => '$in', 'target' => 'user_type_id', 'value' => [1, 3]],
+// ]
+```
+
+> Call `without()` and `withoutType()` on client (request) filters only, never on a scope filter. A scope can use the same target as a facet (`branch_id`), and removing it widens what the caller sees.
 
 ### Search
 
@@ -842,7 +852,7 @@ final class B2cUserSearchFilter extends TokenSearchFilterMethod
 
 - The phrase is split on Unicode whitespace. Duplicates are dropped case-insensitively, and only the first `maxTokens()` tokens (default 5) are used. An empty phrase adds no constraint.
 - Every token must match (AND). A token matches when any column matches (OR).
-- `email` is a column of the model. `data.lastname` is a column of the `data` relation, resolved with `whereHas()`: the part before the last dot is the relation, which must live on the same connection. Columns of one relation share one `EXISTS` per token.
+- `email` is a column of the model. `data.lastname` is a column of the `data` relation, resolved with `whereHas()`: the part before the last dot is the relation path, which may be nested (`user.data.personalnr`). Columns of one relation path share one subquery per token. The first relation of a path may live on another connection, see [Relations on another connection](#relations-on-another-connection).
 - `mode()` returns `SearchMode::Prefix` (`token%`, the default) or `SearchMode::Contains` (`%token%`). Prefix can use a B-tree index on the column, Contains scans it.
 - `%`, `_` and `!` in a token are literals. The filter escapes them and adds an explicit `ESCAPE '!'`, so it behaves the same on MySQL/MariaDB (with or without `NO_BACKSLASH_ESCAPES`), SQLite and PostgreSQL.
 - Case sensitivity follows the column collation. A `utf8mb4_*_ci` collation on MariaDB matches `müller` to `Müller`, and whether `ß` matches `ss` depends on the collation. SQLite folds ASCII only, and PostgreSQL's `LIKE` is always case-sensitive.
@@ -880,6 +890,24 @@ if ($search !== '') {
 }
 ```
 
+#### Relations on another connection
+
+The first relation of a path may live on another connection whose database is on the same server as the list's. Here the accounts are on `portal`, the B2B user (`customerUser`) on `users_customer`, the B2C user (`serviceUser`) and its profile (`data`) on `users_service`:
+
+```php
+protected function columns(): array
+{
+    return ['identifiers.value', 'customerUser.email', 'serviceUser.email', 'serviceUser.data.personalnr'];
+}
+```
+
+- A `BelongsTo` becomes `whereIn(<foreign key>, <related query selecting the owner key>)`, a `HasOne` or `HasMany` `whereIn(<local key>, <related query selecting the foreign key>)`. The rest of the path (`data.personalnr`) is a `whereHas()` inside that query.
+- Every table in that query gets its database name, nested relations and joined pivot tables included. `whereHas()` alone would look for them in the list's database.
+- The related models keep their global scopes (soft deletes) and the constraints of the relation method.
+- Other relation types on another connection (`BelongsToMany`, morph relations, `HasOneThrough`/`HasManyThrough`, a one-of-many `HasOne`) throw `RelationNotSearchable`. Relations on the list's connection use `whereHas()` as before.
+
+> **Precondition:** the list's connection must be able to read the other database as `<database>.<table>`, so both databases live on one server and its credentials work for both. That is MySQL and MariaDB. PostgreSQL cannot query across databases, and SQL Server reads `a.b` as schema and table. The package cannot check this. Tables in SQL that is a string already, such as a raw where or a `whereIn` subquery in a global scope of a related model, keep their bare name.
+
 ## Facets
 
 Facet counts are counts per value of one attribute of a list, for example how many users each status tab of an admin UI holds. They are counted on the database, with the same base query the list uses for its page.
@@ -905,11 +933,37 @@ FacetDefinition::relation('services', 'services', 'id');  // filter target: serv
 
 - `column($key, $column, $filterTarget = null)` counts the rows of the list model per value of one of its columns. The filter target defaults to `$column`.
 - `relation($key, $relation, $column, $filterTarget = null)` counts the distinct rows of the list model per value of a column of a `HasMany` or `BelongsToMany` relation: a user with two services counts once for each. The filter target defaults to `$relation`. The related model must live on the list model's connection, otherwise `FacetNotCountable` is thrown. The list's keys go into a subquery, never through PHP memory.
+- Both take an optional `$filterType` last: the type of a custom filter that is the facet's own filter. A client may send a custom filter without a target, which the filter target cannot match, so the facet would keep its own filter and show only the selected bucket. A built-in operator as `$filterType` throws `CustomFilterNotValid`.
+
+```php
+// The status tabs filter with a custom filter the client sends without a target:
+// filters=[{"type":"$statusIn","value":[1,2]}] still counts every status.
+FacetDefinition::column('status', 'status_id', filterType: '$statusIn');
+```
+
+- `expression($key, $expression, $filterTarget, $filterType = null, $bindings = [])` counts the rows of the list model per value of an SQL expression, for tabs that are not the values of one column. The filter target is required, because there is no column to default to. Buckets, ordering, the null bucket, scope and requested filters work as for a column facet, and so does the join rule below. Values that can vary go in as `?` placeholders with `$bindings`.
+
+```php
+use Illuminate\Support\Facades\DB;
+
+FacetDefinition::expression('linked_users', DB::raw(
+    "CASE
+        WHEN accounts.user_customer_id IS NOT NULL AND accounts.user_service_id IS NOT NULL THEN 'both'
+        WHEN accounts.user_customer_id IS NOT NULL THEN 'b2b'
+        WHEN accounts.user_service_id IS NOT NULL THEN 'b2c'
+        ELSE 'none'
+    END",
+), 'linked_users', filterType: '$eqLinkedUsers');
+
+FacetDefinition::expression('violating', DB::raw('accounts.policy_violation_score > ?'), 'violating', bindings: [0]);
+```
+
+> **The expression is raw SQL and goes into the query as written.** Build it in code, never from request input: anyone who controls it can read any table the connection can read, through a subquery in the bucket values. Put every value that can vary into `$bindings` instead of concatenating it, and qualify columns with their table once the base query joins. Clients only pick facets by key (`facets[]`); they never supply a definition.
 
 **Counting.** `FacetCounter::count(Closure $baseQuery, Builder $scope, Builder $requested, FacetDefinition ...$facets)` returns a `Collection<int, FacetReadModel>` in the order of the definitions.
 
 - `$baseQuery` is a `Closure(Filter\Builder): Eloquent\Builder`: the base query of the list page, including `->filter($filter->toArray())`. Eager loads, ordering, limit and offset are dropped before grouping.
-- Each facet is counted with `$scope->merge($requested->without($facet->filterTarget()))`: the whole scope, plus every requested filter except the facet's own. The status tabs therefore show how many rows each status holds under the current search and type filter.
+- Each facet is counted with `$scope->merge($requested->without($facet->filterTarget()))`, plus `->withoutType($facet->filterType())` when the facet names one: the whole scope, plus every requested filter except the facet's own. The status tabs therefore show how many rows each status holds under the current search and type filter.
 - **Keep the scope and the requested filters apart.** The scope (tenant, branch: what the caller may see at all) is never reduced. Merge the two before calling the counter, and a facet on `branch_id` drops the branch scope along with the client's branch filter.
 - A column facet groups the list query with `count(*)`, so the base query must not join a to-many table, or a row counts once per joined row. A relation facet groups the related rows with `count(distinct …)`, and the soft-delete scopes of both models stay active.
 

@@ -6,9 +6,11 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
+use Lava83\LaravelDdd\Domain\Exceptions\EntityNotFound;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantDeleteModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\CantSaveModel;
 use Lava83\LaravelDdd\Infrastructure\Exceptions\ConcurrencyException;
+use Lava83\LaravelDdd\Infrastructure\Exceptions\ModelWasDeleted;
 use Lava83\LaravelDdd\Infrastructure\Repositories\Exceptions\EntityClassNotAvailable;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\AggregateTestModel;
 use Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities\AggregateTestSubject;
@@ -46,6 +48,7 @@ beforeEach(function (): void {
         $table->string('name');
         $table->unsignedInteger('version')->default(1);
         $table->timestamps();
+        $table->softDeletes();
     });
 
     entity_mapper_resolver()->registerMapper(AggregateTestSubject::class, new AggregateTestMapper);
@@ -381,5 +384,82 @@ describe('auto-increment identity (integer keys)', function (): void {
         expect($counter->id()->value())->toBe(1)
             ->and($dispatched)->toHaveCount(1)
             ->and($dispatched->first()[0]->aggregateId()->value())->toBe(1);
+    });
+});
+
+describe('a row deleted after the aggregate was loaded', function (): void {
+    it('marks a new aggregate as persisted once it is inserted', function (): void {
+        $counter = CounterTestSubject::create('one');
+
+        expect($counter->isPersisted())->toBeFalse();
+
+        counterRepository()->save($counter);
+
+        expect($counter->isPersisted())->toBeTrue();
+    });
+
+    it('refuses to save over a soft-deleted row instead of inserting a copy, even without a change', function (): void {
+        CounterTestModel::query()->create(['name' => 'one']);
+        $counter = counterRepository()->find(1);
+
+        CounterTestModel::query()->whereKey(1)->delete();
+
+        expect(fn () => counterRepository()->save($counter))->toThrow(ModelWasDeleted::class);
+        expect(CounterTestModel::withTrashed()->count())->toBe(1)
+            ->and($counter->id()->value())->toBe(1);
+    });
+
+    it('refuses to save a change over a soft-deleted row', function (): void {
+        CounterTestModel::query()->create(['name' => 'one']);
+        $counter = counterRepository()->find(1);
+        $counter->rename('two');
+
+        CounterTestModel::query()->whereKey(1)->delete();
+
+        expect(fn () => counterRepository()->save($counter))->toThrow(ModelWasDeleted::class);
+        expect(CounterTestModel::withTrashed()->count())->toBe(1)
+            ->and(CounterTestModel::withTrashed()->find(1)->name)->toBe('one');
+    });
+
+    it('reports a row deleted for good as EntityNotFound', function (): void {
+        CounterTestModel::query()->create(['name' => 'one']);
+        $counter = counterRepository()->find(1);
+
+        CounterTestModel::query()->whereKey(1)->forceDelete();
+
+        expect(fn () => counterRepository()->save($counter))->toThrow(EntityNotFound::class);
+        expect(CounterTestModel::withTrashed()->count())->toBe(0);
+    });
+
+    it('does not resurrect the row of a model without soft deletes', function (): void {
+        $id = seedAggregateRow('Original');
+        $aggregate = aggregateRepository()->find($id);
+        $aggregate->rename('Renamed');
+
+        AggregateTestModel::query()->whereKey($id->value())->delete();
+
+        expect(fn () => aggregateRepository()->save($aggregate))->toThrow(EntityNotFound::class);
+        expect(AggregateTestModel::query()->count())->toBe(0);
+    });
+
+    it('refuses to remove a soft-deleted row', function (): void {
+        CounterTestModel::query()->create(['name' => 'one']);
+        $counter = counterRepository()->find(1);
+
+        CounterTestModel::query()->whereKey(1)->delete();
+
+        expect(fn () => counterRepository()->remove($counter))->toThrow(ModelWasDeleted::class);
+    });
+
+    it('refuses to remove a row deleted for good and dispatches none of its events', function (): void {
+        $id = seedAggregateRow('Original');
+        $aggregate = aggregateRepository()->find($id);
+        $aggregate->rename('About to go');
+
+        AggregateTestModel::query()->whereKey($id->value())->delete();
+        Event::fake();
+
+        expect(fn () => aggregateRepository()->remove($aggregate))->toThrow(EntityNotFound::class);
+        Event::assertNotDispatched(AggregateTestRenamed::class);
     });
 });

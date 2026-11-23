@@ -699,6 +699,24 @@ describe('serialization and hydration', function (): void {
             ->and($entity->persistedVersion())->toBe(5);
     });
 
+    it('is new until it is hydrated from a stored row', function (): void {
+        $entity = new EntityTestSubject(EntityTestId::generate(), 'Fresh');
+
+        expect($entity->isPersisted())->toBeFalse()
+            ->and(reconstituteSubject()->isPersisted())->toBeTrue();
+    });
+
+    it('stays new when hydrated from a model built in memory', function (): void {
+        $id = EntityTestId::generate();
+        $model = (new EntityTestModel)->forceFill(['id' => $id->value(), 'name' => 'Unsaved']);
+
+        $entity = new EntityTestSubject($id, 'Fresh');
+        $entity->hydrate($model);
+
+        expect($model->exists)->toBeFalse()
+            ->and($entity->isPersisted())->toBeFalse();
+    });
+
     it('reconstitutes an entity from model state', function (): void {
         $id = EntityTestId::generate();
         $createdAt = CarbonImmutable::now()->subDays(5);

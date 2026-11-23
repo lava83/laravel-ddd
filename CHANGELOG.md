@@ -2,6 +2,50 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v1.6.0 - 2026-11-23
+
+This release makes saving an aggregate whose row was deleted fail instead of inserting a copy. It also extends the read side: a facet can drop its own custom filter and count an SQL expression, and the token search reaches relations on another connection of the same database server.
+
+### Fixed
+
+- **Saving or removing an aggregate whose row was deleted after it was loaded now fails (#55, #67).** Before, `EntityMapper::findOrCreateModel()` fell back to a fresh model when the row was gone or soft-deleted:
+  
+  - `save()` inserted a copy: a new auto-increment id for an `Integer` identity, a duplicate-key `QueryException` or a silent resurrection for a `Uuid`.
+  - `remove()` failed with the generic `CantDeleteModel`.
+  
+  Now a loaded aggregate must find its row again, looked up past the soft-delete scope. A deleted row throws `Domain\Exceptions\EntityNotFound`, and a soft-deleted row throws the new `Infrastructure\Exceptions\ModelWasDeleted`. Both are thrown before anything is written or an event is dispatched.
+  
+- **`Entity::isPersisted()`** (new) tells the two cases apart. It is true for an entity hydrated from a stored row and after its first save. It is false for one built in memory.
+  
+
+### Added
+
+- **A facet can drop its own custom filter by type (#66, #68).** `FacetDefinition::column()` and `relation()` take an optional `$filterType`.
+  - While counting, a facet drops the requested filters on its target. With a filter type, it also drops the custom filters of that type, even when a client sends them without a target. Only the requested filters are reduced; the scope always applies in full.
+  - A built-in operator as filter type throws `CustomFilterNotValid`.
+  
+- **`Filter\Builder::withoutType(string ...$types)`** (new) returns a new builder without the custom filters of these types, whatever their target.
+- **Facets over an SQL expression (#65, #69).** `FacetDefinition::expression($key, Expression $expression, $filterTarget, $filterType = null, array $bindings = [])` counts the rows of the list per value of an expression, e.g. a `CASE WHEN … END` over several columns.
+  - The expression is raw SQL. Build it in code, never from client input, and pass varying values as `?` placeholders with `$bindings`.
+  - The new getters are `rawExpression()` and `bindings()`. `columnName()` throws a `LogicException` for an expression facet.
+  
+- **Search through a relation on another connection (#64, #70).** In a `TokenSearchFilterMethod`, the first relation of a search column may now be a `BelongsTo`, `HasOne` or `HasMany` on another connection.
+  - The column is matched with `whereIn()` and a subquery in which every table carries its database name, nested relations and pivot tables included.
+  - The related models keep their global scopes, so soft deletes still apply.
+  - Other relation types on another connection throw the new `RelationNotSearchable`.
+  - Both databases must be on one server and readable through the list's connection, which in practice means MySQL or MariaDB.
+  
+
+### Upgrade notes
+
+- `save()` and `remove()` of an aggregate whose row was deleted meanwhile now throw `EntityNotFound` or `ModelWasDeleted`. Code that relied on the silent insert, or that caught `CantDeleteModel` or a `QueryException` for this case, has to handle the new exceptions.
+- The check relies on `hydrate()`. A mapper whose `toEntity()` does not call it leaves its entities new and keeps the old behaviour.
+- An entity subclass that already declares a `$persisted` property or an `isPersisted()` method conflicts with the new members and has to rename them.
+- A search column through a relation on another connection used to fail, or to read a table of the same name in the list's database. It now works or throws `RelationNotSearchable`. Relations on the list's connection are unchanged.
+- No config changes, no new dependency.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v1.5.0...v1.6.0
+
 ## v1.5.0 - 2026-11-23
 
 This release adds `put()` to the HTTP client behind `ApiRepository`, for APIs that offer a write only as PUT.
@@ -107,6 +151,7 @@ protected function uniqueSortableFields(): array
 
 
 
+
 ```
 ### Changed
 
@@ -164,6 +209,7 @@ final class ListUsersRequest extends FormRequest
     protected function searchFilterType(): string { return UserSearchFilter::type(); }
     protected function facetEnum(): string { return UserFacet::class; }
 }
+
 
 
 
@@ -231,6 +277,7 @@ $facets->first()->toArray();
 
 
 
+
 ```
 - `FacetDefinition::column()` counts the rows per value of a column of the list model. `FacetDefinition::relation()` counts the distinct rows per value of a column of a `HasMany` or `BelongsToMany` relation on the same connection.
 - Each facet keeps the whole scope and every requested filter except its own. Pass the scope and the client's filters separately: the scope is never reduced.
@@ -255,6 +302,7 @@ final class B2cUserSearchFilter extends TokenSearchFilterMethod
         return ['email', 'data.firstname', 'data.lastname'];
     }
 }
+
 
 
 
@@ -292,6 +340,7 @@ $counter = Counter::create('one');      // records CounterCreated with id 0
 $repository->save($counter);
 
 // Listeners now receive CounterCreated with aggregateId() === $counter->id(), e.g. 1
+
 
 
 
@@ -350,6 +399,7 @@ final class Title extends ValueObject
         return [];
     }
 }
+
 
 
 
@@ -470,6 +520,7 @@ return $pages->fromResponse(
 
 
 
+
 ```
 - **`RelayedCursorPaginator`:** a `CursorPaginator` subclass built from items, page size and the `next` / `prev` tokens of the neighbouring pages. Nothing is derived from the items, so read models need no sort column. `Resource::collection($page)` produces `data`, `links` and `meta` as usual, with your own URLs.
 - **`RelayedCursor`:** keeps the token exactly as received. Laravel's `Cursor::encode()` rebuilds a token from decoded parameters, which is not guaranteed to give the same string back.
@@ -504,6 +555,7 @@ return ReadModelCursorPaginator::fromPage(
     $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
     fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
 );
+
 
 
 
@@ -587,6 +639,7 @@ public function validate(): array
 
 
 
+
 ```
 `isValid()` is unchanged (`validate() === []`).
 
@@ -609,6 +662,7 @@ $exceptions->render(function (DomainValidationException $e) {
         ? null
         : throw LaravelValidationException::withMessages($e->errors());
 });
+
 
 
 
@@ -777,6 +831,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -810,6 +865,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -875,6 +931,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 

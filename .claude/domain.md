@@ -164,7 +164,7 @@ Change tracking keys are prefixed: `collectChanges()` returns the diff of one ca
 
 What still cannot be seen is an **in-place mutation handed back as the same instance** — `$entity->members()->push(...)` followed by `syncMembers($entity->members())` compares the collection with itself. Build a new collection instead.
 
-`hydrate(Model $model)` pulls `created_at`, `updated_at` and `version` back off the row. The base mapper does **not** call it — it has no `toEntity()` at all, so calling `hydrate()` is the consuming mapper's job by convention. `Repository::syncEntityFromModel()` and `ApiRepository` call it again after a write. `hydrate()` ends clean: it empties `dirty` (including the `old_id`/`new_id` that `idFromPersistence()` records for a new key) and makes the hydrated `updatedAt` the baseline A → B → A returns to.
+`hydrate(Model $model)` pulls `created_at`, `updated_at` and `version` back off the row. The base mapper does **not** call it — it has no `toEntity()` at all, so calling `hydrate()` is the consuming mapper's job by convention. `Repository::syncEntityFromModel()` and `ApiRepository` call it again after a write. `hydrate()` ends clean: it empties `dirty` (including the `old_id`/`new_id` that `idFromPersistence()` records for a new key) and makes the hydrated `updatedAt` the baseline A → B → A returns to. It also sets `isPersisted()` from `$model->exists`: true for a row read from the database, after a save and for `RemoteModel::fromAttributes()`, false for a model built in memory. The base mapper relies on it to tell a new entity from one whose row was deleted after loading (see `.claude/infrastructure.md`, Mappers).
 
 ## Domain Events
 

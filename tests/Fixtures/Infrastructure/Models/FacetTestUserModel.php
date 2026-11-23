@@ -34,6 +34,7 @@ final class FacetTestUserModel extends Model
             Filter::field('branch_id', [FilterType::EQUAL, FilterType::IN]),
             Filter::field('status_id', [FilterType::EQUAL, FilterType::IN]),
             Filter::field('type_id', [FilterType::EQUAL, FilterType::IN]),
+            Filter::custom('$eqStatus'),
         );
     }
 
