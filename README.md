@@ -247,7 +247,7 @@ return new class extends Migration
 
 ### 4. Mapper
 
-The mapper is the single translation point between the domain and the database. `findOrCreateModelFillData()` (from the base mapper) loads or creates the row and fills the shared columns (`id`, `version`, timestamps) for you.
+The mapper is the single translation point between the domain and the database. `findOrCreateModelFillData()` (from the base mapper) loads or creates the row and fills the shared columns (`id`, `version`, timestamps) for you. It creates a row only for a new aggregate: one loaded from the database (`isPersisted()`, set by `hydrate()`) must find its row again. If that row was deleted after loading, saving or removing the aggregate throws `EntityNotFound`, or `ModelWasDeleted` when the row is soft-deleted, instead of inserting a copy.
 
 ```php
 <?php

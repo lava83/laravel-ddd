@@ -24,6 +24,11 @@ final class CounterTestRepository extends Repository
         return $model;
     }
 
+    public function remove(CounterTestSubject $aggregate): void
+    {
+        $this->deleteEntity($aggregate);
+    }
+
     public function find(int $id): ?CounterTestSubject
     {
         $model = CounterTestModel::query()->find($id);

@@ -338,6 +338,13 @@ describe('clone and serialization drop the event buffer', function (): void {
             ->and($restored->version())->toBe(3)
             ->and($restored->updatedAt()->getTimestamp())->toBe($updatedAt->getTimestamp());
     });
+
+    it('stays persisted across serialize/unserialize', function (): void {
+        /** @var AggregateTestSubject $restored */
+        $restored = unserialize(serialize(reconstituteAggregate()));
+
+        expect($restored->isPersisted())->toBeTrue();
+    });
 });
 
 describe('serialization visibility trap for a private subclass identity', function (): void {

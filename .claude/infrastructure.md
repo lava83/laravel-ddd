@@ -113,7 +113,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
 
 Base helpers, both `protected static`:
 
-- `findOrCreateModel(Entity $entity, string $modelClass)` — `findOr()` on the primary key, falling back to a fresh instance from the container.
+- `findOrCreateModel(Entity $entity, string $modelClass)` — `findOr()` on the primary key, falling back to a fresh instance from the container. The fallback is only for a new entity. One that `isPersisted()` (hydrated from a stored row) must find its row again: the lookup ignores the soft-delete scope and throws `Domain\Exceptions\EntityNotFound` when the row is gone and `Exceptions\ModelWasDeleted` when it is soft-deleted. Without this, a row deleted after loading came back as a fresh model and `saveEntity()` inserted a copy (#55). A mapper that never calls `hydrate()` leaves its entities new and keeps the old fallback.
 - `findOrCreateModelFillData(Entity $entity, string $modelClass, array $data)` — the above, plus `fill()` with `id`, `version`, `created_at`, `updated_at` merged in front of `$data`.
 
 The base class has no `toEntity()` — hydration direction is entirely yours, including calling `Entity::hydrate()` and handling `$deep`.
@@ -139,6 +139,7 @@ The base gives you protected building blocks; the public read/write surface is y
 - `saveEntity(Aggregate): Model` — maps to a model, persists **only if the aggregate is dirty or the row is new**, re-hydrates the aggregate, then runs the `syncDependencies()` hook, and finally dispatches the aggregate's uncommitted events
 - `syncDependencies(Aggregate, Model)` — **no-op extension hook** run inside `saveEntity()` after the row is persisted and *before* events dispatch; override it to persist dependent rows (child records, pivot rows) that belong to the same write. See the Rules below.
 - `deleteEntity(Aggregate)`, `deleteEntities(Collection)`, `deleteRelatedEntity(Aggregate, string $relation, int|string $relatedId)`
+- Saving or deleting an aggregate whose row was deleted after it was loaded throws `EntityNotFound` (row gone) or `ModelWasDeleted` (row soft-deleted) from `makeModel()`, before anything is written or dispatched, even for a clean aggregate. Restoring a trashed row is the caller's explicit decision, never a side effect of `save()`.
 - `updateWithVersionGuard(Aggregate, Model)`, `dispatchUncommittedEvents(Aggregate)`, `syncEntityFromModel(Aggregate, Model)`, `makeModel(Aggregate): Model`
 - `entityMapper(): EntityMapper`
 
@@ -369,7 +370,7 @@ Tests: `tests/Foundation/Infrastructure/Http/**`, `tests/Foundation/Infrastructu
 
 | Namespace | Class |
 | --- | --- |
-| `Infrastructure\Exceptions` | `CantSaveModel`, `CantDeleteModel`, `CantDeleteRelatedModel`, `ConcurrencyException` |
+| `Infrastructure\Exceptions` | `CantSaveModel`, `CantDeleteModel`, `CantDeleteRelatedModel`, `ConcurrencyException`, `ModelWasDeleted` |
 | `Infrastructure\Mappers\Exceptions` | `NoMapperFoundForEntity` |
 | `Infrastructure\Models\Exceptions` | `EntityClassNotAvailable` |
 | `Infrastructure\Models\Facets\Exceptions` | `FacetNotCountable` |
