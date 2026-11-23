@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\SortField;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\ListRequests;
+use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\NullableSortListRequest;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\SortedListRequest;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\UniqueSortListRequest;
 
@@ -84,5 +85,33 @@ describe('AcceptsSort', function (): void {
     it('names the duplicate field', function (): void {
         expect(ListRequests::errors(SortedListRequest::class, ['sort' => ['-name', 'name']]))
             ->toBe(['sort' => ['The sort holds "name" more than once.']]);
+    });
+
+    it('carries the nullable columns and relation fields of the request', function (): void {
+        $sort = ListRequests::resolve(NullableSortListRequest::class, ['sort' => ['-owner_name', 'score', 'rank']])->sort();
+        [$owner, $score, $rank] = $sort->fields();
+
+        expect([$owner->toString(), $owner->relation(), $owner->isNullable()])->toBe(['-owner_name', 'owner.name', true])
+            ->and([$score->toString(), $score->relation(), $score->isNullable()])->toBe(['score', null, true])
+            ->and([$rank->toString(), $rank->relation(), $rank->isNullable()])->toBe(['rank', null, false])
+            ->and($sort->nullableCursorParameters())->toBe(['owner_name', 'score']);
+    });
+
+    it('does not end the sort at a unique field that may hold NULL', function (): void {
+        $sort = ListRequests::resolve(NullableSortListRequest::class, ['sort' => ['email', 'rank']])->sort();
+
+        expect($sort->cursorParameters())->toBe(['email', 'rank', 'id']);
+    });
+
+    it('declares no nullable column and no relation field by default', function (): void {
+        $sort = ListRequests::resolve(SortedListRequest::class, ['sort' => ['rank']])->sort();
+
+        expect($sort->nullableCursorParameters())->toBe([])
+            ->and($sort->fields()[0]->relation())->toBeNull();
+    });
+
+    it('accepts a relation field by its name and rejects its relation path', function (): void {
+        expect(ListRequests::errors(NullableSortListRequest::class, ['sort' => ['-owner_name']]))->toBe([])
+            ->and(ListRequests::errors(NullableSortListRequest::class, ['sort' => ['owner.name']]))->toHaveKey('sort.0');
     });
 });

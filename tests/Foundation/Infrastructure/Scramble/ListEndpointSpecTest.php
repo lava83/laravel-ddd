@@ -83,7 +83,7 @@ describe('The OpenAPI spec of a list endpoint', function (): void {
         expect($this->parameters['sort[]']['description'])->toStartWith('The fields to sort by')
             ->and($this->parameters['sort[]']['schema'])->toEqual([
                 'type' => 'array',
-                'items' => ['type' => 'string', 'enum' => ['rank', '-rank', 'name', '-name', 'happened_at', '-happened_at']],
+                'items' => ['type' => 'string', 'enum' => ['rank', '-rank', 'name', '-name', 'happened_at', '-happened_at', 'owner_name', '-owner_name']],
                 'minItems' => 1,
                 'uniqueItems' => true,
             ]);
@@ -156,7 +156,7 @@ describe('The OpenAPI spec of a list endpoint in every API', function (): void {
             ->toEqualCanonicalizing(['per_page', 'cursor', 'filters', 'sort[]', 'search', 'facets[]'])
             ->and($parameters['sort[]']['description'])->toStartWith('The fields to sort by')
             ->and($parameters['sort[]']['schema'])->not->toHaveKey('enum')
-            ->and($parameters['sort[]']['schema']['items']['enum'])->toBe(['rank', '-rank', 'name', '-name', 'happened_at', '-happened_at'])
+            ->and($parameters['sort[]']['schema']['items']['enum'])->toBe(['rank', '-rank', 'name', '-name', 'happened_at', '-happened_at', 'owner_name', '-owner_name'])
             ->and($parameters['filters']['description'])->toStartWith('The filters of the list')
             ->and($parameters['filters']['schema'])->toHaveKey('anyOf');
     })->with([

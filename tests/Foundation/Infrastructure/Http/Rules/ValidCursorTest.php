@@ -7,11 +7,12 @@ use Lava83\LaravelDdd\Infrastructure\Http\Rules\ValidCursor;
 
 /**
  * @param  list<string>|null  $parameters
+ * @param  list<string>  $nullable
  * @return array<string, array<int, string>>
  */
-function cursorErrors(mixed $cursor, ?array $parameters): array
+function cursorErrors(mixed $cursor, ?array $parameters, array $nullable = []): array
 {
-    return validator(['cursor' => $cursor], ['cursor' => [new ValidCursor($parameters)]])->errors()->toArray();
+    return validator(['cursor' => $cursor], ['cursor' => [new ValidCursor($parameters, $nullable)]])->errors()->toArray();
 }
 
 describe('ValidCursor', function (): void {
@@ -55,4 +56,12 @@ describe('ValidCursor', function (): void {
         'null' => [null],
         'an array' => [[1, 2]],
     ]);
+
+    it('accepts NULL for a parameter that may be NULL, and only for it', function (): void {
+        expect(cursorErrors((new Cursor(['score' => null, 'id' => 3]))->encode(), ['score', 'id'], ['score']))->toBe([])
+            ->and(cursorErrors((new Cursor(['score' => 2, 'id' => null]))->encode(), ['score', 'id'], ['score']))
+            ->toBe(['cursor' => ['The cursor is not a valid cursor.']])
+            ->and(cursorErrors((new Cursor(['score' => [1], 'id' => 3]))->encode(), ['score', 'id'], ['score']))
+            ->toBe(['cursor' => ['The cursor is not a valid cursor.']]);
+    });
 });
