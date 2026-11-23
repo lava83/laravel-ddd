@@ -882,3 +882,62 @@ describe('Builder without', function () {
             ]);
     });
 });
+
+describe('Builder withoutType', function () {
+    it('removes the custom filters of the type, with and without a target', function () {
+        $requested = Builder::make()
+            ->custom('$eqLinkedUsers', 'b2b')
+            ->custom('$eqLinkedUsers', 'b2c', 'linked_users')
+            ->eq('status', 'active');
+
+        expect($requested->withoutType('$eqLinkedUsers')->toArray())->toBe([
+            ['type' => '$eq', 'target' => 'status', 'value' => 'active'],
+        ]);
+    });
+
+    it('keeps built-in filters, even when named by their operator', function () {
+        $requested = Builder::make()->eq('status', 'active')->in('type', ['a']);
+
+        expect($requested->withoutType('$eq', '$in')->toArray())->toBe($requested->toArray());
+    });
+
+    it('removes the custom filters of several types at once', function () {
+        $requested = Builder::make()
+            ->custom('$search', 'müller')
+            ->custom('$hasService', 1, 'services')
+            ->custom('$eqLinkedUsers', 'b2b');
+
+        expect($requested->withoutType('$search', '$eqLinkedUsers')->toArray())->toBe([
+            ['type' => '$hasService', 'target' => 'services', 'value' => 1],
+        ]);
+    });
+
+    it('treats an unknown type as a no-op', function () {
+        $requested = Builder::make()->custom('$search', 'müller')->eq('status', 'active');
+
+        expect($requested->withoutType('$unknown')->toArray())->toBe($requested->toArray());
+    });
+
+    it('returns a new builder and leaves the original unchanged', function () {
+        $requested = Builder::make()->custom('$search', 'müller');
+
+        $result = $requested->withoutType('$search');
+        $result->eq('status', 'active');
+
+        expect($result)->not->toBe($requested)
+            ->and($requested->toArray())->toBe([
+                ['type' => '$search', 'value' => 'müller'],
+            ]);
+    });
+
+    it('returns an equal but independent copy without arguments', function () {
+        $requested = Builder::make()->custom('$search', 'müller');
+
+        $copy = $requested->withoutType();
+        $copy->eq('status', 'active');
+
+        expect($copy)->not->toBe($requested)
+            ->and($copy)->toHaveCount(2)
+            ->and($requested)->toHaveCount(1);
+    });
+});

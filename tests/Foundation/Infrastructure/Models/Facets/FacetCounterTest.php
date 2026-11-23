@@ -12,6 +12,7 @@ use Lava83\LaravelDdd\Infrastructure\Models\Facets\Exceptions\FacetNotCountable;
 use Lava83\LaravelDdd\Infrastructure\Models\Facets\FacetCounter;
 use Lava83\LaravelDdd\Infrastructure\Models\Facets\FacetDefinition;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder;
+use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Filters\FacetTestStatusFilter;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Models\FacetTestNoteModel;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Models\FacetTestServiceModel;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Models\FacetTestUserModel;
@@ -44,6 +45,8 @@ function facetCounts(Collection $facets): array
  */
 beforeEach(function (): void {
     config()->set('database.connections.facet_test_remote', ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']);
+    // FacetTestUserModel allows `$eqStatus`; eloquent-filtering needs its class for every filtered query.
+    config()->set('eloquent-filtering.custom_filters', [FacetTestStatusFilter::class]);
 
     foreach (['facet_test_service_user', 'facet_test_services', 'facet_test_notes', 'facet_test_users'] as $table) {
         Schema::dropIfExists($table);
@@ -361,5 +364,51 @@ describe('FacetCounter queries', function (): void {
 
     it('returns an empty collection without definitions', function (): void {
         expect(FacetCounter::count(facetTestBaseQuery(...), Builder::make(), Builder::make()))->toBeEmpty();
+    });
+});
+
+describe('FacetCounter custom filter types', function (): void {
+    it("drops the facet's own custom filter, sent with or without a target", function (?string $target): void {
+        $facets = FacetCounter::count(
+            facetTestBaseQuery(...),
+            Builder::make(),
+            Builder::make()->custom('$eqStatus', 1, $target),
+            FacetDefinition::column('status', 'status_id', 'status', '$eqStatus'),
+            FacetDefinition::column('type', 'type_id'),
+        );
+
+        expect(facetCounts($facets))->toBe([
+            // $eqStatus is dropped: anna, bert, carl, dora, erik
+            'status' => [
+                ['value' => null, 'count' => 1],
+                ['value' => 1, 'count' => 2],
+                ['value' => 2, 'count' => 2],
+            ],
+            // $eqStatus = 1 stays: anna, bert
+            'type' => [
+                ['value' => 1, 'count' => 1],
+                ['value' => 2, 'count' => 1],
+            ],
+        ]);
+    })->with([
+        'without a target' => [null],
+        'with the facet target' => ['status'],
+        'with another target' => ['linked'],
+    ]);
+
+    it('keeps a scope filter of the same custom type', function (): void {
+        $facets = FacetCounter::count(
+            facetTestBaseQuery(...),
+            Builder::make()->custom('$eqStatus', 2),
+            Builder::make()->custom('$eqStatus', 1),
+            FacetDefinition::column('status', 'status_id', filterType: '$eqStatus'),
+        );
+
+        // Only the requested $eqStatus = 1 is dropped; the scope keeps carl and erik.
+        expect(facetCounts($facets))->toBe([
+            'status' => [
+                ['value' => 2, 'count' => 2],
+            ],
+        ]);
     });
 });
