@@ -921,6 +921,25 @@ FacetDefinition::relation('services', 'services', 'id');  // filter target: serv
 FacetDefinition::column('status', 'status_id', filterType: '$statusIn');
 ```
 
+- `expression($key, $expression, $filterTarget, $filterType = null, $bindings = [])` counts the rows of the list model per value of an SQL expression, for tabs that are not the values of one column. The filter target is required, because there is no column to default to. Buckets, ordering, the null bucket, scope and requested filters work as for a column facet, and so does the join rule below. Values that can vary go in as `?` placeholders with `$bindings`.
+
+```php
+use Illuminate\Support\Facades\DB;
+
+FacetDefinition::expression('linked_users', DB::raw(
+    "CASE
+        WHEN accounts.user_customer_id IS NOT NULL AND accounts.user_service_id IS NOT NULL THEN 'both'
+        WHEN accounts.user_customer_id IS NOT NULL THEN 'b2b'
+        WHEN accounts.user_service_id IS NOT NULL THEN 'b2c'
+        ELSE 'none'
+    END",
+), 'linked_users', filterType: '$eqLinkedUsers');
+
+FacetDefinition::expression('violating', DB::raw('accounts.policy_violation_score > ?'), 'violating', bindings: [0]);
+```
+
+> **The expression is raw SQL and goes into the query as written.** Build it in code, never from request input: anyone who controls it can read any table the connection can read, through a subquery in the bucket values. Put every value that can vary into `$bindings` instead of concatenating it, and qualify columns with their table once the base query joins. Clients only pick facets by key (`facets[]`); they never supply a definition.
+
 **Counting.** `FacetCounter::count(Closure $baseQuery, Builder $scope, Builder $requested, FacetDefinition ...$facets)` returns a `Collection<int, FacetReadModel>` in the order of the definitions.
 
 - `$baseQuery` is a `Closure(Filter\Builder): Eloquent\Builder`: the base query of the list page, including `->filter($filter->toArray())`. Eager loads, ordering, limit and offset are dropped before grouping.
