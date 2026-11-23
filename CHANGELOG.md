@@ -2,6 +2,30 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v1.4.3 - 2026-11-20
+
+This release fixes the change tracking of entities and aggregates: a behaviour that changed nothing could make `save()` drop an earlier change of the same instance.
+
+### Fixed
+
+- **Earlier changes are no longer lost (#56).** `collectChanges()` reset the dirty state on every call, so a behaviour without change (e.g. `activate()` on an active aggregate) wiped the changes of an earlier one. `Repository::saveEntity()` then saw a clean aggregate and skipped the write, the event of the lost change was dispatched anyway, and `version()` ran ahead of the row. `dirty()` is now the sum of every change since the entity was last clean (constructed, hydrated or saved): the first `old_*` value of a property stays, the last `new_*` value wins, and a call without change adds nothing and takes nothing away.
+- **A → B → A is no change.** A property set back to its first `old_*` value drops out of `dirty()`. Once nothing is left, `version()` returns to `persistedVersion()` and `updatedAt()` to its value at the last clean point, so `save()` writes nothing. The events of those calls are still recorded and dispatched.
+- **A rejected update keeps earlier changes.** When an update violates an invariant, only that call is rolled back; the changes of earlier calls stay dirty. Before, the `ValidationException` branch cleared all of them.
+- **`hydrate()` ends clean.** After a save, the aggregate is no longer left dirty with the `old_id`/`new_id` of a database-assigned key.
+
+### Unchanged
+
+- The return value of `updateEntity()`, and with it the payload of an event built from `$eventClass` in `updateAggregateRoot()`, is still the diff of that one call.
+
+### Upgrade notes
+
+- No action required for code that changes state through `updateEntity()` / `updateAggregateRoot()`.
+- `dirty()` now holds the accumulated changes, not only those of the last call. Code that reads it after several behaviours sees all of them.
+- `collectChanges()` (protected) no longer resets and fills the dirty state; it only returns the diff. If you call it directly and rely on that side effect, go through `updateEntity()` instead.
+- The workaround of returning early from every behaviour that would change nothing is no longer needed. It is harmless to keep.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v1.4.2...v1.4.3
+
 ## v1.4.2 - 2026-11-20
 
 This release changes no package code. CI now runs on PHP 8.6 as well, and the test suite passes with Scramble 0.13.53 and later.
@@ -61,6 +85,7 @@ protected function uniqueSortableFields(): array
 {
     return ['email'];
 }
+
 
 
 
@@ -125,6 +150,7 @@ final class ListUsersRequest extends FormRequest
 
 
 
+
 ```
 - `PaginatesByCursor`: `per_page` (1–200, default 50, overridable) and `cursor`. The cursor must carry exactly the parameters of the order of the list, so a cursor issued for another sort is a 422 on `cursor` instead of an `UnexpectedValueException` in the read query.
 - `AcceptsFilters`: `filters` as a JSON string or a bracket-notation query array, read with `filters()`. JSON is decoded before the rules run, so rules of the request on `filters.*` apply to both forms. Where both forms meet, the JSON string wins.
@@ -184,6 +210,7 @@ $facets->first()->toArray();
 
 
 
+
 ```
 - `FacetDefinition::column()` counts the rows per value of a column of the list model. `FacetDefinition::relation()` counts the distinct rows per value of a column of a `HasMany` or `BelongsToMany` relation on the same connection.
 - Each facet keeps the whole scope and every requested filter except its own. Pass the scope and the client's filters separately: the scope is never reduced.
@@ -208,6 +235,7 @@ final class B2cUserSearchFilter extends TokenSearchFilterMethod
         return ['email', 'data.firstname', 'data.lastname'];
     }
 }
+
 
 
 
@@ -243,6 +271,7 @@ $counter = Counter::create('one');      // records CounterCreated with id 0
 $repository->save($counter);
 
 // Listeners now receive CounterCreated with aggregateId() === $counter->id(), e.g. 1
+
 
 
 
@@ -299,6 +328,7 @@ final class Title extends ValueObject
         return [];
     }
 }
+
 
 
 
@@ -415,6 +445,7 @@ return $pages->fromResponse(
 
 
 
+
 ```
 - **`RelayedCursorPaginator`:** a `CursorPaginator` subclass built from items, page size and the `next` / `prev` tokens of the neighbouring pages. Nothing is derived from the items, so read models need no sort column. `Resource::collection($page)` produces `data`, `links` and `meta` as usual, with your own URLs.
 - **`RelayedCursor`:** keeps the token exactly as received. Laravel's `Cursor::encode()` rebuilds a token from decoded parameters, which is not guaranteed to give the same string back.
@@ -449,6 +480,7 @@ return ReadModelCursorPaginator::fromPage(
     $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
     fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
 );
+
 
 
 
@@ -528,6 +560,7 @@ public function validate(): array
 
 
 
+
 ```
 `isValid()` is unchanged (`validate() === []`).
 
@@ -550,6 +583,7 @@ $exceptions->render(function (DomainValidationException $e) {
         ? null
         : throw LaravelValidationException::withMessages($e->errors());
 });
+
 
 
 
@@ -714,6 +748,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -747,6 +782,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -810,6 +846,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 

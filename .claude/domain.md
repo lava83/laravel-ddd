@@ -149,18 +149,22 @@ final class Article extends Aggregate
 
 State changes go through two **protected** helpers — they are internal machinery, not public API:
 
-- `protected Entity::updateEntity(array $changes): Collection` — diffs, applies, then runs `validate()`; only if that passes does it bump version and `updatedAt`. A violated invariant rolls the `old_*` values back (through `applyChanges()`, so only promoted properties), clears `dirty` and throws `ValidationException` — the entity stays as it was. Returns the dirty collection, or an empty one if nothing changed. `idFromPersistence()` runs through the same gate.
+- `protected Entity::updateEntity(array $changes): Collection` — diffs, applies, then runs `validate()`; only if that passes does it bump version and `updatedAt`. A violated invariant rolls the `old_*` values back (through `applyChanges()`, so only promoted properties), leaves `dirty` as it was and throws `ValidationException` — the entity stays as it was, including the changes of earlier calls. Returns the diff of this call, or an empty one if nothing changed. `idFromPersistence()` runs through the same gate.
 - `protected Aggregate::updateAggregateRoot(array $changes, ?string $eventClass = null, ?DomainEvent $event = null): void` — same, plus records an event. Use this in aggregate roots. A rejected change records no event. (The `$eventClass` guard still fires *after* the change was applied — a separate, known non-atomicity.)
 
 **Gotcha:** `applyChanges()` reflects over the constructor and only writes **promoted** constructor properties. A property declared in the class body instead of the constructor signature is silently skipped, and `version`, `createdAt`, `updatedAt`, `domainEvents` are always excluded.
 
-Change tracking keys are prefixed: `collectChanges()` writes `old_{property}` and `new_{property}` into `dirty`. `hasChanged()` special-cases `Collection` (element by element, see below), `CarbonImmutable` (timestamp *and* timezone), `Entity` (via `equals()`), `BackedEnum` (via `->value`) and `Stringable` (string cast), in that order.
+Change tracking keys are prefixed: `collectChanges()` returns the diff of one call as `old_{property}` and `new_{property}` and does not touch `dirty`.
+
+**`dirty` is the sum of every change since the entity was last clean** (constructed, hydrated or saved), not the diff of the last call. `updateEntity()` merges each accepted diff into it: the first `old_*` of a property stays, the last `new_*` wins, and a call that changes nothing adds nothing and takes nothing away. A property back at its first `old_*` value drops out (A → B → A is no change); once `dirty` is empty again, `version` returns to `persistedVersion` and `updatedAt` to its value at the last clean point, so `Repository::saveEntity()` skips the write and the aggregate does not run ahead of its row. The events of such calls are still recorded and dispatched.
+
+`hasChanged()` special-cases `Collection` (element by element, see below), `CarbonImmutable` (timestamp *and* timezone), `Entity` (via `equals()`), `BackedEnum` (via `->value`) and `Stringable` (string cast), in that order.
 
 **A `Collection` property is compared by content.** Keys and their order count, and each element goes through the same type rules — with one exception: an **entity element is compared by its state, not by its identity**. A child collection is normally rebuilt as a whole from input (`update(name, scopes, description)`), and children built that way carry no identity yet; comparing them by identity would mark every such collection dirty, overwrite the reconstituted children with transient ones and leave the repository re-inserting rows that already exist. The trade-off is the mirror image: swapping a child for another one with identical state is not a change. The identity itself is excluded from the comparison via `comparableState()`, which a child entity may override.
 
 What still cannot be seen is an **in-place mutation handed back as the same instance** — `$entity->members()->push(...)` followed by `syncMembers($entity->members())` compares the collection with itself. Build a new collection instead.
 
-`hydrate(Model $model)` pulls `created_at`, `updated_at` and `version` back off the row. The base mapper does **not** call it — it has no `toEntity()` at all, so calling `hydrate()` is the consuming mapper's job by convention. `Repository::syncEntityFromModel()` calls it again after save.
+`hydrate(Model $model)` pulls `created_at`, `updated_at` and `version` back off the row. The base mapper does **not** call it — it has no `toEntity()` at all, so calling `hydrate()` is the consuming mapper's job by convention. `Repository::syncEntityFromModel()` and `ApiRepository` call it again after a write. `hydrate()` ends clean: it empties `dirty` (including the `old_id`/`new_id` that `idFromPersistence()` records for a new key) and makes the hydrated `updatedAt` the baseline A → B → A returns to.
 
 ## Domain Events
 
@@ -185,7 +189,7 @@ final readonly class ArticleRenamed extends DomainEvent
 }
 ```
 
-When you pass `$eventClass` to `updateAggregateRoot()`, it is instantiated as `new $eventClass($this->id(), $changesCollection)` — the payload is the dirty collection with its `old_`/`new_` keys. Need a different payload? Build the event yourself and pass it as the third argument.
+When you pass `$eventClass` to `updateAggregateRoot()`, it is instantiated as `new $eventClass($this->id(), $changesCollection)` — the payload is the diff of this call with its `old_`/`new_` keys, not the accumulated `dirty`. Need a different payload? Build the event yourself and pass it as the third argument.
 
 `withAggregateId(Id $aggregateId): static` is declared by the contract and returns a copy for another identity of the same aggregate, keeping payload, version and `occurredOn`. In the base class, because the `final` constructor resets `occurredOn`, the copy is built with `newInstanceWithoutConstructor()` and its `readonly` properties are initialised by reflection. An event that implements the contract directly must provide its own (see `UPGRADING.md`). `Aggregate::idFromPersistence()` uses it to move buffered events onto a persisted key (see Identities).
 

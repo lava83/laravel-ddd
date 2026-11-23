@@ -48,6 +48,12 @@ abstract class Entity implements Stringable
     protected Collection $dirty;
 
     /**
+     * updatedAt as of the last clean state (construction, load or save).
+     * Protected, not private: Aggregate::__sleep() can only name what it sees.
+     */
+    protected ?CarbonImmutable $cleanUpdatedAt = null;
+
+    /**
      * @throws ValidationException
      */
     public function __construct(
@@ -62,7 +68,7 @@ abstract class Entity implements Stringable
             throw ValidationException::fromArray($errors);
         }
 
-        $this->dirty = collect();
+        $this->markClean();
     }
 
     /**
@@ -180,6 +186,9 @@ abstract class Entity implements Stringable
             $this->version = (int) $versionOnModel;
             $this->persistedVersion = (int) $versionOnModel;
         }
+
+        // The entity now matches the model: nothing is left to persist.
+        $this->markClean();
     }
 
     /**
@@ -332,7 +341,7 @@ abstract class Entity implements Stringable
      * Helper method for child entities to update themselves
      *
      * @param  Collection<string, EntityPropertyValue>|array{}|array<string, EntityPropertyValue>  $changes  Key-value pairs of changes made to the aggregate
-     * @return Collection<string, EntityPropertyValue>
+     * @return Collection<string, EntityPropertyValue> The diff of this call; dirty() holds every change since the entity was last clean
      *
      * @throws ReflectionException
      * @throws ValidationException When the changed state violates an invariant; the entity is left untouched
@@ -351,14 +360,48 @@ abstract class Entity implements Stringable
 
         if ($errors !== []) {
             $this->applyChanges($this->reverted($changes));
-            $this->resetDirty();
 
             throw ValidationException::fromArray($errors);
         }
 
         $this->touch();
+        $this->mergeIntoDirty($changes);
 
         return $changes;
+    }
+
+    /**
+     * Adds the diff of one updateEntity() call to the dirty state: the first
+     * old_ value of a property stays, the last new_ value wins. A property back
+     * at its first old_ value drops out, and once none is left, version and
+     * updatedAt return to their clean values, so A -> B -> A leaves no trace.
+     *
+     * @param  Collection<string, EntityPropertyValue>  $changes
+     */
+    private function mergeIntoDirty(Collection $changes): void
+    {
+        foreach ($changes as $key => $newValue) {
+            if (! str_starts_with($key, 'new_')) {
+                continue;
+            }
+
+            $property = substr($key, 4);
+            $original = $this->dirty->has('old_'.$property)
+                ? $this->dirty->get('old_'.$property)
+                : $changes->get('old_'.$property);
+
+            if ($this->hasChanged($original, $newValue)) {
+                $this->dirty->put('old_'.$property, $original);
+                $this->dirty->put('new_'.$property, $newValue);
+            } else {
+                $this->dirty->forget(['old_'.$property, 'new_'.$property]);
+            }
+        }
+
+        if ($this->dirty->toArray() === []) {
+            $this->version = $this->persistedVersion;
+            $this->updatedAt = $this->cleanUpdatedAt;
+        }
     }
 
     /**
@@ -376,7 +419,8 @@ abstract class Entity implements Stringable
     }
 
     /**
-     * Collects changes between current entity state and new values
+     * Collects changes between current entity state and new values, without
+     * touching the dirty state
      *
      * @param  array<string, EntityPropertyValue>  $newValues  Key-value pairs of new values to compare
      * @return Collection<string, EntityPropertyValue> Collection of changes with 'old_' and 'new_' prefixes
@@ -385,18 +429,19 @@ abstract class Entity implements Stringable
      */
     protected function collectChanges(array $newValues): Collection
     {
-        $this->resetDirty();
+        /** @var Collection<string, EntityPropertyValue> $changes */
+        $changes = collect();
 
         foreach ($newValues as $property => $newValue) {
             $currentValue = $this->getPropertyValue($property);
 
             if ($this->hasChanged($currentValue, $newValue)) {
-                $this->dirty->put('old_'.$property, $currentValue);
-                $this->dirty->put('new_'.$property, $newValue);
+                $changes->put('old_'.$property, $currentValue);
+                $changes->put('new_'.$property, $newValue);
             }
         }
 
-        return $this->dirty;
+        return $changes;
     }
 
     protected function hasChanged(mixed $current, mixed $new): bool
@@ -572,9 +617,10 @@ abstract class Entity implements Stringable
         }
     }
 
-    private function resetDirty(): void
+    private function markClean(): void
     {
         $this->dirty = collect();
+        $this->cleanUpdatedAt = $this->updatedAt;
     }
 
     /**
