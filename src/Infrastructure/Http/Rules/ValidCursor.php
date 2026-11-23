@@ -18,14 +18,18 @@ use Lava83\LaravelDdd\Infrastructure\Models\Sort\Sort;
  * A cursor of the same columns in another direction passes: Laravel's cursor
  * does not record the direction. The page then starts at the cursor row in the
  * new direction.
+ *
+ * NULL passes only for a parameter of a field that may hold NULL.
  */
 final readonly class ValidCursor implements ValidationRule
 {
     /**
      * @param  list<string>|null  $parameters  the parameters of the order, see {@see Sort::cursorParameters()}; null only checks that the cursor decodes
+     * @param  list<string>  $nullable  the parameters that may be NULL, see {@see Sort::nullableCursorParameters()}
      */
     public function __construct(
         private ?array $parameters = null,
+        private array $nullable = [],
     ) {}
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
@@ -56,8 +60,8 @@ final readonly class ValidCursor implements ValidationRule
             return;
         }
 
-        foreach ($carried as $carriedValue) {
-            if (! is_scalar($carriedValue)) {
+        foreach ($carried as $name => $carriedValue) {
+            if (! is_scalar($carriedValue) && ! ($carriedValue === null && in_array($name, $this->nullable, true))) {
                 $fail('The :attribute is not a valid cursor.');
 
                 return;
