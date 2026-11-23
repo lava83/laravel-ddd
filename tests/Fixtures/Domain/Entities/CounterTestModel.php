@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Tests\Fixtures\Domain\Entities;
 
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Lava83\LaravelDdd\Infrastructure\Models\Model;
 
 /**
@@ -13,10 +14,14 @@ use Lava83\LaravelDdd\Infrastructure\Models\Model;
  * database owns the key and Repository::handleAutoIncrementFields() has an
  * `int` key type to null out before insert.
  *
+ * Soft-deletes, so a test can trash the row behind a loaded aggregate.
+ *
  * @extends Model<CounterTestSubject>
  */
 final class CounterTestModel extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'counter_test_subjects';
 
     protected $fillable = ['name'];
