@@ -92,6 +92,25 @@ final readonly class Builder implements Countable
     }
 
     /**
+     * Return a new Builder without every custom filter whose type is one of
+     * `$types`, whatever its target, mutating neither operand.
+     *
+     * The counterpart of {@see self::without()} for a custom filter a client
+     * may send without a target. Meant for client filters only, like
+     * without(). Built-in filters are never removed, unknown types are a no-op,
+     * and no types return an equal copy.
+     */
+    public function withoutType(string ...$types): self
+    {
+        return new self(
+            $this->filters
+                ->reject(fn (FilterDefinition $filter): bool => $filter instanceof Custom
+                    && in_array($filter->identifier(), $types, true))
+                ->values(),
+        );
+    }
+
+    /**
      * Rebuild a Builder from the array shape produced by {@see self::toArray()}.
      *
      * Unknown types are rejected unless registered in
