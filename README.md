@@ -815,7 +815,17 @@ $requested->without('status_id')->toArray();
 
 Custom filters without a target are never removed, an unknown target is a no-op, and `without()` with no arguments returns an equal copy.
 
-> Call `without()` on client (request) filters only, never on a scope filter. A scope can use the same target as a facet (`branch_id`), and removing it widens what the caller sees.
+`withoutType(string ...$types)` removes custom filters by their type instead, whatever their target, so it also reaches the ones a client sends without a target. Built-in filters are never removed, even when named by their operator (`'$eq'`), and an unknown type is a no-op. Like `without()`, it returns a new `Builder`.
+
+```php
+$requested->withoutType('$b2cUserSearch')->toArray();
+// [
+//     ['type' => '$eq', 'target' => 'status_id', 'value' => 2],
+//     ['type' => '$in', 'target' => 'user_type_id', 'value' => [1, 3]],
+// ]
+```
+
+> Call `without()` and `withoutType()` on client (request) filters only, never on a scope filter. A scope can use the same target as a facet (`branch_id`), and removing it widens what the caller sees.
 
 ### Search
 
@@ -903,11 +913,18 @@ FacetDefinition::relation('services', 'services', 'id');  // filter target: serv
 
 - `column($key, $column, $filterTarget = null)` counts the rows of the list model per value of one of its columns. The filter target defaults to `$column`.
 - `relation($key, $relation, $column, $filterTarget = null)` counts the distinct rows of the list model per value of a column of a `HasMany` or `BelongsToMany` relation: a user with two services counts once for each. The filter target defaults to `$relation`. The related model must live on the list model's connection, otherwise `FacetNotCountable` is thrown. The list's keys go into a subquery, never through PHP memory.
+- Both take an optional `$filterType` last: the type of a custom filter that is the facet's own filter. A client may send a custom filter without a target, which the filter target cannot match, so the facet would keep its own filter and show only the selected bucket. A built-in operator as `$filterType` throws `CustomFilterNotValid`.
+
+```php
+// The status tabs filter with a custom filter the client sends without a target:
+// filters=[{"type":"$statusIn","value":[1,2]}] still counts every status.
+FacetDefinition::column('status', 'status_id', filterType: '$statusIn');
+```
 
 **Counting.** `FacetCounter::count(Closure $baseQuery, Builder $scope, Builder $requested, FacetDefinition ...$facets)` returns a `Collection<int, FacetReadModel>` in the order of the definitions.
 
 - `$baseQuery` is a `Closure(Filter\Builder): Eloquent\Builder`: the base query of the list page, including `->filter($filter->toArray())`. Eager loads, ordering, limit and offset are dropped before grouping.
-- Each facet is counted with `$scope->merge($requested->without($facet->filterTarget()))`: the whole scope, plus every requested filter except the facet's own. The status tabs therefore show how many rows each status holds under the current search and type filter.
+- Each facet is counted with `$scope->merge($requested->without($facet->filterTarget()))`, plus `->withoutType($facet->filterType())` when the facet names one: the whole scope, plus every requested filter except the facet's own. The status tabs therefore show how many rows each status holds under the current search and type filter.
 - **Keep the scope and the requested filters apart.** The scope (tenant, branch: what the caller may see at all) is never reduced. Merge the two before calling the counter, and a facet on `branch_id` drops the branch scope along with the client's branch filter.
 - A column facet groups the list query with `count(*)`, so the base query must not join a to-many table, or a row counts once per joined row. A relation facet groups the related rows with `count(distinct …)`, and the soft-delete scopes of both models stay active.
 
