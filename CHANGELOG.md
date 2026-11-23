@@ -2,6 +2,23 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v1.5.0 - 2026-11-23
+
+This release adds `put()` to the HTTP client behind `ApiRepository`, for APIs that offer a write only as PUT.
+
+### Added
+
+- **`ApiClient::put(string $path, array $data = []): Response` (#62).** Built like `patch()`: the payload goes out as JSON, and a failing status maps to the same `ApiException` subclasses as for every other verb. Before, a host could not add the verb in a subclass without copying the token handling and the failure mapping, because `send()` is private.
+- **PUT counts as a write and is never retried.** HTTP calls PUT idempotent, but without idempotency keys a repeated write could be applied twice, and the client cannot know whether the API behind it implements PUT idempotently. Only GETs are retried, as before.
+- A 401 behaves as for every other verb: with a `RefreshableAuthenticator` the token is dropped and the PUT is repeated once.
+
+### Upgrade notes
+
+- No action required. The change is additive: no other change to the public API, no config, no new dependency.
+- A subclass of `ApiClient` that already defines its own `put()` with a different signature conflicts with the new method and has to be aligned or renamed.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v1.4.3...v1.5.0
+
 ## v1.4.3 - 2026-11-20
 
 This release fixes the change tracking of entities and aggregates: a behaviour that changed nothing could make `save()` drop an earlier change of the same instance.
@@ -89,6 +106,7 @@ protected function uniqueSortableFields(): array
 
 
 
+
 ```
 ### Changed
 
@@ -146,6 +164,7 @@ final class ListUsersRequest extends FormRequest
     protected function searchFilterType(): string { return UserSearchFilter::type(); }
     protected function facetEnum(): string { return UserFacet::class; }
 }
+
 
 
 
@@ -211,6 +230,7 @@ $facets->first()->toArray();
 
 
 
+
 ```
 - `FacetDefinition::column()` counts the rows per value of a column of the list model. `FacetDefinition::relation()` counts the distinct rows per value of a column of a `HasMany` or `BelongsToMany` relation on the same connection.
 - Each facet keeps the whole scope and every requested filter except its own. Pass the scope and the client's filters separately: the scope is never reduced.
@@ -235,6 +255,7 @@ final class B2cUserSearchFilter extends TokenSearchFilterMethod
         return ['email', 'data.firstname', 'data.lastname'];
     }
 }
+
 
 
 
@@ -271,6 +292,7 @@ $counter = Counter::create('one');      // records CounterCreated with id 0
 $repository->save($counter);
 
 // Listeners now receive CounterCreated with aggregateId() === $counter->id(), e.g. 1
+
 
 
 
@@ -328,6 +350,7 @@ final class Title extends ValueObject
         return [];
     }
 }
+
 
 
 
@@ -446,6 +469,7 @@ return $pages->fromResponse(
 
 
 
+
 ```
 - **`RelayedCursorPaginator`:** a `CursorPaginator` subclass built from items, page size and the `next` / `prev` tokens of the neighbouring pages. Nothing is derived from the items, so read models need no sort column. `Resource::collection($page)` produces `data`, `links` and `meta` as usual, with your own URLs.
 - **`RelayedCursor`:** keeps the token exactly as received. Laravel's `Cursor::encode()` rebuilds a token from decoded parameters, which is not guaranteed to give the same string back.
@@ -480,6 +504,7 @@ return ReadModelCursorPaginator::fromPage(
     $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
     fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
 );
+
 
 
 
@@ -561,6 +586,7 @@ public function validate(): array
 
 
 
+
 ```
 `isValid()` is unchanged (`validate() === []`).
 
@@ -583,6 +609,7 @@ $exceptions->render(function (DomainValidationException $e) {
         ? null
         : throw LaravelValidationException::withMessages($e->errors());
 });
+
 
 
 
@@ -749,6 +776,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -782,6 +810,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -846,6 +875,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 
