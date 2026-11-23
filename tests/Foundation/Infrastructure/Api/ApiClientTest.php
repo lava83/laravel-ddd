@@ -94,6 +94,24 @@ describe('client credentials', function (): void {
             && $request->hasHeader('Authorization', 'Bearer fresh'));
     });
 
+    it('repeats a put once with a fresh token after a 401', function (): void {
+        Http::fake([
+            '*/v1/oauth/token' => Http::sequence()
+                ->push(['access_token' => 'stale'])
+                ->push(['access_token' => 'fresh']),
+            '*/v1/ping' => Http::sequence()->push([], 401)->push(['data' => 'ok']),
+        ]);
+
+        $response = oauthClient()->put('v1/ping', ['assignable' => true]);
+
+        expect($response->json('data'))->toBe('ok')
+            ->and(tokenRequests())->toBe(2)
+            ->and(Http::recorded(fn (Request $request) => $request->method() === 'PUT')->count())->toBe(2);
+        Http::assertSent(fn (Request $request) => $request->method() === 'PUT'
+            && $request->data() === ['assignable' => true]
+            && $request->hasHeader('Authorization', 'Bearer fresh'));
+    });
+
     it('gives up with Unauthorized when the 401 survives the refresh', function (): void {
         fakeApi(['*/v1/ping' => Http::response([], 401)]);
 
@@ -170,6 +188,20 @@ describe('failures', function (): void {
         }
     });
 
+    it('maps a failing put like every other verb', function (): void {
+        fakeApi(['*/v1/ping' => Http::response([
+            'message' => 'The assignable field must be true or false.',
+            'errors' => ['assignable' => ['The assignable field must be true or false.']],
+        ], 422)]);
+
+        try {
+            oauthClient()->put('v1/ping', ['assignable' => 'maybe']);
+            $this->fail('Expected a validation failure');
+        } catch (ValidationFailed $exception) {
+            expect($exception->errors())->toBe(['assignable' => ['The assignable field must be true or false.']]);
+        }
+    });
+
     it('reports an unreachable API as Unavailable', function (): void {
         fakeApi(['*/v1/ping' => fn () => throw new ConnectionException('connection refused')]);
 
@@ -207,6 +239,20 @@ describe('retries', function (): void {
         Http::assertSentCount(2); // token + one attempt
     });
 
+    it('never retries a put after a server error, the API behind it may not apply it idempotently', function (): void {
+        fakeApi(['*/v1/ping' => Http::sequence()->push([], 500)->push(['data' => 'ok'])]);
+
+        expect(fn () => staticClient()->put('v1/ping', ['assignable' => true]))->toThrow(Unavailable::class);
+        Http::assertSentCount(1);
+    });
+
+    it('never retries a put after a connection error', function (): void {
+        fakeApi(['*/v1/ping' => Http::sequence()->pushFailedConnection()->push(['data' => 'ok'])]);
+
+        expect(fn () => staticClient()->put('v1/ping', ['assignable' => true]))->toThrow(Unavailable::class);
+        Http::assertSentCount(1);
+    });
+
     it('does not retry reads when read attempts is 1', function (): void {
         fakeApi(['*/v1/ping' => Http::sequence()->push([], 500)->push(['data' => 'ok'])]);
         $config = new ApiClientConfig('https://api.test', readAttempts: 1);
@@ -242,5 +288,15 @@ describe('requests', function (): void {
 
         Http::assertSent(fn (Request $request) => $request->method() === 'POST' && $request->data() === ['a' => 1]);
         Http::assertSent(fn (Request $request) => $request->method() === 'DELETE');
+    });
+
+    it('sends put with its verb, the json payload and the bearer token', function (): void {
+        fakeApi(['*/v1/ping' => Http::response(['data' => []])]);
+
+        oauthClient()->put('v1/ping', ['user_id' => 5]);
+
+        Http::assertSent(fn (Request $request) => $request->method() === 'PUT'
+            && $request->data() === ['user_id' => 5]
+            && $request->hasHeader('Authorization', 'Bearer access-token'));
     });
 });
