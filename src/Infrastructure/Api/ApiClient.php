@@ -56,6 +56,16 @@ class ApiClient
      *
      * @throws ApiException
      */
+    public function put(string $path, array $data = []): Response
+    {
+        return $this->send('PUT', $path, ['json' => $data]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ApiException
+     */
     public function patch(string $path, array $data = []): Response
     {
         return $this->send('PATCH', $path, ['json' => $data]);

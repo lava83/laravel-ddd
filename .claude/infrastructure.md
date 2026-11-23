@@ -218,7 +218,7 @@ Because the guard keys off `persistedVersion()`, several in-memory mutations col
 - Event dispatch is not deferred to a transaction commit unless the host opens one; with no transaction it runs immediately.
 - Register a mapper for the aggregate as usual (`entity_mapper_resolver()->registerMapper(...)`); `RemoteModel::toEntity()` goes through it, so set `$entityClassName` on the model.
 
-`Api\ApiClient` is the one door to the API: `get/post/patch/delete`, authentication through `Api\Auth\ApiAuthenticator`, status → `Api\Exceptions\*` mapping, GET-only retries (`ApiClientConfig::$readAttempts` is the *total* number of attempts), one repeat after a 401 only for a `RefreshableAuthenticator`. `ClientCredentialsAuthenticator` caches the token as a string under a key derived from base URL and client id.
+`Api\ApiClient` is the one door to the API: `get/post/put/patch/delete`, authentication through `Api\Auth\ApiAuthenticator`, status → `Api\Exceptions\*` mapping, GET-only retries (`ApiClientConfig::$readAttempts` is the *total* number of attempts), one repeat after a 401 only for a `RefreshableAuthenticator`. `ClientCredentialsAuthenticator` caches the token as a string under a key derived from base URL and client id.
 
 Tests: `tests/Foundation/Infrastructure/{Api,Repositories/ApiRepositoryTest.php,Models/RemoteModelTest.php}`, fixtures `tests/Fixtures/Infrastructure/Api`.
 
