@@ -611,7 +611,7 @@ $this->app->singleton(ApiClient::class, fn () => new ApiClient(
 ```
 
 - Authentication is an `ApiAuthenticator` (`authorize(PendingRequest)`): `ClientCredentialsAuthenticator` (token cached as a plain string) or `StaticBearerAuthenticator`. Implement the interface for API keys or basic auth. An authenticator that also implements `RefreshableAuthenticator` gets one repeat after a 401; fixed credentials get none.
-- Only GETs are retried (connection errors and 5xx, `ApiClientConfig::$readAttempts` total attempts). Writes never are — there are no idempotency keys.
+- Only GETs are retried (connection errors and 5xx, `ApiClientConfig::$readAttempts` total attempts). Writes never are — there are no idempotency keys. PUT counts as a write and is never retried either: HTTP calls it idempotent, but the client cannot know whether the API behind it applies it that way.
 - Failures surface as `Infrastructure\Api\Exceptions\ApiException` subclasses (`Unauthorized`, `Forbidden`, `NotFound`, `ValidationFailed`, `Unavailable`); callers never see Laravel's `RequestException`. A 404 in `fetchOne()` becomes a `ModelNotFoundException`.
 - Several APIs: build one `ApiClient` (or a thin subclass to type-hint it) per API.
 
