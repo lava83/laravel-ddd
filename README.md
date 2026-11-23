@@ -850,7 +850,7 @@ final class B2cUserSearchFilter extends TokenSearchFilterMethod
 
 - The phrase is split on Unicode whitespace. Duplicates are dropped case-insensitively, and only the first `maxTokens()` tokens (default 5) are used. An empty phrase adds no constraint.
 - Every token must match (AND). A token matches when any column matches (OR).
-- `email` is a column of the model. `data.lastname` is a column of the `data` relation, resolved with `whereHas()`: the part before the last dot is the relation, which must live on the same connection. Columns of one relation share one `EXISTS` per token.
+- `email` is a column of the model. `data.lastname` is a column of the `data` relation, resolved with `whereHas()`: the part before the last dot is the relation path, which may be nested (`user.data.personalnr`). Columns of one relation path share one subquery per token. The first relation of a path may live on another connection, see [Relations on another connection](#relations-on-another-connection).
 - `mode()` returns `SearchMode::Prefix` (`token%`, the default) or `SearchMode::Contains` (`%token%`). Prefix can use a B-tree index on the column, Contains scans it.
 - `%`, `_` and `!` in a token are literals. The filter escapes them and adds an explicit `ESCAPE '!'`, so it behaves the same on MySQL/MariaDB (with or without `NO_BACKSLASH_ESCAPES`), SQLite and PostgreSQL.
 - Case sensitivity follows the column collation. A `utf8mb4_*_ci` collation on MariaDB matches `müller` to `Müller`, and whether `ß` matches `ss` depends on the collation. SQLite folds ASCII only, and PostgreSQL's `LIKE` is always case-sensitive.
@@ -887,6 +887,24 @@ if ($search !== '') {
     $requested->custom(B2cUserSearchFilter::type(), $search);
 }
 ```
+
+#### Relations on another connection
+
+The first relation of a path may live on another connection whose database is on the same server as the list's. Here the accounts are on `portal`, the B2B user (`customerUser`) on `users_customer`, the B2C user (`serviceUser`) and its profile (`data`) on `users_service`:
+
+```php
+protected function columns(): array
+{
+    return ['identifiers.value', 'customerUser.email', 'serviceUser.email', 'serviceUser.data.personalnr'];
+}
+```
+
+- A `BelongsTo` becomes `whereIn(<foreign key>, <related query selecting the owner key>)`, a `HasOne` or `HasMany` `whereIn(<local key>, <related query selecting the foreign key>)`. The rest of the path (`data.personalnr`) is a `whereHas()` inside that query.
+- Every table in that query gets its database name, nested relations and joined pivot tables included. `whereHas()` alone would look for them in the list's database.
+- The related models keep their global scopes (soft deletes) and the constraints of the relation method.
+- Other relation types on another connection (`BelongsToMany`, morph relations, `HasOneThrough`/`HasManyThrough`, a one-of-many `HasOne`) throw `RelationNotSearchable`. Relations on the list's connection use `whereHas()` as before.
+
+> **Precondition:** the list's connection must be able to read the other database as `<database>.<table>`, so both databases live on one server and its credentials work for both. That is MySQL and MariaDB. PostgreSQL cannot query across databases, and SQL Server reads `a.b` as schema and table. The package cannot check this. Tables in SQL that is a string already, such as a raw where or a `whereIn` subquery in a global scope of a related model, keep their bare name.
 
 ## Facets
 
