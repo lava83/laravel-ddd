@@ -54,6 +54,12 @@ abstract class Entity implements Stringable
     protected ?CarbonImmutable $cleanUpdatedAt = null;
 
     /**
+     * Hydrated from a stored row: a missing row then means it was deleted, not
+     * that the entity is new. Protected for the same reason as cleanUpdatedAt.
+     */
+    protected bool $persisted = false;
+
+    /**
      * @throws ValidationException
      */
     public function __construct(
@@ -147,6 +153,11 @@ abstract class Entity implements Stringable
         return $this->persistedVersion;
     }
 
+    public function isPersisted(): bool
+    {
+        return $this->persisted;
+    }
+
     /**
      * @param  TModel  $model
      *
@@ -186,6 +197,10 @@ abstract class Entity implements Stringable
             $this->version = (int) $versionOnModel;
             $this->persistedVersion = (int) $versionOnModel;
         }
+
+        // A model built in memory (new Model([...])) does not exist, so the
+        // entity stays new and its first save inserts.
+        $this->persisted = $model->exists;
 
         // The entity now matches the model: nothing is left to persist.
         $this->markClean();

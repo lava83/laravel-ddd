@@ -67,6 +67,7 @@ describe('EntityMapper::toModel()', function (): void {
             $table->string('name');
             $table->unsignedInteger('version')->default(1);
             $table->timestamps();
+            $table->softDeletes();
         });
     });
 

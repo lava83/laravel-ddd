@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Lava83\LaravelDdd\Infrastructure\Models\Facets;
 
 use Closure;
+use Illuminate\Contracts\Database\Query\Expression as ExpressionContract;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Collection;
 use Lava83\LaravelDdd\Domain\ReadModels\Facets\FacetBucketReadModel;
 use Lava83\LaravelDdd\Domain\ReadModels\Facets\FacetReadModel;
@@ -37,7 +39,7 @@ final class FacetCounter
      *
      * @param  Closure(Builder): EloquentBuilder<TModel>  $baseQuery  the base query of the list page, including `->filter($filter->toArray())`
      * @param  Builder  $scope  what the caller may see (tenant, branch); applied in full to every facet
-     * @param  Builder  $requested  the client's filters; each facet drops those on its own filter target
+     * @param  Builder  $requested  the client's filters; each facet drops its own (on its filter target, of its filter type)
      * @return Collection<int, FacetReadModel> in the order of `$facets`
      *
      * @throws FacetNotCountable
@@ -48,29 +50,34 @@ final class FacetCounter
 
         foreach ($facets as $facet) {
             $query = self::forCounting($baseQuery(self::filterFor($facet, $scope, $requested)));
+            $expression = $facet->rawExpression();
             $relation = $facet->relationName();
 
-            $readModels[] = new FacetReadModel(
-                $facet->key(),
-                $relation === null
-                    ? self::countColumn($query, $facet)
-                    : self::countRelation($query, $facet, $relation),
-            );
+            $readModels[] = new FacetReadModel($facet->key(), match (true) {
+                $expression !== null => self::countExpression($query, $facet, $expression),
+                $relation !== null => self::countRelation($query, $facet, $relation),
+                default => self::countColumn($query, $facet),
+            });
         }
 
         return new Collection($readModels);
     }
 
     /**
-     * The scope in full, plus the requested filters without the facet's own.
+     * The scope in full, plus the requested filters without the facet's own:
+     * those on its filter target and, if it names one, those of its custom
+     * filter type, which a client may send without a target.
      *
      * Only `$requested` is ever reduced. A scope filter can share the facet's
-     * target (`branch_id`), and dropping it would count rows the caller must
-     * not see.
+     * target (`branch_id`) or type, and dropping it would count rows the
+     * caller must not see.
      */
     private static function filterFor(FacetDefinition $facet, Builder $scope, Builder $requested): Builder
     {
-        return $scope->merge($requested->without($facet->filterTarget()), MergeStrategy::KeepExisting);
+        $own = $requested->without($facet->filterTarget());
+        $type = $facet->filterType();
+
+        return $scope->merge($type === null ? $own : $own->withoutType($type), MergeStrategy::KeepExisting);
     }
 
     /**
@@ -109,6 +116,39 @@ final class FacetCounter
             ->select($column.' as facet_value')
             ->selectRaw('count(*) as facet_count')
             ->groupBy($column)
+            ->get());
+    }
+
+    /**
+     * Selects the expression once in a derived table and groups its column
+     * outside. Repeating the expression in GROUP BY would repeat its `?`
+     * placeholders, and PostgreSQL (and MySQL under ONLY_FULL_GROUP_BY) treat
+     * two placeholders as different expressions. Grouping by a column of the
+     * derived table also needs no alias support in GROUP BY.
+     *
+     * The expression is the only raw SQL here; its values travel as bindings.
+     *
+     * @template TModel of Model
+     *
+     * @param  EloquentBuilder<TModel>  $query
+     * @return list<FacetBucketReadModel>
+     *
+     * @throws FacetNotCountable
+     */
+    private static function countExpression(EloquentBuilder $query, FacetDefinition $facet, ExpressionContract $expression): array
+    {
+        $base = $query->toBase();
+        $sql = (string) $expression->getValue($base->getGrammar());
+
+        $values = $base
+            ->select(new Expression('('.$sql.') as facet_value'))
+            ->addBinding($facet->bindings(), 'select');
+
+        return self::buckets($facet, $base->newQuery()
+            ->fromSub($values, 'facet_values')
+            ->select('facet_value')
+            ->selectRaw('count(*) as facet_count')
+            ->groupBy('facet_value')
             ->get());
     }
 

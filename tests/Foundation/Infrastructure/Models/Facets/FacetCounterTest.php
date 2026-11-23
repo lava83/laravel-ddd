@@ -12,6 +12,7 @@ use Lava83\LaravelDdd\Infrastructure\Models\Facets\Exceptions\FacetNotCountable;
 use Lava83\LaravelDdd\Infrastructure\Models\Facets\FacetCounter;
 use Lava83\LaravelDdd\Infrastructure\Models\Facets\FacetDefinition;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Builder;
+use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Filters\FacetTestStatusFilter;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Models\FacetTestNoteModel;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Models\FacetTestServiceModel;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Models\FacetTestUserModel;
@@ -44,6 +45,8 @@ function facetCounts(Collection $facets): array
  */
 beforeEach(function (): void {
     config()->set('database.connections.facet_test_remote', ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']);
+    // FacetTestUserModel allows `$eqStatus`; eloquent-filtering needs its class for every filtered query.
+    config()->set('eloquent-filtering.custom_filters', [FacetTestStatusFilter::class]);
 
     foreach (['facet_test_service_user', 'facet_test_services', 'facet_test_notes', 'facet_test_users'] as $table) {
         Schema::dropIfExists($table);
@@ -361,5 +364,147 @@ describe('FacetCounter queries', function (): void {
 
     it('returns an empty collection without definitions', function (): void {
         expect(FacetCounter::count(facetTestBaseQuery(...), Builder::make(), Builder::make()))->toBeEmpty();
+    });
+});
+
+describe('FacetCounter expression facets', function (): void {
+    it('counts the rows per value of a CASE over several columns', function (): void {
+        $facets = FacetCounter::count(
+            facetTestBaseQuery(...),
+            Builder::make(),
+            Builder::make(),
+            FacetDefinition::expression('match', DB::raw(
+                "CASE WHEN status_id IS NULL THEN 'none' WHEN status_id = type_id THEN 'same' ELSE 'different' END",
+            ), 'match'),
+        );
+
+        // fred (same) is soft-deleted and not counted.
+        expect(facetCounts($facets))->toBe([
+            'match' => [
+                ['value' => 'different', 'count' => 3],
+                ['value' => 'none', 'count' => 1],
+                ['value' => 'same', 'count' => 1],
+            ],
+        ]);
+    });
+
+    it('gives an expression that yields NULL the null bucket', function (): void {
+        $facets = FacetCounter::count(
+            facetTestBaseQuery(...),
+            Builder::make(),
+            Builder::make(),
+            FacetDefinition::expression('above_one', DB::raw('status_id > 1'), 'above_one'),
+        );
+
+        expect(facetCounts($facets))->toBe([
+            'above_one' => [
+                ['value' => null, 'count' => 1],
+                ['value' => 0, 'count' => 2],
+                ['value' => 1, 'count' => 2],
+            ],
+        ]);
+    });
+
+    it('binds the values of the placeholders, next to the bindings of the filters', function (): void {
+        $facets = FacetCounter::count(
+            facetTestBaseQuery(...),
+            Builder::make()->eq('branch_id', 1),
+            Builder::make()->in('type_id', [1, 2]),
+            FacetDefinition::expression('kind', DB::raw("CASE WHEN type_id = ? THEN ? ELSE 'other' END"), 'kind', bindings: [2, 'two']),
+        );
+
+        // erik (branch 2) is outside the scope.
+        expect(facetCounts($facets))->toBe([
+            'kind' => [
+                ['value' => 'other', 'count' => 3],
+                ['value' => 'two', 'count' => 1],
+            ],
+        ]);
+    });
+
+    it('never puts a binding into the SQL text, so a hostile value stays a value', function (): void {
+        $hostile = "anna@example.com' OR '1'='1";
+        DB::enableQueryLog();
+
+        $facets = FacetCounter::count(
+            facetTestBaseQuery(...),
+            Builder::make(),
+            Builder::make(),
+            FacetDefinition::expression('anna', DB::raw("CASE WHEN email = ? THEN 'match' ELSE 'other' END"), 'anna', bindings: [$hostile]),
+        );
+
+        $query = collect(DB::getQueryLog())->last();
+
+        expect(facetCounts($facets))->toBe([
+            'anna' => [
+                ['value' => 'other', 'count' => 5],
+            ],
+        ])
+            ->and($query['query'])->not->toContain('anna@example.com')
+            ->and($query['bindings'])->toContain($hostile);
+    });
+
+    it("drops the facet's own filter by target and by type, never the scope", function (): void {
+        $facets = FacetCounter::count(
+            facetTestBaseQuery(...),
+            Builder::make()->eq('branch_id', 1),
+            Builder::make()->custom('$eqStatus', 1)->eq('type_id', 1),
+            FacetDefinition::expression('above_one', DB::raw('status_id > 1'), 'above_one', '$eqStatus'),
+        );
+
+        // branch 1 and type 1: anna, carl, dora. $eqStatus is the facet's own and dropped.
+        expect(facetCounts($facets))->toBe([
+            'above_one' => [
+                ['value' => null, 'count' => 1],
+                ['value' => 0, 'count' => 1],
+                ['value' => 1, 'count' => 1],
+            ],
+        ]);
+    });
+});
+
+describe('FacetCounter custom filter types', function (): void {
+    it("drops the facet's own custom filter, sent with or without a target", function (?string $target): void {
+        $facets = FacetCounter::count(
+            facetTestBaseQuery(...),
+            Builder::make(),
+            Builder::make()->custom('$eqStatus', 1, $target),
+            FacetDefinition::column('status', 'status_id', 'status', '$eqStatus'),
+            FacetDefinition::column('type', 'type_id'),
+        );
+
+        expect(facetCounts($facets))->toBe([
+            // $eqStatus is dropped: anna, bert, carl, dora, erik
+            'status' => [
+                ['value' => null, 'count' => 1],
+                ['value' => 1, 'count' => 2],
+                ['value' => 2, 'count' => 2],
+            ],
+            // $eqStatus = 1 stays: anna, bert
+            'type' => [
+                ['value' => 1, 'count' => 1],
+                ['value' => 2, 'count' => 1],
+            ],
+        ]);
+    })->with([
+        'without a target' => [null],
+        'with the facet target' => ['status'],
+        'with another target' => ['linked'],
+    ]);
+
+    it('keeps a scope filter of the same custom type', function (): void {
+        $facets = FacetCounter::count(
+            facetTestBaseQuery(...),
+            Builder::make()->custom('$eqStatus', 2),
+            Builder::make()->custom('$eqStatus', 1),
+            FacetDefinition::column('status', 'status_id', filterType: '$eqStatus'),
+        );
+
+        // Only the requested $eqStatus = 1 is dropped; the scope keeps carl and erik.
+        expect(facetCounts($facets))->toBe([
+            'status' => [
+                ['value' => 2, 'count' => 2],
+            ],
+        ]);
     });
 });
