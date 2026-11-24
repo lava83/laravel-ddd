@@ -41,6 +41,14 @@ final class SortTestAccountModel extends Model
     }
 
     /**
+     * @return BelongsTo<SortTestScopedManagerModel, $this>
+     */
+    public function scopedManager(): BelongsTo
+    {
+        return $this->belongsTo(SortTestScopedManagerModel::class, 'manager_id');
+    }
+
+    /**
      * @return BelongsTo<self, $this>
      */
     public function parent(): BelongsTo

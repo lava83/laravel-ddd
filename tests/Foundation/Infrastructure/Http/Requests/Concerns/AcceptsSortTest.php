@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use Lava83\LaravelDdd\Infrastructure\Models\Sort\Exceptions\RelationNotSortable;
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\SortField;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\ListRequests;
+use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\MalformedRelationSortListRequest;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\NullableSortListRequest;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\SortedListRequest;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\UniqueSortListRequest;
@@ -109,6 +111,13 @@ describe('AcceptsSort', function (): void {
         expect($sort->nullableCursorParameters())->toBe([])
             ->and($sort->fields()[0]->relation())->toBeNull();
     });
+
+    it('checks the declared relation fields on every request, with or without a sort', function (array $query): void {
+        ListRequests::resolve(MalformedRelationSortListRequest::class, $query);
+    })->with([
+        'without a sort' => [[]],
+        'with a sort by another field' => [['sort' => ['rank']]],
+    ])->throws(RelationNotSortable::class, 'Sort field "owner_name": "owner" must be a relation of the list model and a column of it');
 
     it('accepts a relation field by its name and rejects its relation path', function (): void {
         expect(ListRequests::errors(NullableSortListRequest::class, ['sort' => ['-owner_name']]))->toBe([])

@@ -177,6 +177,14 @@ describe('Sort with cursor pagination', function (): void {
         'Sort::paginate()' => [true],
     ])->throws(CursorValueIsNull::class, 'The cursor parameter "score" is NULL');
 
+    it('takes NULL in the cursor of the last field as the greatest value, not as no constraint', function (): void {
+        // The cursor rule rejects such a cursor. Without the rule, the page must not start over inside the tie of rank 2.
+        $sort = Sort::fromArray(['rank'], ['rank'], 'id');
+        $page = $sort->paginate(SortTestItemModel::query(), 5, cursor: new Cursor(['rank' => 2, 'id' => null]));
+
+        expect(array_map(fn (SortTestItemModel $model): int => $model->id, $page->items()))->toBe([5]);
+    });
+
     it('repeats rows when a datetime column holds fractional seconds', function (): void {
         // The trap the docs warn about: the cursor carries the cast value as `Y-m-d H:i:s`, without the fraction.
         // Ascending, the next page starts before the cursor row again; descending, it would skip rows.
@@ -247,6 +255,13 @@ describe('Sort with cursor pagination over a nullable column', function (): void
 
         expect($page->nextCursor()?->toArray())->toBe(['score' => null, 'id' => 5, '_pointsToNextItems' => true]);
     });
+
+    it('fails loudly when the list query does not select a nullable sort column', function (): void {
+        $sort = Sort::fromArray(['score'], ['score'], 'id', nullable: ['score']);
+
+        // The rows of the page hold 1 and 5. Read as NULL, they would send the next page behind every value.
+        $sort->paginate(SortTestItemModel::query()->select('id', 'rank'), 2)->nextCursor();
+    })->throws(CursorValueIsNull::class, 'The cursor parameter "score" cannot be read: an item of the page has no "score".');
 
     it('does not end the order at a unique field that may hold NULL', function (): void {
         $sort = Sort::fromArray(['score'], ['score'], 'id', unique: ['score'], nullable: ['score']);

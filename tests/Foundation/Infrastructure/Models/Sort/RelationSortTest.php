@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Pagination\Cursor;
+use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Lava83\LaravelDdd\Domain\ReadModels\Facets\FacetReadModel;
@@ -246,6 +247,48 @@ describe('Sort by a relation field', function (): void {
         // The fourth row is account 6 with status 1, its manager Mia has status 2; the fifth is account 3 with status 1 and no manager.
         expect(relationSortPage(relationSort(['status_id']), 4)->nextCursor()?->parameter('status_id'))->toBe(2)
             ->and(relationSortPage(relationSort(['status_id']), 5)->nextCursor()?->parameter('status_id'))->toBeNull();
+    });
+
+    it('selects the value alone when a global scope of the related model selects more columns', function (): void {
+        $sort = Sort::fromArray(['x'], ['x'], 'id', relations: ['x' => 'scopedManager.name']);
+        $models = $sort->paginate(SortTestAccountModel::query(), 6)->items();
+
+        // Not soft-deleting, so account 4 has Zoe.
+        expect(array_map(fn (SortTestAccountModel $model): int => $model->id, $models))->toBe([1, 5, 2, 6, 4, 3]);
+    });
+
+    it('compares a selected alias by its expression in the cursor constraint, as Laravel does', function (): void {
+        $sort = Sort::fromArray(['-identifiers_count'], ['identifiers_count'], 'id');
+        $query = fn (): EloquentBuilder => SortTestAccountModel::query()->withCount('identifiers');
+        $ids = fn (CursorPaginator $page): array => array_map(fn (SortTestAccountModel $model): int => $model->id, $page->items());
+
+        $first = $sort->paginate($query(), 2);
+
+        DB::enableQueryLog();
+        $second = $sort->paginate($query(), 2, cursor: $first->nextCursor());
+        $sql = DB::getQueryLog()[0]['query'];
+
+        expect($ids($first))->toBe([2, 1])
+            ->and($ids($second))->toBe([6, 5])
+            ->and($ids($sort->apply($query())->cursorPaginate(2, cursor: $first->nextCursor())))->toBe([6, 5])
+            // MySQL, MariaDB and PostgreSQL take no alias in WHERE. SQLite does, so only the SQL shows the difference.
+            ->and($sql)->toContain('where ((select count(*) from "sort_test_identifiers" where "sort_test_accounts"."id" = "sort_test_identifiers"."account_id") < ?')
+            ->and($sql)->not->toContain('"identifiers_count" <');
+    });
+
+    it('compares a renamed column by its column in the cursor constraint', function (): void {
+        $sort = Sort::fromArray(['label'], ['label'], 'id');
+
+        DB::enableQueryLog();
+        $page = $sort->paginate(
+            SortTestAccountModel::query()->select('sort_test_accounts.*', 'number as label'),
+            2,
+            cursor: new Cursor(['label' => 'A-2', 'id' => 2]),
+        );
+
+        expect(array_map(fn (SortTestAccountModel $model): int => $model->id, $page->items()))->toBe([3, 4])
+            ->and(DB::getQueryLog()[0]['query'])->toContain('("number" > ?')
+            ->and(DB::getQueryLog()[0]['query'])->not->toContain('"label" >');
     });
 
     it('carries NULL in the cursor of a row without a related row', function (): void {
