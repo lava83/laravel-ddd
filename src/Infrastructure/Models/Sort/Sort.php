@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Str;
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\Enums\SortDirection;
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\Exceptions\RelationNotSortable;
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\Exceptions\SortNotApplicable;
@@ -245,7 +246,7 @@ final readonly class Sort
             ? array_map(fn (SortField $field): SortField => $field->reversed(), $this->orders())
             : $this->orders();
 
-        $operands = $this->operands($query, $orders);
+        $operands = self::operands($query, $orders);
         $grammar = $query->getQuery()->getGrammar();
         // PostgreSQL sorts NULL as the greatest value already, and does not take an alias in an expression.
         $placeNulls = $query->getModel()->getConnection()->getDriverName() !== 'pgsql';
@@ -282,8 +283,9 @@ final readonly class Sort
     }
 
     /**
-     * What each order field is ordered and compared by: the column, or for a
-     * relation field its alias and its subquery, which is selected here.
+     * What each order field is ordered and compared by: the column, see
+     * {@see self::comparable()}, or for a relation field its alias and its
+     * subquery, which is selected here.
      *
      * @template TModel of Model
      *
@@ -293,7 +295,7 @@ final readonly class Sort
      *
      * @throws RelationNotSortable
      */
-    private function operands(EloquentBuilder $query, array $orders): array
+    private static function operands(EloquentBuilder $query, array $orders): array
     {
         $grammar = $query->getQuery()->getGrammar();
         $operands = [];
@@ -302,7 +304,7 @@ final readonly class Sort
             $relation = $field->relation();
 
             if ($relation === null) {
-                $operands[$field->column()] = ['order' => $field->column(), 'compare' => $grammar->wrap($field->column()), 'bindings' => [], 'attribute' => null];
+                $operands[$field->column()] = ['order' => $field->column(), 'compare' => self::comparable($query, $field->column()), 'bindings' => [], 'attribute' => null];
 
                 continue;
             }
@@ -310,7 +312,6 @@ final readonly class Sort
             $value = RelationSortValue::query($query, $field->column(), $relation);
             $alias = self::RELATION_ALIAS_PREFIX.$field->column();
             $sql = '('.$value->toSql().')';
-            /** @var list<mixed> $bindings */
             $bindings = $value->getBindings();
 
             // As withAggregate() does: without it, the list would select the relation field alone.
@@ -323,6 +324,38 @@ final readonly class Sort
         }
 
         return $operands;
+    }
+
+    /**
+     * What a field of the list is compared by in the cursor constraint: the
+     * column, or what the select names so, e.g. the subquery of `withCount()`,
+     * as a WHERE clause takes no alias. Resolved as Laravel's cursor
+     * pagination does, so its limit applies here too: the bindings of such an
+     * expression do not come along.
+     *
+     * @param  EloquentBuilder<*>  $query
+     */
+    private static function comparable(EloquentBuilder $query, string $column): string
+    {
+        $grammar = $query->getQuery()->getGrammar();
+
+        foreach ($query->getQuery()->getColumns() as $selected) {
+            $position = strripos($selected, ' as ');
+
+            if ($position === false) {
+                continue;
+            }
+
+            $alias = substr($selected, $position + 4);
+
+            if ($alias === $column || $alias === $grammar->wrap($column)) {
+                $original = substr($selected, 0, $position);
+
+                return Str::contains($original, ['(', ')']) ? $original : $grammar->wrap($original);
+            }
+        }
+
+        return $grammar->wrap($column);
     }
 
     /**
@@ -349,6 +382,9 @@ final readonly class Sort
             if ($value === null) {
                 if (! $ascending) {
                     $query->whereRaw($sql.' is not null', $bindings);
+                } elseif ($rest === []) {
+                    // Nothing comes after NULL in the last field: an empty group would constrain nothing.
+                    $query->whereRaw('0 = 1');
                 }
             } else {
                 $query->whereRaw($sql.($ascending ? ' > ?' : ' < ?'), [...$bindings, $value]);

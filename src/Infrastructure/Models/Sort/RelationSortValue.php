@@ -77,6 +77,12 @@ final class RelationSortValue
         $query->orders = null;
         $query->setBindings([], 'order');
 
+        // As withAggregate() does: a global scope of the related model may have selected more columns.
+        if (count($query->columns ?? []) > 1) {
+            $query->columns = [$query->columns[0]];
+            $query->setBindings([], 'select');
+        }
+
         if ($otherConnection) {
             CrossDatabaseTables::qualify($query, $model->getConnection()->getDatabaseName());
         }

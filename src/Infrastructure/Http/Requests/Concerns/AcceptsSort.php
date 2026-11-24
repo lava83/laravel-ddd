@@ -106,11 +106,8 @@ trait AcceptsSort
      */
     public function sort(): Sort
     {
-        if (! $this->filled('sort')) {
-            return Sort::byKey($this->listKey());
-        }
-
-        $fields = $this->input('sort');
+        // No fields for a missing sort, not Sort::byKey(): the declared relation fields are checked on every request.
+        $fields = $this->filled('sort') ? $this->input('sort') : [];
 
         if (! is_array($fields)) {
             throw SortNotValid::malformedField($fields);
@@ -127,16 +124,31 @@ trait AcceptsSort
     }
 
     /**
-     * The requested sort, for the cursor rule of {@see PaginatesByCursor}.
+     * The parameters a cursor of the requested sort carries, for the cursor
+     * rule of {@see PaginatesByCursor}.
      *
-     * @return Sort|null null if the sort is not valid: its own rule reports that
+     * @return list<string>|null null if the sort is not valid: its own rule reports that
      */
-    private function sortOfCursor(): ?Sort
+    private function sortCursorParameters(): ?array
     {
         try {
-            return $this->sort();
+            return $this->sort()->cursorParameters();
         } catch (SortNotValid) {
             return null;
+        }
+    }
+
+    /**
+     * Those of them that may be NULL, for the same rule.
+     *
+     * @return list<string> none if the sort is not valid
+     */
+    private function nullableSortCursorParameters(): array
+    {
+        try {
+            return $this->sort()->nullableCursorParameters();
+        } catch (SortNotValid) {
+            return [];
         }
     }
 
