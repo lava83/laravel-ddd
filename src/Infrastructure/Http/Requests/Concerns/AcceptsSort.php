@@ -7,6 +7,7 @@ namespace Lava83\LaravelDdd\Infrastructure\Http\Requests\Concerns;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Lava83\LaravelDdd\Infrastructure\Http\Rules\DistinctSortFields;
+use Lava83\LaravelDdd\Infrastructure\Models\Sort\Exceptions\RelationNotSortable;
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\Exceptions\SortNotValid;
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\Sort;
 
@@ -29,8 +30,9 @@ trait AcceptsSort
     abstract protected function listKey(): string;
 
     /**
-     * The columns of the list model a client may sort by. None of them may
-     * hold NULL: Laravel's cursor pagination cannot page over NULL.
+     * The fields a client may sort by: columns of the list model, and the
+     * names of {@see self::relationSortableFields()}. A column that may hold
+     * NULL belongs in {@see self::nullableSortableFields()} as well.
      *
      * @return list<string>
      */
@@ -46,6 +48,33 @@ trait AcceptsSort
      * @return list<string>
      */
     protected function uniqueSortableFields(): array
+    {
+        return [];
+    }
+
+    /**
+     * The sortable columns that may hold NULL. NULL sorts as the greatest
+     * value, and the read query has to page with `Sort::paginate()`: Laravel's
+     * `cursorPaginate()` cannot page over NULL. A unique field that may hold
+     * NULL does not end the sort.
+     *
+     * @return list<string>
+     */
+    protected function nullableSortableFields(): array
+    {
+        return [];
+    }
+
+    /**
+     * The sortable fields that are a column of a BelongsTo or HasOne of the
+     * list model, by name: `['personnel_number' => 'profile.personnel_number']`.
+     * Clients send the name, never the relation. Such a field may be NULL, as
+     * for a row without a related row, so the read query has to page with
+     * `Sort::paginate()`.
+     *
+     * @return array<string, string>
+     */
+    protected function relationSortableFields(): array
     {
         return [];
     }
@@ -73,20 +102,25 @@ trait AcceptsSort
      * The requested sort, or the key ascending for a missing or blank `sort`.
      *
      * @throws SortNotValid
+     * @throws RelationNotSortable a path of {@see self::relationSortableFields()} is not `relation.column`
      */
     public function sort(): Sort
     {
-        if (! $this->filled('sort')) {
-            return Sort::byKey($this->listKey());
-        }
-
-        $fields = $this->input('sort');
+        // No fields for a missing sort, not Sort::byKey(): the declared relation fields are checked on every request.
+        $fields = $this->filled('sort') ? $this->input('sort') : [];
 
         if (! is_array($fields)) {
             throw SortNotValid::malformedField($fields);
         }
 
-        return Sort::fromArray($fields, $this->sortableFields(), $this->listKey(), $this->uniqueSortableFields());
+        return Sort::fromArray(
+            $fields,
+            $this->sortableFields(),
+            $this->listKey(),
+            $this->uniqueSortableFields(),
+            $this->nullableSortableFields(),
+            $this->relationSortableFields(),
+        );
     }
 
     /**
@@ -101,6 +135,20 @@ trait AcceptsSort
             return $this->sort()->cursorParameters();
         } catch (SortNotValid) {
             return null;
+        }
+    }
+
+    /**
+     * Those of them that may be NULL, for the same rule.
+     *
+     * @return list<string> none if the sort is not valid
+     */
+    private function nullableSortCursorParameters(): array
+    {
+        try {
+            return $this->sort()->nullableCursorParameters();
+        } catch (SortNotValid) {
+            return [];
         }
     }
 

@@ -628,7 +628,7 @@ $page = ReadModelCursorPaginator::fromPage(
 );
 ```
 
-The result is a regular `Illuminate\Pagination\CursorPaginator`, so `Resource::collection($page)` produces `data`, `links` and `meta` as usual. The ordering must be unique (use the primary key), and no order column may hold NULL: the paginator throws `Pagination\Exceptions\CursorValueIsNull` rather than build a cursor that skips or repeats rows. For an order the client chooses, see [Sorting](#sorting).
+The result is a regular `Illuminate\Pagination\CursorPaginator`, so `Resource::collection($page)` produces `data`, `links` and `meta` as usual. The ordering must be unique (use the primary key), and no order column may hold NULL: the paginator throws `Pagination\Exceptions\CursorValueIsNull` rather than build a cursor that skips or repeats rows. For an order the client chooses, and for columns that hold NULL, see [Sorting](#sorting).
 
 ### Reading a paginated list from an API
 
@@ -989,13 +989,49 @@ $page = ReadModelCursorPaginator::fromPage(
 - The cursor rule of `PaginatesByCursor` expects exactly these parameters, so a cursor issued for another sort is a 422 on `cursor`. A cursor of the same columns in the other direction passes, because Laravel's cursor does not record the direction. The page then starts at the cursor row in the new direction.
 - `ReadModelCursorPaginator` reads the cursor values from the source models, so a sort column does not have to be a property of the read model.
 - `FacetCounter` drops the order before grouping, so the facets do not change with the sort.
-- Only columns of the list model are sortable. Sorting by a column of a relation, such as a last name in a profile table, needs a join and the joined value in the select under a name of its own. That is not built. It would be a second kind of sort field next to the plain column, with that name as its cursor parameter.
+
+### Columns that hold NULL, and columns of a relation
+
+A list can sort by a column that holds NULL, and by a column of a `BelongsTo` or `HasOne` of the list model under a name of its own. A missing related row counts as NULL, so every such relation field may be NULL. Declare them, and page with `Sort::paginate()` instead of `apply()` and `cursorPaginate()`:
+
+```php
+$sort = Sort::fromArray(
+    $request->input('sort') ?? [],
+    allowed: ['created_at', 'closed_at', 'b2b_user_email', 'active_email'],
+    key: 'id',
+    nullable: ['closed_at'],
+    relations: [
+        'b2b_user_email' => 'customerUser.email',        // BelongsTo, may live on another connection
+        'active_email' => 'activeEmailIdentifier.value', // HasOne with constraints of its own
+    ],
+);
+
+$page = ReadModelCursorPaginator::fromPage(
+    $sort->paginate(AccountModel::query()->filter($filter->toArray()), $perPage),
+    fn (AccountModel $model) => AccountReadModel::fromModel($model),
+);
+```
+
+- **NULL sorts as the greatest value:** last ascending, first descending, the same on MySQL, MariaDB, SQLite and PostgreSQL. Descending is the exact mirror of ascending, so paging back works as paging forward. MySQL, MariaDB and SQLite sort NULL first ascending by themselves, so the order is `ORDER BY CASE WHEN x IS NULL THEN 1 ELSE 0 END, x`; PostgreSQL gets a plain `ORDER BY x`, as it sorts NULL last already. SQL Server takes no alias inside an `ORDER BY` expression, so a relation field does not work there.
+- **The cursor carries NULL.** `paginate()` builds the cursor constraint itself: after a value ascending, a nullable field matches greater values and NULL (`x > ? OR x IS NULL`); after NULL, it matches NULL and then the next field (`x IS NULL AND (…)`). It walks every row exactly once forwards and backwards, also when NULL rows span a page border, fill whole pages or the whole list.
+- **A relation field** is a correlated subquery, `(SELECT MIN(column) FROM related WHERE <relation> …)`, selected as `laravel_ddd_sort_<name>` and ordered by that alias. The cursor reads its value from there, and its parameter is named after the field. Clients send the name, never the relation path.
+  - The relation's own constraints (`->where('driver', 'email')` in the relation method) and the related model's global scopes apply. A row a soft-delete scope hides counts as missing.
+  - A `HasOne` that matches more than one row does not duplicate list rows: the smallest value counts, in both directions.
+  - The list model's columns stay as they are; the alias overwrites none of them, even when the field is named like one. No join: filters with unqualified columns, a `whereHas()` on the same relation and eager loads work unchanged, and `FacetCounter` never sees the sort.
+  - A relation on another connection of the same server works as in the [search](#relations-on-another-connection): every table of the subquery gets its database name, with the same precondition (MySQL or MariaDB). A one-of-many `HasOne` works only on the list's connection.
+  - Anything but `relation.column` throws `Sort\Exceptions\RelationNotSortable` when the sort is built. `AcceptsSort` builds it on every request, sorted or not, so a wrong path fails on the first one. A relation the list model does not have, or one that is not a `BelongsTo` or `HasOne` (`HasMany`, `BelongsToMany`, `MorphTo`, …) throws it when the list is sorted by it.
+- **A unique field that may be NULL does not end the order.** NULL is not unique, so the key follows it.
+- `nullableCursorParameters()` lists the parameters that may be NULL. The cursor rule of `PaginatesByCursor` accepts NULL for them and for nothing else.
+- `apply()` throws `Sort\Exceptions\SortNotApplicable` for an order with a field that may be NULL: Laravel's `cursorPaginate()` would compare with `>` and `<` and skip the NULL rows silently. `paginate()` serves every sort, including those `apply()` serves, and returns the same pages.
+- A field that is an alias of the select, such as a `withCount()` column, is compared by its expression in the cursor constraint, because a `WHERE` clause takes no alias. As in Laravel's cursor pagination, the bindings of that expression do not come along: a `withCount()` whose constraint binds a value cannot be sorted by.
+
+**What a relation sort costs.** The subquery runs for every row the list query reads, once in the select and again in the cursor constraint, and the database sorts the rows itself, as no index covers a value from another table. On large lists, give a `HasOne` an index on its foreign key and the column, plus the columns of its constraints (`profiles (user_id, personalnr)`, `identifiers (account_id, driver, active, value)`); a `BelongsTo` looks up a primary key. Keep filters selective. A nullable column of the list model also loses its index for the order on MySQL and MariaDB, because they cannot read `ORDER BY CASE … END, x` from an index; the `x IS NULL` in the cursor constraint can in addition keep them from using an index range.
 
 **Indexes.** An index on the sort column serves the sort in both directions: the index carries the key ascending, and read backwards, descending, which is why the key follows the direction of the last field. A sort by several columns needs an index on them in that order. Declare a column with a unique index as unique: MariaDB does not serve `ORDER BY email, id` from a unique index on `email` and sorts the whole table instead, on every page.
 
 **Traps.**
 
-- **No NULL in a sort column.** Laravel's cursor pagination compares the cursor value with `>` and `<`, which never matches NULL, so the next page would skip or repeat rows. Allow only columns that never hold NULL. `ReadModelCursorPaginator` throws `Pagination\Exceptions\CursorValueIsNull` instead of putting NULL into a cursor, so the mistake fails loudly.
+- **NULL only in declared columns.** Laravel's cursor pagination compares the cursor value with `>` and `<`, which never matches NULL, so the next page would skip or repeat rows. Declare every column that may hold NULL as nullable, and page with `paginate()`. Both paginators throw `Pagination\Exceptions\CursorValueIsNull` instead of putting NULL into a cursor for a column that is not declared, so the mistake fails loudly. The same goes for a nullable column the list query does not select: the model would read it as NULL although the row holds a value.
 - **No fractions of a second in a datetime sort column.** A `datetime` cast puts the value into the cursor as `Y-m-d H:i:s`. If the column stores fractions of a second, the next page repeats rows when sorting ascending and skips rows when sorting descending. Sort by such a column only if it stores whole seconds.
 - **Only unique columns as unique fields.** The order ends at a unique field, so the next page skips every row that has the same value as the cursor row.
 
@@ -1058,6 +1094,17 @@ final class ListUsersRequest extends FormRequest
         return ['email'];
     }
 
+    // Optional: columns that hold NULL, and columns of a to-one relation. Both need Sort::paginate() in the read query.
+    protected function nullableSortableFields(): array
+    {
+        return [];
+    }
+
+    protected function relationSortableFields(): array
+    {
+        return [];
+    }
+
     protected function searchFilterType(): string
     {
         return UserSearchFilter::type();
@@ -1077,9 +1124,9 @@ Every error is a 422 on its field: `per_page`, `cursor`, `filters`, `sort` (a fi
 **Cursor pagination.**
 
 - `per_page` is an integer from 1 to 200, and 50 if it is missing. Override `defaultPerPage()` and `maxPerPage()` to change that. They are methods, not constants, because a class cannot redefine a constant it got from a trait. Scramble shows the 50 of the trait, in the description and as `@default 50`, so a request with another default documents it in a rule of its own.
-- `cursor` must decode and carry exactly the parameters of the order of the list: the key alone, or with `AcceptsSort` the columns of the requested sort (`Sort::cursorParameters()`). A cursor of another order is a 422 on `cursor`, so the read query never throws `UnexpectedValueException` for it. Do not catch that exception around the read query.
+- `cursor` must decode and carry exactly the parameters of the order of the list: the key alone, or with `AcceptsSort` the fields of the requested sort (`Sort::cursorParameters()`). A cursor of another order is a 422 on `cursor`, so the read query never throws `UnexpectedValueException` for it. Do not catch that exception around the read query. A parameter may be NULL only for a field that may be NULL (`Sort::nullableCursorParameters()`).
 
-**The key.** `listKey()` is the column the list is ordered by last, unique per row. With `AcceptsSort`, `sort()` carries it to the read query, which calls `$sort->apply()` and names no key of its own. Without `AcceptsSort`, the read query orders by its own key, and `listKey()` must name the same column. If it does not, the cursor rule rejects every cursor from the second page on.
+**The key.** `listKey()` is the column the list is ordered by last, unique per row. With `AcceptsSort`, `sort()` carries it to the read query, which calls `$sort->apply()` or `$sort->paginate()` and names no key of its own. Without `AcceptsSort`, the read query orders by its own key, and `listKey()` must name the same column. If it does not, the cursor rule rejects every cursor from the second page on.
 
 **Client filters.** `filters` comes as a JSON string or as a bracket-notation query array. Both give the same `Filter\Builder`. Prefer JSON: bracket notation sends every value as a string, which `$gt`, `$gte`, `$lt`, `$lte` and `$null` reject (see [Reconstructing filters from a request](#reconstructing-filters-from-a-request)).
 
@@ -1093,7 +1140,7 @@ GET /users?filters[0][type]=$in&filters[0][target]=status_id&filters[0][value][0
 - **JSON wins.** Within the query string `filters` has one form, but Laravel merges a JSON body and the query string into one input. If both carry `filters`, a JSON string wins over an array, whichever of the two carries it.
 - Invalid JSON, JSON that is not a list, a malformed filter, an unknown operator and a value the operator rejects are a 422 on `filters`.
 
-**Sort.** `sort[]=-created_at&sort[]=email`: the first field sorts first, and a leading `-` sorts descending. Only the `sortableFields()` are allowed, and none of them may hold NULL. List the ones with a unique index in `uniqueSortableFields()` too (none by default), so the sort ends at them and the database can use that index. Without `sort`, `sort()` is the key ascending. See [Sorting](#sorting).
+**Sort.** `sort[]=-created_at&sort[]=email`: the first field sorts first, and a leading `-` sorts descending. Only the `sortableFields()` are allowed, and the OpenAPI spec lists them. List the ones with a unique index in `uniqueSortableFields()` too (none by default), so the sort ends at them and the database can use that index. A column that holds NULL belongs in `nullableSortableFields()`, and a field that is a column of a relation in `relationSortableFields()` as `name => 'relation.column'`, its name in `sortableFields()` as well. With either, the read query pages with `$sort->paginate()`. Without `sort`, `sort()` is the key ascending. See [Sorting](#sorting).
 
 **Search.**
 

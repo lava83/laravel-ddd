@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Pagination\Cursor;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\FullListRequest;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\ListRequests;
+use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\NullableSortListRequest;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\PagedListRequest;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\TunedListRequest;
 use Lava83\LaravelDdd\Tests\Fixtures\Infrastructure\Http\Requests\UniqueSortListRequest;
@@ -100,5 +101,29 @@ describe('PaginatesByCursor cursor', function (): void {
         expect(ListRequests::errors(FullListRequest::class, ['sort' => ['unknown'], 'cursor' => $cursor]))
             ->toHaveKey('sort.0')
             ->not->toHaveKey('cursor');
+    });
+
+    it('takes NULL in the cursor of a field that may be NULL', function (array $sort, array $parameters): void {
+        $cursor = (new Cursor($parameters))->encode();
+
+        expect(ListRequests::errors(NullableSortListRequest::class, ['sort' => $sort, 'cursor' => $cursor]))->toBe([]);
+    })->with([
+        'a nullable column' => [['-score'], ['score' => null, 'id' => 5]],
+        'a relation field' => [['owner_name', 'rank'], ['owner_name' => null, 'rank' => 2, 'id' => 5]],
+        'a unique column that may hold NULL, with the key after it' => [['email'], ['email' => null, 'id' => 5]],
+    ]);
+
+    it('rejects NULL in the cursor of a field that never holds NULL', function (): void {
+        $cursor = (new Cursor(['owner_name' => null, 'rank' => null, 'id' => 5]))->encode();
+
+        expect(ListRequests::errors(NullableSortListRequest::class, ['sort' => ['owner_name', 'rank'], 'cursor' => $cursor]))
+            ->toBe(['cursor' => ['The cursor is not a valid cursor.']]);
+    });
+
+    it('rejects a cursor of another relation field or nullable column', function (): void {
+        $cursor = (new Cursor(['owner_name' => 'Ann', 'id' => 5]))->encode();
+
+        expect(ListRequests::errors(NullableSortListRequest::class, ['sort' => ['score'], 'cursor' => $cursor]))
+            ->toBe(['cursor' => ['The cursor does not belong to the sort of the list.']]);
     });
 });
