@@ -50,14 +50,11 @@ final class RelationSortValue
         }
 
         $related = $relation->getRelated();
-        // getName() resolves the default connection; getConnectionName() would be null for it.
-        $connection = $model->getConnection();
-        $relatedConnection = $related->getConnection();
-        $otherConnection = $relatedConnection->getName() !== $connection->getName();
+        $otherConnection = CrossDatabaseTables::onOtherConnection($model, $related);
 
         // Its join is a subquery that is SQL already, so its tables cannot be qualified.
         if ($otherConnection && $relation instanceof HasOne && $relation->isOneOfMany()) {
-            throw RelationNotSortable::oneOfManyOnOtherConnection($field, $name, $model::class, (string) $connection->getName(), (string) $relatedConnection->getName());
+            throw RelationNotSortable::oneOfManyOnOtherConnection($field, $name, $model::class, (string) $model->getConnection()->getName(), (string) $related->getConnection()->getName());
         }
 
         // A relation to the list's own table aliases the related table, and the column has to name the alias.
@@ -81,7 +78,7 @@ final class RelationSortValue
         $query->setBindings([], 'order');
 
         if ($otherConnection) {
-            CrossDatabaseTables::qualify($query, $connection->getDatabaseName());
+            CrossDatabaseTables::qualify($query, $model->getConnection()->getDatabaseName());
         }
 
         return $query;

@@ -144,16 +144,14 @@ abstract class TokenSearchFilterMethod implements FilterMethod
         $model = $query->getModel();
         $relation = $model->isRelation($name) ? Relation::noConstraints(fn (): mixed => $model->{$name}()) : null;
 
-        // getName() resolves the default connection; getConnectionName() would be null for it.
-        $connection = $model->getConnection();
-
         // An unknown relation goes to whereHas() as well, which reports it.
-        if (! $relation instanceof Relation || $relation->getRelated()->getConnection()->getName() === $connection->getName()) {
+        if (! $relation instanceof Relation || ! CrossDatabaseTables::onOtherConnection($model, $relation->getRelated())) {
             $query->orWhereHas($path, $constraint);
 
             return;
         }
 
+        $connection = $model->getConnection();
         $relatedConnection = $relation->getRelated()->getConnection();
         [$key, $relatedKey] = self::keys($relation, $name, $model, (string) $connection->getName(), (string) $relatedConnection->getName());
         $related = $relation->getQuery();

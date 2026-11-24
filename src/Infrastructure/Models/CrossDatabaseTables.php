@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lava83\LaravelDdd\Infrastructure\Models;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Query\JoinClause;
 
@@ -20,6 +21,17 @@ use Illuminate\Database\Query\JoinClause;
  */
 final class CrossDatabaseTables
 {
+    /**
+     * Whether a query of `$related` inside one of `$list` needs its tables
+     * qualified: the two models are on different connections, compared by
+     * name. `getName()` resolves the default connection, `getConnectionName()`
+     * would be null for it.
+     */
+    public static function onOtherConnection(Model $list, Model $related): bool
+    {
+        return $related->getConnection()->getName() !== $list->getConnection()->getName();
+    }
+
     /**
      * Prefixes the table and the joined tables of the query, and of every
      * subquery in its where clauses (`whereHas()`, nested wheres), with their
