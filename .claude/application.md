@@ -150,7 +150,7 @@ Traps, in short:
 - A request that overrides `validationData()` must return `$this->withDecodedFilters(...)`.
 - The search type goes into `eloquent-filtering.custom_filters`, never into `laravel-ddd.filters.custom_types`.
 - `listKey()` must be the key the read query orders by; with `AcceptsSort` the read query takes it from `Sort::key()`.
-- Sort columns must not hold NULL, and datetime sort columns must store whole seconds.
+- A sort column that may hold NULL, and every relation field, must be declared (`nullableSortableFields()`, `relationSortableFields()`), and the read query must page with `Sort::paginate()`. Datetime sort columns must store whole seconds.
 
 ## Layering caveat
 

@@ -54,7 +54,7 @@ trait PaginatesByCursor
              * The cursor of the page to load (`next_cursor` or `prev_cursor` of the previous response), the first page
              * if omitted. It only fits the sort it was issued for.
              */
-            'cursor' => ['bail', 'nullable', 'string', new ValidCursor($this->expectedCursorParameters())],
+            'cursor' => ['bail', 'nullable', 'string', new ValidCursor($this->expectedCursorParameters(), $this->nullableCursorParameters())],
         ];
     }
 
@@ -77,5 +77,14 @@ trait PaginatesByCursor
         }
 
         return Sort::byKey($this->listKey())->cursorParameters();
+    }
+
+    /**
+     * @return list<string> the parameters that may be NULL: only a sort declares any
+     */
+    private function nullableCursorParameters(): array
+    {
+        // The second seam to AcceptsSort.
+        return method_exists($this, 'nullableSortCursorParameters') ? $this->nullableSortCursorParameters() : [];
     }
 }

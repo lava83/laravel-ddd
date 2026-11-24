@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\Enums\SortDirection;
+use Lava83\LaravelDdd\Infrastructure\Models\Sort\Exceptions\RelationNotSortable;
+use Lava83\LaravelDdd\Infrastructure\Models\Sort\Exceptions\SortNotApplicable;
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\Exceptions\SortNotValid;
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\Sort;
 use Lava83\LaravelDdd\Infrastructure\Models\Sort\SortField;
@@ -92,9 +94,75 @@ describe('Sort', function (): void {
     });
 });
 
+describe('Sort with fields that may be NULL', function (): void {
+    it('marks nullable columns and relation fields, and lists their cursor parameters', function (): void {
+        $sort = Sort::fromArray(
+            ['-owner_name', 'score', 'rank'],
+            ['rank', 'score', 'owner_name'],
+            'id',
+            nullable: ['score'],
+            relations: ['owner_name' => 'owner.name'],
+        );
+
+        expect(array_map(fn (SortField $field): array => [$field->toString(), $field->isNullable(), $field->relation()], $sort->orders()))
+            ->toBe([
+                ['-owner_name', true, 'owner.name'],
+                ['score', true, null],
+                ['rank', false, null],
+                ['id', false, null],
+            ])
+            ->and($sort->cursorParameters())->toBe(['owner_name', 'score', 'rank', 'id'])
+            ->and($sort->nullableCursorParameters())->toBe(['owner_name', 'score']);
+    });
+
+    it('ends the order only at a unique field that never holds NULL', function (): void {
+        $sort = Sort::fromArray(['email', 'code'], ['email', 'code'], 'id', unique: ['email', 'code'], nullable: ['email']);
+
+        expect(sortOrders($sort))->toBe(['email', 'code']);
+    });
+
+    it('never ends the order at a relation field declared unique', function (): void {
+        $sort = Sort::fromArray(['owner_name'], ['owner_name'], 'id', unique: ['owner_name'], relations: ['owner_name' => 'owner.name']);
+
+        expect(sortOrders($sort))->toBe(['owner_name', 'id']);
+    });
+
+    it('rejects a relation field that is not a relation and a column of it, requested or not', function (string $path): void {
+        expect(fn () => Sort::fromArray(['rank'], ['rank', 'x'], 'id', relations: ['x' => $path]))
+            ->toThrow(RelationNotSortable::class, "Sort field \"x\": \"{$path}\" must be a relation of the list model and a column of it, as in \"profile.personnel_number\".");
+    })->with([
+        'no column' => ['owner'],
+        'a nested relation' => ['owner.team.name'],
+        'no relation' => ['.name'],
+        'an empty column' => ['owner.'],
+    ]);
+
+    it('applies only an order whose fields never hold NULL', function (): void {
+        $query = SortTestItemModel::query();
+
+        Sort::fromArray(['-rank'], ['rank', 'score'], 'id', nullable: ['score'])->apply($query);
+
+        expect(fn () => Sort::fromArray(['score'], ['score'], 'id', nullable: ['score'])->apply($query))
+            ->toThrow(SortNotApplicable::class, 'The sort by "score" may be NULL: page it with Sort::paginate(), not with apply() and cursorPaginate().');
+    });
+});
+
 describe('SortField', function (): void {
     it('prints itself as a client requests it', function (): void {
         expect((new SortField('rank'))->toString())->toBe('rank')
             ->and((new SortField('rank', SortDirection::Descending))->toString())->toBe('-rank');
+    });
+
+    it('is nullable as a nullable column or a relation field', function (): void {
+        expect((new SortField('rank'))->isNullable())->toBeFalse()
+            ->and((new SortField('score', nullable: true))->isNullable())->toBeTrue()
+            ->and((new SortField('owner_name', relation: 'owner.name'))->isNullable())->toBeTrue();
+    });
+
+    it('reverses its direction and keeps the rest', function (): void {
+        $reversed = (new SortField('owner_name', SortDirection::Descending, relation: 'owner.name'))->reversed();
+
+        expect([$reversed->toString(), $reversed->isNullable(), $reversed->relation()])->toBe(['owner_name', true, 'owner.name'])
+            ->and((new SortField('rank'))->reversed()->toString())->toBe('-rank');
     });
 });

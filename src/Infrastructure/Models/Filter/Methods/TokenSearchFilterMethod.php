@@ -13,10 +13,9 @@ use Illuminate\Database\Eloquent\Relations\HasOneOrMany;
 use Illuminate\Database\Eloquent\Relations\MorphOneOrMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Database\Query\JoinClause;
 use IndexZer0\EloquentFiltering\Filter\Contracts\FilterMethod;
 use IndexZer0\EloquentFiltering\Filter\Traits\FilterMethod\FilterContext\CustomFilter;
+use Lava83\LaravelDdd\Infrastructure\Models\CrossDatabaseTables;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Enums\SearchMode;
 use Lava83\LaravelDdd\Infrastructure\Models\Filter\Methods\Exceptions\RelationNotSearchable;
 
@@ -145,16 +144,14 @@ abstract class TokenSearchFilterMethod implements FilterMethod
         $model = $query->getModel();
         $relation = $model->isRelation($name) ? Relation::noConstraints(fn (): mixed => $model->{$name}()) : null;
 
-        // getName() resolves the default connection; getConnectionName() would be null for it.
-        $connection = $model->getConnection();
-
         // An unknown relation goes to whereHas() as well, which reports it.
-        if (! $relation instanceof Relation || $relation->getRelated()->getConnection()->getName() === $connection->getName()) {
+        if (! $relation instanceof Relation || ! CrossDatabaseTables::onOtherConnection($model, $relation->getRelated())) {
             $query->orWhereHas($path, $constraint);
 
             return;
         }
 
+        $connection = $model->getConnection();
         $relatedConnection = $relation->getRelated()->getConnection();
         [$key, $relatedKey] = self::keys($relation, $name, $model, (string) $connection->getName(), (string) $relatedConnection->getName());
         $related = $relation->getQuery();
@@ -166,7 +163,7 @@ abstract class TokenSearchFilterMethod implements FilterMethod
         }
 
         $subquery = $related->toBase()->select($relatedKey);
-        self::qualifyTables($subquery, $connection->getDatabaseName());
+        CrossDatabaseTables::qualify($subquery, $connection->getDatabaseName());
 
         $query->orWhereIn($key, $subquery);
     }
@@ -196,45 +193,6 @@ abstract class TokenSearchFilterMethod implements FilterMethod
         }
 
         throw RelationNotSearchable::unsupportedOnOtherConnection($name, get_debug_type($relation), $model::class, $connection, $relatedConnection);
-    }
-
-    /**
-     * Prefixes the table and the joined tables of the query, and of every
-     * subquery in its where clauses (`whereHas()`, nested wheres), with their
-     * database name where it is not the list's.
-     *
-     * SQL that is a string already, a raw where or a `whereIn` subquery in a
-     * scope of the related model, is out of reach.
-     */
-    private static function qualifyTables(QueryBuilder $query, string $listDatabase): void
-    {
-        $database = $query->getConnection()->getDatabaseName();
-
-        if ($database !== $listDatabase) {
-            if (is_string($query->from)) {
-                $query->from = self::qualifyTable($query->from, $database);
-            }
-
-            foreach ($query->joins ?? [] as $join) {
-                if ($join instanceof JoinClause && is_string($join->table)) {
-                    $join->table = self::qualifyTable($join->table, $database);
-                }
-            }
-        }
-
-        foreach ($query->wheres as $where) {
-            if (($where['query'] ?? null) instanceof QueryBuilder) {
-                self::qualifyTables($where['query'], $listDatabase);
-            }
-        }
-    }
-
-    /**
-     * A table that names its database (or schema) already is left alone.
-     */
-    private static function qualifyTable(string $table, string $database): string
-    {
-        return str_contains($table, '.') ? $table : $database.'.'.$table;
     }
 
     /**
