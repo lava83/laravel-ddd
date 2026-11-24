@@ -2,6 +2,54 @@
 
 All notable changes to `laravel-ddd` will be documented in this file.
 
+## v1.7.0 - 2026-11-24
+
+This release lets a list sort by columns that hold NULL and by a column of a to-one relation, also on another connection of the same database server. Lists that sort only by NOT NULL columns of the list model are unchanged.
+
+### Added
+
+- **Sort by columns that hold NULL (#72, #73).** `AcceptsSort::nullableSortableFields()` (new, default `[]`) declares the sortable columns that may hold NULL.
+  - NULL sorts as the greatest value: last ascending, first descending.
+  - The read query pages with `$sort->paginate($query, $perPage)` instead of `$sort->apply($query)->cursorPaginate($perPage)`. `paginate()` builds the cursor constraint itself and walks every row exactly once in both directions, also when NULL rows span a page border.
+  - `apply()` throws the new `Sort\Exceptions\SortNotApplicable` for an order with a field that may be NULL, because Laravel's `cursorPaginate()` would silently skip the NULL rows.
+  - The cursor carries NULL for a nullable field. `ValidCursor` takes the nullable parameters as an optional second argument, and `PaginatesByCursor` passes them. NULL for any other parameter is still a 422.
+  - A unique field that may hold NULL no longer ends the order, so the key follows it.
+  
+- **Sort by a column of a to-one relation (#72, #73).** `AcceptsSort::relationSortableFields()` (new, default `[]`) maps a public name to `relation.column`, e.g. `['personnel_number' => 'profile.personnel_number']`. The name is listed in `sortableFields()` too. Clients send the name, never the path.
+  - Supported are `BelongsTo` and `HasOne`. The value is a correlated subquery, `(SELECT MIN(column) FROM related WHERE <relation>)`, built as Laravel's `withMin()` builds it.
+  - The constraints of the relation method and the global scopes of the related model apply, so a soft-deleted row counts as missing.
+  - A list row without a related row sorts as NULL, so every relation field pages with `paginate()`.
+  - A `HasOne` with several matching rows takes the smallest value and duplicates no list row.
+  - The list keeps its own columns, `whereHas()` on the same relation and eager loads are untouched, and facet counts never see the sort.
+  - **Another connection:** the related model may live on another connection of the same server, readable through the list's connection, which in practice means MySQL or MariaDB. A one-of-many `HasOne` works only on the list's connection.
+  
+- **`Sort\Exceptions\RelationNotSortable`** (new, `LogicException`):
+  - A declared path that is not `relation.column` throws when the sort is built. `AcceptsSort` builds the sort on every request, so a wrong path fails on the first one.
+  - An unknown relation, a relation that is not a `BelongsTo` or `HasOne` (`HasMany`, `BelongsToMany`, `MorphTo`, …), or a one-of-many `HasOne` on another connection throws when the list is sorted by the field.
+  
+- **`Pagination\SortedCursorPaginator`** (new) is the page of `Sort::paginate()`, and `ReadModelCursorPaginator::fromPage()` takes it as before.
+  - It throws `CursorValueIsNull` for a nullable sort column that the list query did not select. A model would read that column as NULL and the cursor would skip rows.
+  
+- **Select aliases in the cursor.** A sort field that is an alias of the select, such as a `withCount()` column, is compared by its expression in the cursor constraint, as Laravel does. MySQL, MariaDB and PostgreSQL take no alias in `WHERE`.
+- `Sort::fromArray()` takes the optional `$nullable` and `$relations`, and `Sort::nullableCursorParameters()` is new. `SortField` takes an optional `$nullable` and `$relation` and has `isNullable()`, `relation()` and `reversed()`.
+
+### Limits
+
+- SQL Server takes no alias inside an `ORDER BY` expression, so relation fields do not work there.
+- An aliased expression with bindings, e.g. a `withCount()` with a bound constraint, cannot be sorted by. This is Laravel's own limit.
+- A relation field runs its subquery per row read, in the select and again in the cursor constraint. A `HasOne` wants an index on its foreign key, the column and the constraint columns.
+- On MySQL and MariaDB, the NULL-last order of a nullable column cannot come from an index on that column.
+
+### Upgrade notes
+
+- No action required. Lists that sort only by NOT NULL columns of the list model keep `apply()` and `cursorPaginate()` and behave as before.
+- `ReadModelCursorPaginator` now extends `SortedCursorPaginator`. For a plain Laravel page nothing changes: every NULL cursor value still throws `CursorValueIsNull`.
+- The message of `CursorValueIsNull::forParameter()` changed. It now says to declare the column nullable and page with `Sort::paginate()`. Tests that assert the exact text have to be updated.
+- A form request that already defines its own `nullableSortableFields()` or `relationSortableFields()` conflicts with the new methods of `AcceptsSort` and has to rename them.
+- No config changes, no new dependency.
+
+**Full Changelog**: https://github.com/lava83/laravel-ddd/compare/v1.6.0...v1.7.0
+
 ## v1.6.0 - 2026-11-23
 
 This release makes saving an aggregate whose row was deleted fail instead of inserting a copy. It also extends the read side: a facet can drop its own custom filter and count an SQL expression, and the token search reaches relations on another connection of the same database server.
@@ -21,15 +69,19 @@ This release makes saving an aggregate whose row was deleted fail instead of ins
 ### Added
 
 - **A facet can drop its own custom filter by type (#66, #68).** `FacetDefinition::column()` and `relation()` take an optional `$filterType`.
+  
   - While counting, a facet drops the requested filters on its target. With a filter type, it also drops the custom filters of that type, even when a client sends them without a target. Only the requested filters are reduced; the scope always applies in full.
   - A built-in operator as filter type throws `CustomFilterNotValid`.
   
 - **`Filter\Builder::withoutType(string ...$types)`** (new) returns a new builder without the custom filters of these types, whatever their target.
+  
 - **Facets over an SQL expression (#65, #69).** `FacetDefinition::expression($key, Expression $expression, $filterTarget, $filterType = null, array $bindings = [])` counts the rows of the list per value of an expression, e.g. a `CASE WHEN … END` over several columns.
+  
   - The expression is raw SQL. Build it in code, never from client input, and pass varying values as `?` placeholders with `$bindings`.
   - The new getters are `rawExpression()` and `bindings()`. `columnName()` throws a `LogicException` for an expression facet.
   
 - **Search through a relation on another connection (#64, #70).** In a `TokenSearchFilterMethod`, the first relation of a search column may now be a `BelongsTo`, `HasOne` or `HasMany` on another connection.
+  
   - The column is matched with `whereIn()` and a subquery in which every table carries its database name, nested relations and pivot tables included.
   - The related models keep their global scopes, so soft deletes still apply.
   - Other relation types on another connection throw the new `RelationNotSearchable`.
@@ -152,6 +204,7 @@ protected function uniqueSortableFields(): array
 
 
 
+
 ```
 ### Changed
 
@@ -209,6 +262,7 @@ final class ListUsersRequest extends FormRequest
     protected function searchFilterType(): string { return UserSearchFilter::type(); }
     protected function facetEnum(): string { return UserFacet::class; }
 }
+
 
 
 
@@ -278,6 +332,7 @@ $facets->first()->toArray();
 
 
 
+
 ```
 - `FacetDefinition::column()` counts the rows per value of a column of the list model. `FacetDefinition::relation()` counts the distinct rows per value of a column of a `HasMany` or `BelongsToMany` relation on the same connection.
 - Each facet keeps the whole scope and every requested filter except its own. Pass the scope and the client's filters separately: the scope is never reduced.
@@ -302,6 +357,7 @@ final class B2cUserSearchFilter extends TokenSearchFilterMethod
         return ['email', 'data.firstname', 'data.lastname'];
     }
 }
+
 
 
 
@@ -340,6 +396,7 @@ $counter = Counter::create('one');      // records CounterCreated with id 0
 $repository->save($counter);
 
 // Listeners now receive CounterCreated with aggregateId() === $counter->id(), e.g. 1
+
 
 
 
@@ -399,6 +456,7 @@ final class Title extends ValueObject
         return [];
     }
 }
+
 
 
 
@@ -521,6 +579,7 @@ return $pages->fromResponse(
 
 
 
+
 ```
 - **`RelayedCursorPaginator`:** a `CursorPaginator` subclass built from items, page size and the `next` / `prev` tokens of the neighbouring pages. Nothing is derived from the items, so read models need no sort column. `Resource::collection($page)` produces `data`, `links` and `meta` as usual, with your own URLs.
 - **`RelayedCursor`:** keeps the token exactly as received. Laravel's `Cursor::encode()` rebuilds a token from decoded parameters, which is not guaranteed to give the same string back.
@@ -555,6 +614,7 @@ return ReadModelCursorPaginator::fromPage(
     $this->baseQuery($filter)->orderBy('account_id')->cursorPaginate($perPage),
     fn (AccountModel $m) => AccountReadModelMapper::fromAccountModel($m),
 );
+
 
 
 
@@ -640,6 +700,7 @@ public function validate(): array
 
 
 
+
 ```
 `isValid()` is unchanged (`validate() === []`).
 
@@ -662,6 +723,7 @@ $exceptions->render(function (DomainValidationException $e) {
         ? null
         : throw LaravelValidationException::withMessages($e->errors());
 });
+
 
 
 
@@ -832,6 +894,7 @@ php artisan make:aggregate Order OrderProcessing \
 
 
 
+
 ```
 The generated files are skeletons: the model and mapper carry a `name` placeholder, and the aggregate's `validate()` and the mapper's `toModel()` are left for you to fill in.
 
@@ -865,6 +928,7 @@ $filters = $defaults->merge($incoming);
 
 // Opt in to replacement — only for trusted filter sources.
 $filters = $defaults->merge($incoming, MergeStrategy::Override);
+
 
 
 
@@ -931,6 +995,7 @@ final class ArticleMapper extends BaseMapper implements EntityMapper
         ]);
     }
 }
+
 
 
 

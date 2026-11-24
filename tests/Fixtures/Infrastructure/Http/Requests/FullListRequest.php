@@ -48,7 +48,12 @@ final class FullListRequest extends FormRequest
 
     protected function sortableFields(): array
     {
-        return ['rank', 'name', 'happened_at'];
+        return ['rank', 'name', 'happened_at', 'owner_name'];
+    }
+
+    protected function relationSortableFields(): array
+    {
+        return ['owner_name' => 'owner.name'];
     }
 
     protected function searchFilterType(): string

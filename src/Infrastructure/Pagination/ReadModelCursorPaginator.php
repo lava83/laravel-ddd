@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Support\Collection;
+use Lava83\LaravelDdd\Infrastructure\Models\Sort\Sort;
 use Lava83\LaravelDdd\Infrastructure\Pagination\Exceptions\CursorValueIsNull;
 use WeakMap;
 
@@ -21,14 +22,15 @@ use WeakMap;
  * source model, and the cursor parameters are read from there.
  *
  * A cursor value of NULL fails with {@see CursorValueIsNull} instead of
- * producing a cursor that skips or repeats rows.
+ * producing a cursor that skips or repeats rows, unless the page comes from
+ * {@see Sort::paginate()} and the sort declares the field nullable.
  *
  * @template TModel of Model
  * @template TReadModel of object
  *
- * @extends CursorPaginator<int, TReadModel>
+ * @extends SortedCursorPaginator<int, TReadModel>
  */
-class ReadModelCursorPaginator extends CursorPaginator
+class ReadModelCursorPaginator extends SortedCursorPaginator
 {
     /** @var WeakMap<object, TModel>|null */
     private ?WeakMap $sources = null;
@@ -83,7 +85,7 @@ class ReadModelCursorPaginator extends CursorPaginator
      * @param  mixed  $item
      * @return array<string, mixed>
      *
-     * @throws CursorValueIsNull an order column of the item holds NULL
+     * @throws CursorValueIsNull an order column of the item holds NULL, and the sort does not declare it nullable
      */
     public function getParametersForItem($item)
     {
@@ -91,15 +93,7 @@ class ReadModelCursorPaginator extends CursorPaginator
 
         $source = is_object($key) ? ($this->sources()[$key] ?? null) : null;
 
-        $parameters = parent::getParametersForItem($source ?? $item);
-
-        foreach ($parameters as $parameter => $value) {
-            if ($value === null) {
-                throw CursorValueIsNull::forParameter($parameter);
-            }
-        }
-
-        return $parameters;
+        return parent::getParametersForItem($source ?? $item);
     }
 
     /**
